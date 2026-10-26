@@ -61,5 +61,5 @@ pytest
 - When the task is done, open a pull request into `dev`. Another member reviews and approves it, then it is merged and the branch is deleted.
 
 ## Licence
-- GNU General Public License version 3.0
+- *GNU General Public License version 3.0*<br/>
 We chose GPL-3.0 because it prevents commercial exploitation of our work. It forces anyone who benefits from or modifies our software to share their source code openly under the exact same terms, protecting our community's collective contribution from being hidden away in closed-source software.
