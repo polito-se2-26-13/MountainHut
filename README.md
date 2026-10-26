@@ -59,3 +59,7 @@ pytest
 - Every task gets its own short branch, created from an up to date `dev` and named after its YouTrack card: `OQM-<number>-<short-description>`, for example `OQM-15-post-tickets`.
 - Commit messages start with the card ID too, for example `OQM-15 add POST /tickets`.
 - When the task is done, open a pull request into `dev`. Another member reviews and approves it, then it is merged and the branch is deleted.
+
+## Licence
+- GNU General Public License version 3.0
+We chose GPL-3.0 because it prevents commercial exploitation of our work. It forces anyone who benefits from or modifies our software to share their source code openly under the exact same terms, protecting our community's collective contribution from being hidden away in closed-source software.
