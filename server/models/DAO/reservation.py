@@ -20,7 +20,7 @@ from server.const import ReservationStatus
 
 def generate_booking_reference() -> str:
     """Generate a readable, unique booking reference code (MH-03)."""
-    return f"MH-{datetime.utcnow().strftime('%Y%m%d')}-{uuid.uuid4().hex[:6].upper()}"
+    return f"MH-{datetime.now().strftime('%Y%m%d')}-{uuid.uuid4().hex[:6].upper()}"
 
 
 class ReservationDAO(Base):
