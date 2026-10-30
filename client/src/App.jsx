@@ -5,6 +5,7 @@ import RegisterPage from './pages/RegisterPage.jsx'
 import LoginPage from './pages/LoginPage.jsx'
 import RoleHomePage from './pages/RoleHomePage.jsx'
 import { AuthProvider } from './auth/AuthContext.jsx'
+import EmployeeSlotConfigPage from './pages/EmployeeSlotConfigPage.jsx'
 import './App.css'
 
 function App() {
@@ -16,6 +17,7 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/home/:role" element={<RoleHomePage />} />
+          <Route path="/employee/slots" element={<EmployeeSlotConfigPage />} />
           <Route path="/404" element={<NotFoundPage />} />
           <Route path="*" element={<Navigate to="/404" replace />} />
         </Routes>
