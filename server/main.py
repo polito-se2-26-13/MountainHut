@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from server.config.config import ORIGIN
 from server.database import Base, engine, SessionLocal
 import server.models.DAO  # noqa: F401 - registers models with Base.metadata
+from server.routes import reservation_router
 
 # create all tables on startup if they don't exist
 Base.metadata.create_all(bind=engine)
@@ -17,6 +18,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(reservation_router)
 
 
 @app.get("/api/health")
