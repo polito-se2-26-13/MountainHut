@@ -1,4 +1,5 @@
-"""Core Booking and Capacity Deduction Service (MH-44)."""
+"""Core Booking, Table Splitting, and Two-Hour Rule Service (MH-44 & MH-42)."""
+from datetime import datetime, timedelta
 from typing import List, Optional, Tuple
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
@@ -8,6 +9,24 @@ from server.models.DAO.user import UserDAO
 from server.models.DAO.time_slot import TimeSlotDAO, SlotTableDAO
 from server.models.DAO.reservation import ReservationDAO, ReservationTableAssignmentDAO
 from server.models.DTO.reservation_dto import ReservationCreate
+
+
+def validate_two_hour_rule(
+    slot: TimeSlotDAO, current_time: Optional[datetime] = None
+) -> None:
+    """
+    Validate MH-01 / MH-42 constraint:
+    A hiker can reserve a seat up to 2 hours before the due time.
+    """
+    now = current_time or datetime.now()
+    slot_datetime = datetime.combine(slot.date, slot.start_time)
+    cutoff = slot_datetime - timedelta(hours=2)
+
+    if now > cutoff:
+        raise ValueError(
+            f"Reservations must be made at least 2 hours before the time slot. "
+            f"Cutoff was {cutoff.strftime('%Y-%m-%d %H:%M')}, current time is {now.strftime('%Y-%m-%d %H:%M')}."
+        )
 
 
 def get_slot_availability(db: Session, slot_id: int) -> dict:
@@ -52,9 +71,15 @@ def assign_tables_for_party(
     slot: TimeSlotDAO, party_size: int
 ) -> List[Tuple[SlotTableDAO, int]]:
     """
-    Allocate seats across available tables for the party.
-    Tries single-table fit first (smallest table that fits).
-    If no single table has enough seats, allocates across multiple tables.
+    Allocate seats across available tables for the party (MH-01 & MH-42).
+
+    Rules:
+    1. Keep party together as far as possible: try to seat the whole party at
+       one table, possibly sharing it with other parties, occupying the smallest
+       available set of seats on a table.
+    2. Split the party only when no single table has enough free seats.
+       When splitting, use as few tables as possible, occupying the smallest
+       available set of seats on a table.
     """
     # Active tables for this slot with at least 1 free seat
     available_tables = [
@@ -64,19 +89,26 @@ def assign_tables_for_party(
     if not available_tables:
         raise ValueError("No available tables configured for this time slot.")
 
-    # 1. Single-table attempt: smallest table where free_seats >= party_size
+    # 1. Single table attempt (Keep party together):
     single_fits = [st for st in available_tables if st.free_seats >= party_size]
     if single_fits:
-        # Best-fit: choose the table with the smallest free capacity >= party_size
-        chosen = min(single_fits, key=lambda st: st.free_seats)
+        # Best-fit: pick the table with the smallest free capacity >= party_size
+        chosen = min(
+            single_fits,
+            key=lambda st: (st.free_seats, st.table.capacity if st.table else 0),
+        )
         return [(chosen, party_size)]
 
-    # 2. Multi-table attempt: allocate across tables
-    assignments = []
-    remaining = party_size
+    # 2. Split party across tables (only when no single table can fit party):
+    # Sort descending by free seats to minimize number of tables used
+    sorted_tables = sorted(
+        available_tables,
+        key=lambda st: (st.free_seats, -(st.table.capacity if st.table else 0)),
+        reverse=True,
+    )
 
-    # Sort descending by free seats to use as few tables as possible
-    sorted_tables = sorted(available_tables, key=lambda st: st.free_seats, reverse=True)
+    assignments: List[Tuple[SlotTableDAO, int]] = []
+    remaining = party_size
 
     for st in sorted_tables:
         if remaining <= 0:
@@ -93,10 +125,15 @@ def assign_tables_for_party(
     return assignments
 
 
-def create_reservation(db: Session, data: ReservationCreate) -> ReservationDAO:
+def create_reservation(
+    db: Session,
+    data: ReservationCreate,
+    current_time: Optional[datetime] = None,
+) -> ReservationDAO:
     """
-    Create a new table reservation and deduct capacity (MH-44).
-    Validates user, slot status, hiker uniqueness per slot, and available capacity.
+    Create a new table reservation and deduct capacity.
+    Enforces user existence, slot status, 2-hour rule (MH-42),
+    one-booking rule (MH-01), capacity check, and table assignment.
     """
     # 1. Validate User
     hiker = db.query(UserDAO).filter(UserDAO.id == data.user_id).first()
@@ -111,7 +148,10 @@ def create_reservation(db: Session, data: ReservationCreate) -> ReservationDAO:
     if slot.status != SlotStatus.OPEN.value:
         raise ValueError(f"Time slot is {slot.status} and cannot accept reservations.")
 
-    # 3. Check rule: Only one booking per time slot on a date per hiker
+    # 3. Validate Two-Hour Cutoff Rule (MH-42)
+    validate_two_hour_rule(slot, current_time=current_time)
+
+    # 4. Check rule: Only one booking per time slot on a date per hiker
     existing_booking = (
         db.query(ReservationDAO)
         .filter(
@@ -124,16 +164,16 @@ def create_reservation(db: Session, data: ReservationCreate) -> ReservationDAO:
     if existing_booking:
         raise ValueError("Hiker already has a confirmed booking for this time slot.")
 
-    # 4. Check available capacity (Capacity Deduction constraint)
+    # 5. Check available capacity (Capacity Deduction constraint)
     if data.party_size > slot.remaining_seats:
         raise ValueError(
             f"Not enough seats available (requested {data.party_size}, remaining {slot.remaining_seats})."
         )
 
-    # 5. Determine table assignments
+    # 6. Determine table assignments (single table fit or split across tables)
     table_allocations = assign_tables_for_party(slot, data.party_size)
 
-    # 6. Create Reservation record
+    # 7. Create Reservation record
     reservation = ReservationDAO(
         user_id=data.user_id,
         slot_id=data.slot_id,
@@ -145,9 +185,9 @@ def create_reservation(db: Session, data: ReservationCreate) -> ReservationDAO:
         status=ReservationStatus.CONFIRMED.value,
     )
     db.add(reservation)
-    db.flush()  # Generate reservation.id for foreign keys
+    db.flush()
 
-    # 7. Create Table Assignments
+    # 8. Create Table Assignments
     for slot_table, seats in table_allocations:
         assignment = ReservationTableAssignmentDAO(
             reservation_id=reservation.id,
