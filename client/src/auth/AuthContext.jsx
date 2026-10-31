@@ -4,12 +4,23 @@ import { createContext, useContext, useMemo, useState } from 'react'
 const AuthContext = createContext(null)
 const STORAGE_KEY = 'mountainhut.auth'
 
+const DEV_MOCK_SESSION = {
+  isAuthenticated: true,
+  token: 'mock-dev-jwt-token',
+  userProfile: {
+    id: 'dev-user-001',
+    email: 'dev@mountainhut.com',
+    fullName: 'Dev User',
+    role: 'Employee',
+  },
+}
+
 function readStoredSession() {
   try {
     const stored = localStorage.getItem(STORAGE_KEY)
-    return stored ? JSON.parse(stored) : null
+    return stored ? JSON.parse(stored) : DEV_MOCK_SESSION
   } catch {
-    return null
+    return DEV_MOCK_SESSION
   }
 }
 

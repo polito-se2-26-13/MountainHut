@@ -22,6 +22,7 @@ function RoleHomePage() {
       <h1>{role} home</h1>
       <p>Welcome, {session.userProfile.fullName || session.userProfile.email}.</p>
       <p>You are signed in as a {role}.</p>
+      {role === 'Employee' && <Link to="/employee/slots">Configure service slots and tables</Link>}
       <Link to="/">Back to the MountainHut home page</Link>
     </main>
   )
