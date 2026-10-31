@@ -46,7 +46,7 @@ JSON response:
 ```
 **login**
 
-name: `/api/counters/{id_counter}/next-customer`<br>
+name: `/api/auth/login`<br>
 parameter: -<br>
 body:
 ```json
