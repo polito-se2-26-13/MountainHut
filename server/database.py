@@ -1,18 +1,39 @@
-"""Database connection shared by the whole backend (SQLite file next to this module)."""
+"""Database connection shared by the whole backend (Async SQLite with aiosqlite)."""
 from pathlib import Path
+from typing import AsyncGenerator
 
-from sqlalchemy import create_engine, event
+from sqlalchemy import event
 from sqlalchemy.engine import Engine
-from sqlalchemy.orm import DeclarativeBase, sessionmaker
+from sqlalchemy.ext.asyncio import (
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
+from sqlalchemy.orm import DeclarativeBase
 
-DATABASE_URL = f"sqlite:///{Path(__file__).parent / 'mountainHut.sqlite'}"
+DB_PATH = Path(__file__).parent / "mountainHut.sqlite"
+DATABASE_URL = f"sqlite+aiosqlite:///{DB_PATH}"
 
-# check_same_thread=False lets FastAPI use the connection from its worker threads
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
-SessionLocal = sessionmaker(bind=engine)
+# Async engine with SQLite pragma support
+engine = create_async_engine(
+    DATABASE_URL,
+    connect_args={"check_same_thread": False},
+    echo=False,
+)
+
+AsyncSessionLocal = async_sessionmaker(
+    bind=engine,
+    class_=AsyncSession,
+    expire_on_commit=False,
+    autocommit=False,
+    autoflush=False,
+)
+
+# For backward compatibility with scripts
+SessionLocal = AsyncSessionLocal
 
 
-@event.listens_for(Engine, "connect")
+@event.listens_for(engine.sync_engine, "connect")
 def set_sqlite_pragma(dbapi_connection, connection_record):
     """Enable foreign key constraints in SQLite."""
     cursor = dbapi_connection.cursor()
@@ -21,32 +42,33 @@ def set_sqlite_pragma(dbapi_connection, connection_record):
 
 
 class Base(DeclarativeBase):
-    """Parent class of every table defined in models.py."""
+    """Parent class of every table defined in models."""
 
 
-def get_db():
-    """FastAPI dependency: gives each request its own session and closes it at the end."""
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
+    """FastAPI async dependency: yields an AsyncSession and closes it at end of request."""
+    async with AsyncSessionLocal() as session:
+        try:
+            yield session
+        finally:
+            await session.close()
 
 
-def init_db():
-    """Create all registered tables."""
-    # Import all models to ensure they are registered with Base
+async def init_db():
+    """Create all registered tables asynchronously."""
     import server.models.DAO  # noqa: F401
-    Base.metadata.create_all(bind=engine)
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
 
 
-def drop_db():
-    """Drop all tables."""
+async def drop_db():
+    """Drop all tables asynchronously."""
     import server.models.DAO  # noqa: F401
-    Base.metadata.drop_all(bind=engine)
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
 
 
-def reset_db():
+async def reset_db():
     """Drop and recreate all tables."""
-    drop_db()
-    init_db()
+    await drop_db()
+    await init_db()

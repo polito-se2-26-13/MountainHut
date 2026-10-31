@@ -1,0 +1,309 @@
+-- ====================================================================
+-- MountainHut Database DDL & Seed Script (SQLite)
+-- Corresponds to context.md, stories.md (MH-01, MH-02, MH-03)
+-- ====================================================================
+
+PRAGMA foreign_keys = ON;
+
+-- ====================================================================
+-- 1. DDL: TABLES, INDEXES & CONSTRAINTS
+-- ====================================================================
+
+-- Migrations tracking table
+CREATE TABLE IF NOT EXISTS schema_migrations (
+    version VARCHAR(100) PRIMARY KEY,
+    applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Hut Profile & Information (context.md)
+CREATE TABLE IF NOT EXISTS hut_info (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name VARCHAR(150) NOT NULL,
+    description TEXT,
+    location VARCHAR(255),
+    altitude_m INTEGER,
+    how_to_reach TEXT,
+    points_of_interest TEXT,
+    contact_email VARCHAR(255),
+    contact_phone VARCHAR(50),
+    has_ebike_charging BOOLEAN NOT NULL DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Users: Hikers, Employees, Wardens / Managers (context.md)
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email VARCHAR(255) NOT NULL UNIQUE,
+    password_hash VARCHAR(255) NOT NULL,
+    first_name VARCHAR(100) NOT NULL,
+    last_name VARCHAR(100) NOT NULL,
+    phone VARCHAR(50),
+    role VARCHAR(50) NOT NULL DEFAULT 'Hiker',
+    notes TEXT,
+    emergency_contact VARCHAR(255),
+    is_active BOOLEAN NOT NULL DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT chk_user_role CHECK (role IN ('Hiker', 'Employee', 'Warden', 'Manager'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
+
+-- Hut Dining Tables (MH-01 & MH-02)
+CREATE TABLE IF NOT EXISTS tables (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    table_number VARCHAR(50) NOT NULL UNIQUE,
+    capacity INTEGER NOT NULL CHECK (capacity > 0),
+    location VARCHAR(100),
+    is_active BOOLEAN NOT NULL DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_tables_table_number ON tables(table_number);
+
+-- Meal Time Slots (MH-01 & MH-02)
+CREATE TABLE IF NOT EXISTS time_slots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    date DATE NOT NULL,
+    start_time TIME NOT NULL,
+    end_time TIME NOT NULL,
+    meal_type VARCHAR(50),
+    status VARCHAR(20) NOT NULL DEFAULT 'OPEN',
+    notes VARCHAR(255),
+    created_by_id INTEGER,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_slots_creator FOREIGN KEY (created_by_id) REFERENCES users(id) ON DELETE SET NULL,
+    CONSTRAINT chk_slot_status CHECK (status IN ('OPEN', 'CLOSED', 'CANCELLED'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_time_slots_date ON time_slots(date);
+CREATE INDEX IF NOT EXISTS idx_time_slots_status ON time_slots(status);
+
+-- Slot Table Capacity (MH-02)
+CREATE TABLE IF NOT EXISTS slot_tables (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    slot_id INTEGER NOT NULL,
+    table_id INTEGER NOT NULL,
+    available_seats INTEGER NOT NULL CHECK (available_seats >= 0),
+    is_available BOOLEAN NOT NULL DEFAULT 1,
+    CONSTRAINT fk_slot_tables_slot FOREIGN KEY (slot_id) REFERENCES time_slots(id) ON DELETE CASCADE,
+    CONSTRAINT fk_slot_tables_table FOREIGN KEY (table_id) REFERENCES tables(id) ON DELETE CASCADE,
+    CONSTRAINT uq_slot_table UNIQUE (slot_id, table_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_slot_tables_slot_id ON slot_tables(slot_id);
+CREATE INDEX IF NOT EXISTS idx_slot_tables_table_id ON slot_tables(table_id);
+
+-- Reservations (MH-01 & MH-03)
+CREATE TABLE IF NOT EXISTS reservations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    booking_reference VARCHAR(32) NOT NULL UNIQUE,
+    user_id INTEGER NOT NULL,
+    slot_id INTEGER NOT NULL,
+    party_size INTEGER NOT NULL CHECK (party_size > 0),
+    special_requirements TEXT,
+    contact_name VARCHAR(200) NOT NULL,
+    contact_email VARCHAR(255) NOT NULL,
+    contact_phone VARCHAR(50),
+    status VARCHAR(20) NOT NULL DEFAULT 'CONFIRMED',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_res_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    CONSTRAINT fk_res_slot FOREIGN KEY (slot_id) REFERENCES time_slots(id) ON DELETE CASCADE,
+    CONSTRAINT uq_user_slot_reservation UNIQUE (user_id, slot_id),
+    CONSTRAINT chk_res_status CHECK (status IN ('CONFIRMED', 'CANCELLED', 'COMPLETED', 'NO_SHOW'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_reservations_booking_ref ON reservations(booking_reference);
+CREATE INDEX IF NOT EXISTS idx_reservations_user_id ON reservations(user_id);
+CREATE INDEX IF NOT EXISTS idx_reservations_slot_id ON reservations(slot_id);
+
+-- Reservation Table Assignments (MH-01: Table sharing & splitting)
+CREATE TABLE IF NOT EXISTS reservation_table_assignments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    reservation_id INTEGER NOT NULL,
+    slot_table_id INTEGER NOT NULL,
+    assigned_seats INTEGER NOT NULL CHECK (assigned_seats > 0),
+    CONSTRAINT fk_rta_reservation FOREIGN KEY (reservation_id) REFERENCES reservations(id) ON DELETE CASCADE,
+    CONSTRAINT fk_rta_slot_table FOREIGN KEY (slot_table_id) REFERENCES slot_tables(id) ON DELETE CASCADE,
+    CONSTRAINT uq_reservation_slot_table UNIQUE (reservation_id, slot_table_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_rta_reservation_id ON reservation_table_assignments(reservation_id);
+CREATE INDEX IF NOT EXISTS idx_rta_slot_table_id ON reservation_table_assignments(slot_table_id);
+
+
+-- ====================================================================
+-- 2. DML: SEED DATA (Password for all users: Password123!)
+-- ====================================================================
+
+-- 1. Hut Profile
+INSERT OR IGNORE INTO hut_info (
+    id, name, description, location, altitude_m, how_to_reach, points_of_interest,
+    contact_email, contact_phone, has_ebike_charging
+) VALUES (
+    1,
+    'Rifugio Alpe Grande',
+    'Historic alpine hut situated at 2,150m, offering traditional mountain hospitality, warm meals, and panoramic views of the western Alps.',
+    'Valle d''Aosta / Piedmont Western Alps',
+    2150,
+    'Trail 3A from the valley parking (approx. 2.5 hours hike, 750m elevation gain), or military gravel track suitable for mountain bikes.',
+    'Monte Rosa viewpoint, Glacier tarn (45 min walk), Alpine botanical reserve.',
+    'info@rifugioalpegrande.it',
+    '+39 0125 987654',
+    1
+);
+
+-- 2. Users (Warden, Employee, Hikers)
+INSERT OR IGNORE INTO users (
+    id, email, password_hash, first_name, last_name, phone, role, notes, emergency_contact, is_active
+) VALUES 
+(
+    1,
+    'warden@mountainhut.com',
+    '600310da4c63aeecbc3b40cc3c96d085$76ab5fae1ca88c390c151a9a3a8a848d557f5ec4684c7d853d0caf3640506a6c',
+    'Marco',
+    'Rossi',
+    '+39 333 1112233',
+    'Warden',
+    'Hut Warden & Operations Lead',
+    'Elena Rossi (+39 333 9998877)',
+    1
+),
+(
+    2,
+    'employee@mountainhut.com',
+    '600310da4c63aeecbc3b40cc3c96d085$76ab5fae1ca88c390c151a9a3a8a848d557f5ec4684c7d853d0caf3640506a6c',
+    'Giulia',
+    'Bianchi',
+    '+39 333 4445566',
+    'Employee',
+    'Hut Staff & Service Coordinator',
+    'Davide Bianchi (+39 333 5556677)',
+    1
+),
+(
+    3,
+    'hiker1@example.com',
+    '600310da4c63aeecbc3b40cc3c96d085$76ab5fae1ca88c390c151a9a3a8a848d557f5ec4684c7d853d0caf3640506a6c',
+    'Alex',
+    'Smith',
+    '+39 340 1234567',
+    'Hiker',
+    'Registered mountain guide (UIAGM)',
+    'Sarah Smith (+39 340 9876543)',
+    1
+),
+(
+    4,
+    'hiker2@example.com',
+    '600310da4c63aeecbc3b40cc3c96d085$76ab5fae1ca88c390c151a9a3a8a848d557f5ec4684c7d853d0caf3640506a6c',
+    'Elena',
+    'Moretti',
+    '+39 349 2345678',
+    'Hiker',
+    'Frequent visitor, trail runner',
+    'Luca Moretti (+39 349 8765432)',
+    1
+),
+(
+    5,
+    'hiker3@example.com',
+    '600310da4c63aeecbc3b40cc3c96d085$76ab5fae1ca88c390c151a9a3a8a848d557f5ec4684c7d853d0caf3640506a6c',
+    'John',
+    'Doe',
+    '+39 348 3456789',
+    'Hiker',
+    'Travelling with family and hiking club',
+    'Mary Doe (+39 348 7654321)',
+    1
+);
+
+-- 3. Hut Tables
+INSERT OR IGNORE INTO tables (id, table_number, capacity, location, is_active) VALUES
+(1, 'T1', 6, 'Indoor Main Hall', 1),
+(2, 'T2', 4, 'Indoor Main Hall', 1),
+(3, 'T3', 8, 'Indoor Main Hall', 1),
+(4, 'T4', 4, 'Stube (Fireplace)', 1),
+(5, 'T5', 6, 'Terrace (Panoramic)', 1),
+(6, 'T6', 6, 'Terrace (Panoramic)', 1);
+
+-- 4. Meal Time Slots
+INSERT OR IGNORE INTO time_slots (id, date, start_time, end_time, meal_type, status, notes, created_by_id) VALUES
+(1, '2026-10-30', '12:00:00', '13:00:00', 'Lunch', 'OPEN', 'Lunch Service 1 - Sunny day seating active', 2),
+(2, '2026-10-30', '13:00:00', '14:00:00', 'Lunch', 'OPEN', 'Lunch Service 2 - Sunny day seating active', 2),
+(3, '2026-10-30', '19:00:00', '20:30:00', 'Dinner', 'OPEN', 'Dinner Service 1 - Indoor only', 2),
+(4, '2026-10-30', '20:30:00', '22:00:00', 'Dinner', 'OPEN', 'Dinner Service 2 - Indoor only', 2);
+
+-- 5. Slot Tables
+INSERT OR IGNORE INTO slot_tables (id, slot_id, table_id, available_seats, is_available) VALUES
+(1, 1, 1, 6, 1),
+(2, 1, 2, 4, 1),
+(3, 1, 3, 8, 1),
+(4, 1, 4, 4, 1),
+(5, 1, 5, 6, 1),
+(6, 1, 6, 6, 1),
+(7, 2, 1, 6, 1),
+(8, 2, 2, 4, 1),
+(9, 2, 3, 8, 1),
+(10, 2, 4, 4, 1),
+(11, 2, 5, 6, 1),
+(12, 2, 6, 6, 1),
+(13, 3, 1, 6, 1),
+(14, 3, 2, 4, 1),
+(15, 3, 3, 8, 1),
+(16, 3, 4, 4, 1);
+
+-- 6. Reservations
+INSERT OR IGNORE INTO reservations (
+    id, booking_reference, user_id, slot_id, party_size, special_requirements,
+    contact_name, contact_email, contact_phone, status
+) VALUES 
+(
+    1,
+    'MH-20261030-ALX01',
+    3,
+    1,
+    4,
+    '2 vegetarian meals, 1 gluten allergy',
+    'Alex Smith',
+    'hiker1@example.com',
+    '+39 340 1234567',
+    'CONFIRMED'
+),
+(
+    2,
+    'MH-20261030-ELN02',
+    4,
+    1,
+    2,
+    'High chair requested for toddler',
+    'Elena Moretti',
+    'hiker2@example.com',
+    '+39 349 2345678',
+    'CONFIRMED'
+),
+(
+    3,
+    'MH-20261030-JHN03',
+    5,
+    2,
+    10,
+    'Mountain hiking club group',
+    'John Doe',
+    'hiker3@example.com',
+    '+39 348 3456789',
+    'CONFIRMED'
+);
+
+-- 7. Reservation Table Assignments (Sharing T1, Splitting party across T3 & T2)
+INSERT OR IGNORE INTO reservation_table_assignments (id, reservation_id, slot_table_id, assigned_seats) VALUES
+(1, 1, 1, 4),
+(2, 2, 1, 2),
+(3, 3, 9, 8),
+(4, 3, 8, 2);
+

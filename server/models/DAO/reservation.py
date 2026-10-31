@@ -1,7 +1,7 @@
 """Reservation and Table Assignment database models (MH-01 & MH-03)."""
 import uuid
 from datetime import datetime
-from typing import Optional, List
+from typing import TYPE_CHECKING, Optional, List
 
 from sqlalchemy import (
     String,
@@ -16,6 +16,10 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from server.database import Base
 from server.const import ReservationStatus
+
+if TYPE_CHECKING:
+    from server.models.DAO.user import UserDAO
+    from server.models.DAO.time_slot import TimeSlotDAO, SlotTableDAO
 
 
 def generate_booking_reference() -> str:
@@ -58,13 +62,14 @@ class ReservationDAO(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
 
-    # Relationships
-    hiker: Mapped["UserDAO"] = relationship("UserDAO", back_populates="reservations")
-    slot: Mapped["TimeSlotDAO"] = relationship("TimeSlotDAO", back_populates="reservations")
+    # Relationships with eager selectin loading for async operations
+    hiker: Mapped["UserDAO"] = relationship("UserDAO", back_populates="reservations", lazy="selectin")
+    slot: Mapped["TimeSlotDAO"] = relationship("TimeSlotDAO", back_populates="reservations", lazy="selectin")
     table_assignments: Mapped[List["ReservationTableAssignmentDAO"]] = relationship(
         "ReservationTableAssignmentDAO",
         back_populates="reservation",
         cascade="all, delete-orphan",
+        lazy="selectin",
     )
 
     def to_confirmation_dict(self) -> dict:
@@ -127,12 +132,12 @@ class ReservationTableAssignmentDAO(Base):
     )
     assigned_seats: Mapped[int] = mapped_column(Integer, nullable=False)
 
-    # Relationships
+    # Relationships with eager selectin loading for async operations
     reservation: Mapped["ReservationDAO"] = relationship(
-        "ReservationDAO", back_populates="table_assignments"
+        "ReservationDAO", back_populates="table_assignments", lazy="selectin"
     )
     slot_table: Mapped["SlotTableDAO"] = relationship(
-        "SlotTableDAO", back_populates="assignments"
+        "SlotTableDAO", back_populates="assignments", lazy="selectin"
     )
 
     def to_dict(self) -> dict:
@@ -153,4 +158,3 @@ class ReservationTableAssignmentDAO(Base):
             f"<ReservationTableAssignmentDAO(id={self.id}, res_id={self.reservation_id}, "
             f"slot_table_id={self.slot_table_id}, seats={self.assigned_seats})>"
         )
-

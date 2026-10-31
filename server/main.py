@@ -1,15 +1,22 @@
 # run with: py -m uvicorn server.main:app --reload  (from project root)
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from server.config.config import ORIGIN
-from server.database import Base, engine, SessionLocal
+from server.database import Base, engine
 import server.models.DAO  # noqa: F401 - registers models with Base.metadata
 from server.routes import reservation_router
 
-# create all tables on startup if they don't exist
-Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="Mountain Hut")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Async startup and shutdown lifespan context."""
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    yield
+
+
+app = FastAPI(title="Mountain Hut", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -23,6 +30,6 @@ app.include_router(reservation_router)
 
 
 @app.get("/api/health")
-def health():
+async def health():
     """Quick check that the backend is running."""
     return {"status": "ok"}

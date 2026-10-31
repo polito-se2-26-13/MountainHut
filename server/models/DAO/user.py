@@ -1,6 +1,6 @@
 """User / Hiker / Staff database model."""
 from datetime import datetime
-from typing import Optional, List
+from typing import TYPE_CHECKING, Optional, List
 
 from sqlalchemy import String, Text, Boolean, DateTime, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -8,6 +8,10 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from server.database import Base
 from server.const import UserRole
 from server.utils.security import hash_password, verify_password
+
+if TYPE_CHECKING:
+    from server.models.DAO.reservation import ReservationDAO
+    from server.models.DAO.time_slot import TimeSlotDAO
 
 
 class UserDAO(Base):
@@ -33,10 +37,10 @@ class UserDAO(Base):
 
     # Relationships
     reservations: Mapped[List["ReservationDAO"]] = relationship(
-        "ReservationDAO", back_populates="hiker", cascade="all, delete-orphan"
+        "ReservationDAO", back_populates="hiker", cascade="all, delete-orphan", lazy="selectin"
     )
     created_slots: Mapped[List["TimeSlotDAO"]] = relationship(
-        "TimeSlotDAO", back_populates="creator"
+        "TimeSlotDAO", back_populates="creator", lazy="selectin"
     )
 
     @property
@@ -70,4 +74,3 @@ class UserDAO(Base):
 
     def __repr__(self) -> str:
         return f"<UserDAO(id={self.id}, email='{self.email}', role='{self.role}')>"
-

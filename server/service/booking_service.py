@@ -1,7 +1,8 @@
-"""Core Booking, Table Splitting, and Two-Hour Rule Service (MH-44 & MH-42)."""
+"""Core Booking, Table Splitting, and Two-Hour Rule Async Service (MH-44 & MH-42)."""
 from datetime import datetime, timedelta
 from typing import List, Optional, Tuple
-from sqlalchemy.orm import Session
+from sqlalchemy import select, func
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 
 from server.const import SlotStatus, ReservationStatus
@@ -29,11 +30,30 @@ def validate_two_hour_rule(
         )
 
 
-def get_slot_availability(db: Session, slot_id: int) -> dict:
-    """Retrieve slot details and real-time seat availability."""
-    slot = db.query(TimeSlotDAO).filter(TimeSlotDAO.id == slot_id).first()
+async def get_slot_availability(db: AsyncSession, slot_id: int) -> dict:
+    """Retrieve slot details and real-time seat availability asynchronously."""
+    result = await db.execute(select(TimeSlotDAO).where(TimeSlotDAO.id == slot_id))
+    slot = result.scalar_one_or_none()
     if not slot:
         raise ValueError(f"Time slot with id {slot_id} not found.")
+
+    # Calculate capacity and reservations via direct SQL for accuracy
+    cap_res = await db.execute(
+        select(func.coalesce(func.sum(SlotTableDAO.available_seats), 0)).where(
+            SlotTableDAO.slot_id == slot_id,
+            SlotTableDAO.is_available == True,
+        )
+    )
+    total_capacity = int(cap_res.scalar_one())
+
+    res_count = await db.execute(
+        select(func.coalesce(func.sum(ReservationDAO.party_size), 0)).where(
+            ReservationDAO.slot_id == slot_id,
+            ReservationDAO.status == ReservationStatus.CONFIRMED.value,
+        )
+    )
+    reserved_seats = int(res_count.scalar_one())
+    remaining_seats = max(0, total_capacity - reserved_seats)
 
     return {
         "slot_id": slot.id,
@@ -42,29 +62,32 @@ def get_slot_availability(db: Session, slot_id: int) -> dict:
         "end_time": slot.end_time.strftime("%H:%M"),
         "meal_type": slot.meal_type,
         "status": slot.status,
-        "total_capacity": slot.total_capacity,
-        "reserved_seats": slot.reserved_seats,
-        "remaining_seats": slot.remaining_seats,
+        "total_capacity": total_capacity,
+        "reserved_seats": reserved_seats,
+        "remaining_seats": remaining_seats,
     }
 
 
-def get_reservation_by_reference(db: Session, reference: str) -> Optional[ReservationDAO]:
-    """Find reservation by booking reference."""
-    return (
-        db.query(ReservationDAO)
-        .filter(ReservationDAO.booking_reference == reference)
-        .first()
+async def get_reservation_by_reference(
+    db: AsyncSession, reference: str
+) -> Optional[ReservationDAO]:
+    """Find reservation by booking reference asynchronously."""
+    result = await db.execute(
+        select(ReservationDAO).where(ReservationDAO.booking_reference == reference)
     )
+    return result.scalar_one_or_none()
 
 
-def get_user_reservations(db: Session, user_id: int) -> List[ReservationDAO]:
-    """Retrieve all reservations made by a hiker."""
-    return (
-        db.query(ReservationDAO)
-        .filter(ReservationDAO.user_id == user_id)
+async def get_user_reservations(
+    db: AsyncSession, user_id: int
+) -> List[ReservationDAO]:
+    """Retrieve all reservations made by a hiker asynchronously."""
+    result = await db.execute(
+        select(ReservationDAO)
+        .where(ReservationDAO.user_id == user_id)
         .order_by(ReservationDAO.created_at.desc())
-        .all()
     )
+    return list(result.scalars().all())
 
 
 def assign_tables_for_party(
@@ -81,7 +104,6 @@ def assign_tables_for_party(
        When splitting, use as few tables as possible, occupying the smallest
        available set of seats on a table.
     """
-    # Active tables for this slot with at least 1 free seat
     available_tables = [
         st for st in slot.slot_tables if st.is_available and st.free_seats > 0
     ]
@@ -92,7 +114,6 @@ def assign_tables_for_party(
     # 1. Single table attempt (Keep party together):
     single_fits = [st for st in available_tables if st.free_seats >= party_size]
     if single_fits:
-        # Best-fit: pick the table with the smallest free capacity >= party_size
         chosen = min(
             single_fits,
             key=lambda st: (st.free_seats, st.table.capacity if st.table else 0),
@@ -100,7 +121,6 @@ def assign_tables_for_party(
         return [(chosen, party_size)]
 
     # 2. Split party across tables (only when no single table can fit party):
-    # Sort descending by free seats to minimize number of tables used
     sorted_tables = sorted(
         available_tables,
         key=lambda st: (st.free_seats, -(st.table.capacity if st.table else 0)),
@@ -125,23 +145,25 @@ def assign_tables_for_party(
     return assignments
 
 
-def create_reservation(
-    db: Session,
+async def create_reservation(
+    db: AsyncSession,
     data: ReservationCreate,
     current_time: Optional[datetime] = None,
 ) -> ReservationDAO:
     """
-    Create a new table reservation and deduct capacity.
+    Create a new table reservation and deduct capacity asynchronously.
     Enforces user existence, slot status, 2-hour rule (MH-42),
     one-booking rule (MH-01), capacity check, and table assignment.
     """
     # 1. Validate User
-    hiker = db.query(UserDAO).filter(UserDAO.id == data.user_id).first()
+    result = await db.execute(select(UserDAO).where(UserDAO.id == data.user_id))
+    hiker = result.scalar_one_or_none()
     if not hiker:
         raise ValueError(f"User with id {data.user_id} not found.")
 
     # 2. Validate Time Slot
-    slot = db.query(TimeSlotDAO).filter(TimeSlotDAO.id == data.slot_id).first()
+    result = await db.execute(select(TimeSlotDAO).where(TimeSlotDAO.id == data.slot_id))
+    slot = result.scalar_one_or_none()
     if not slot:
         raise ValueError(f"Time slot with id {data.slot_id} not found.")
 
@@ -152,22 +174,21 @@ def create_reservation(
     validate_two_hour_rule(slot, current_time=current_time)
 
     # 4. Check rule: Only one booking per time slot on a date per hiker
-    existing_booking = (
-        db.query(ReservationDAO)
-        .filter(
+    existing_booking_res = await db.execute(
+        select(ReservationDAO).where(
             ReservationDAO.user_id == data.user_id,
             ReservationDAO.slot_id == data.slot_id,
             ReservationDAO.status == ReservationStatus.CONFIRMED.value,
         )
-        .first()
     )
-    if existing_booking:
+    if existing_booking_res.scalar_one_or_none():
         raise ValueError("Hiker already has a confirmed booking for this time slot.")
 
     # 5. Check available capacity (Capacity Deduction constraint)
-    if data.party_size > slot.remaining_seats:
+    avail = await get_slot_availability(db, data.slot_id)
+    if data.party_size > avail["remaining_seats"]:
         raise ValueError(
-            f"Not enough seats available (requested {data.party_size}, remaining {slot.remaining_seats})."
+            f"Not enough seats available (requested {data.party_size}, remaining {avail['remaining_seats']})."
         )
 
     # 6. Determine table assignments (single table fit or split across tables)
@@ -185,7 +206,7 @@ def create_reservation(
         status=ReservationStatus.CONFIRMED.value,
     )
     db.add(reservation)
-    db.flush()
+    await db.flush()
 
     # 8. Create Table Assignments
     for slot_table, seats in table_allocations:
@@ -197,10 +218,10 @@ def create_reservation(
         db.add(assignment)
 
     try:
-        db.commit()
-        db.refresh(reservation)
+        await db.commit()
+        await db.refresh(reservation)
     except IntegrityError as e:
-        db.rollback()
+        await db.rollback()
         raise ValueError(f"Failed to create reservation due to database constraint: {e}")
 
     return reservation

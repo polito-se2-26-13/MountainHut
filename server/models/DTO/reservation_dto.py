@@ -52,3 +52,4 @@ class SlotAvailabilityResponse(BaseModel):
     total_capacity: int
     reserved_seats: int
     remaining_seats: int
+
