@@ -3,7 +3,8 @@
 #Database connection shared by the whole backend (SQLite file next to this module).
 from pathlib import Path
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
+from sqlalchemy.engine import Engine
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 DATABASE_URL = f"sqlite:///{Path(__file__).parent / 'mountainHut.sqlite'}"
@@ -11,6 +12,14 @@ DATABASE_URL = f"sqlite:///{Path(__file__).parent / 'mountainHut.sqlite'}"
 # check_same_thread=False lets FastAPI use the connection from its worker threads
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(bind=engine)
+
+
+@event.listens_for(Engine, "connect")
+def set_sqlite_pragma(dbapi_connection, connection_record):
+    #Enable foreign key constraints in SQLite.
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA foreign_keys=ON")
+    cursor.close()
 
 
 class Base(DeclarativeBase):

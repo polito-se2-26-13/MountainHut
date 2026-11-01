@@ -22,6 +22,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(reservation_router)
+
 
 @app.get("/api/health")
 def health():

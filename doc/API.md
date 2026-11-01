@@ -1,10 +1,168 @@
 # API List
 
-
 All paths start with `/api` (the Vite dev server forwards them to the backend).<br>
 Errors return `{"detail": "message"}`. Live docs: http://localhost:8000/docs
 
 ## GET
+
+**get slots for copy**
+
+name: `/api/slots?date={date}`<br>
+parameter: `date` (required, query, `YYYY-MM-DD`) — date whose existing service slots should be returned.<br>
+header: `Authorization: Bearer <token>` (Employee access)<br>
+
+HTTP Status: 200 ok, 401 unauthorized, 403 forbidden, 422 invalid date, 500 ISE<br>
+JSON response:
+```json
+[
+  {
+    "slotId": 101,
+    "date": "2026-10-28",
+    "startTime": "12:00",
+    "endTime": "13:00",
+    "mealType": "Lunch",
+    "tables": [
+      { "tableNumber": "T1", "seats": 4 },
+      { "tableNumber": "T2", "seats": 2 }
+    ]
+  },
+  {
+    "slotId": 102,
+    "date": "2026-10-28",
+    "startTime": "19:00",
+    "endTime": "20:30",
+    "mealType": "Dinner",
+    "tables": [
+      { "tableNumber": "T1", "seats": 4 },
+      { "tableNumber": "T2", "seats": 4 },
+      { "tableNumber": "T3", "seats": 2 }
+    ]
+  }
+]
+```
+
+If there are no slots for the date, return an empty array: `[]`.<br>
+Error response:
+```json
+{
+  "detail": "message"
+}
+**get slot availability**
+
+name: `/api/slots/{slot_id}/availability`<br>
+parameter: `slot_id` (path, integer)<br>
+HTTP Status: 200 ok, 404 not found, 500 ISE<br>
+JSON response:
+```json
+// 200
+{
+  "slot_id": 1,
+  "date": "2026-10-30",
+  "start_time": "12:00",
+  "end_time": "13:00",
+  "meal_type": "Lunch",
+  "status": "OPEN",
+  "total_capacity": 34,
+  "reserved_seats": 6,
+  "remaining_seats": 28
+}
+
+// 404
+{
+  "detail": "Time slot with id 1 not found."
+}
+```
+
+**get reservation by reference**
+
+name: `/api/reservations/{reference}`<br>
+parameter: `reference` (path, string)<br>
+HTTP Status: 200 ok, 404 not found, 500 ISE<br>
+JSON response:
+```json
+// 200
+{
+  "id": 1,
+  "booking_reference": "MH-20261030-ALX01",
+  "user_id": 3,
+  "slot_id": 1,
+  "party_size": 4,
+  "special_requirements": "2 vegetarian meals, 1 gluten allergy",
+  "contact_name": "Alex Smith",
+  "contact_email": "hiker1@example.com",
+  "contact_phone": "+39 340 1234567",
+  "status": "CONFIRMED",
+  "assigned_tables": [
+    {
+      "table_id": 1,
+      "table_number": "T1",
+      "location": "Indoor Main Hall",
+      "assigned_seats": 4
+    }
+  ],
+  "created_at": "2026-10-30T12:00:00"
+}
+
+// 404
+{
+  "detail": "Reservation with reference 'MH-20261030-ALX01' not found."
+}
+```
+
+**preview booking confirmation email**
+
+name: `/api/reservations/{reference}/email-preview`<br>
+parameter: `reference` (path, string)<br>
+HTTP Status: 200 ok, 404 not found, 500 ISE<br>
+JSON response:
+```json
+// 200
+{
+  "booking_reference": "MH-20261030-ALX01",
+  "recipient_email": "hiker1@example.com",
+  "subject": "Mountain Hut Booking Confirmation [MH-20261030-ALX01]",
+  "email_text": "...",
+  "email_html": "..."
+}
+
+// 404
+{
+  "detail": "Reservation with reference 'MH-20261030-ALX01' not found."
+}
+```
+
+**get hiker reservations**
+
+name: `/api/reservations/user/{user_id}`<br>
+parameter: `user_id` (path, integer)<br>
+HTTP Status: 200 ok, 500 ISE<br>
+JSON response:
+```json
+// 200
+[
+  {
+    "id": 1,
+    "booking_reference": "MH-20261030-ALX01",
+    "user_id": 3,
+    "slot_id": 1,
+    "party_size": 4,
+    "special_requirements": "2 vegetarian meals, 1 gluten allergy",
+    "contact_name": "Alex Smith",
+    "contact_email": "hiker1@example.com",
+    "contact_phone": "+39 340 1234567",
+    "status": "CONFIRMED",
+    "assigned_tables": [
+      {
+        "table_id": 1,
+        "table_number": "T1",
+        "location": "Indoor Main Hall",
+        "assigned_seats": 4
+      }
+    ],
+    "created_at": "2026-10-30T12:00:00"
+  }
+]
+```
 
 ## POST
 
@@ -23,10 +181,10 @@ body:
   "role": "Hiker"
 }
 ```
-HTTP Status: 201 ok, 500 ISE,404 Not Found (unknown service) <br>
-JSON response: 
-```json 
-//201
+HTTP Status: 201 ok, 500 ISE, 404 Not Found (unknown service)<br>
+JSON response:
+```json
+// 201
 {
   "userId": 101,
   "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
@@ -34,16 +192,12 @@ JSON response:
   "message": "Registration successful"
 }
 
-//404
+// 404 / 500
 {
-    "detail":string
-}
-
-//500
-{
-    "detail":string
+  "detail": "message"
 }
 ```
+
 **login**
 
 name: `/api/auth/login`<br>
@@ -55,10 +209,10 @@ body:
   "password": "SecurePassword123!"
 }
 ```
-HTTP Status: 200 ok, 204 no content, 404 not found, 500 ISE <br>
-JSON responses: 
+HTTP Status: 200 ok, 404 not found, 500 ISE<br>
+JSON response:
 ```json
-//200 
+// 200
 {
   "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
   "user": {
@@ -69,16 +223,107 @@ JSON responses:
     "role": "Manager"  // "Hiker" | "Employee" | "Manager"
   }
 }
-//404
+
+// 404 / 500
 {
-    "detail": string
-}
-//500
-{
-    "detail":string
+  "detail": "message"
 }
 ```
+
+**create service slot**
+
+name: `/api/slots`<br>
+parameter: -<br>
+header: `Authorization: Bearer <token>` (Employee access)<br>
+body:
+```json
+{
+  "date": "2026-11-01",
+  "startTime": "12:00",
+  "endTime": "13:00",
+  "mealType": "Lunch",
+  "tables": [
+    { "tableNumber": "T1", "seats": 4 },
+    { "tableNumber": "T2", "seats": 2 },
+    { "tableNumber": "T3", "seats": 6 }
+  ]
+}
+```
+`mealType` is optional. Suggested values: `Lunch`, `Dinner`, `Snack`.<br>
+HTTP Status: 201 created, 401 unauthorized, 403 forbidden, 404 Not Found (unknown service), 422 invalid request, 500 ISE<br>
+JSON response:
+```json
+// 201
+{
+  "slotId": 103,
+  "date": "2026-11-01",
+  "startTime": "12:00",
+  "endTime": "13:00",
+  "mealType": "Lunch",
+  "tables": [
+    { "tableNumber": "T1", "seats": 4 },
+    { "tableNumber": "T2", "seats": 2 },
+    { "tableNumber": "T3", "seats": 6 }
+  ],
+  "message": "Slot created successfully"
+}
+
+// Error response
+{
+  "detail": "message"
+}
+```
+
+**create reservation**
+
+name: `/api/reservations`<br>
+parameter: -<br>
+body:
+```json
+{
+  "slot_id": 1,
+  "party_size": 4,
+  "user_id": 3,
+  "contact_name": "Alex Smith",
+  "contact_email": "hiker1@example.com",
+  "contact_phone": "+39 340 1234567",
+  "special_requirements": "2 vegetarian meals, 1 gluten allergy"
+}
+```
+HTTP Status: 201 ok, 400 bad request, 404 not found, 500 ISE<br>
+JSON response:
+```json
+// 201
+{
+  "id": 1,
+  "booking_reference": "MH-20261030-ALX01",
+  "user_id": 3,
+  "slot_id": 1,
+  "party_size": 4,
+  "special_requirements": "2 vegetarian meals, 1 gluten allergy",
+  "contact_name": "Alex Smith",
+  "contact_email": "hiker1@example.com",
+  "contact_phone": "+39 340 1234567",
+  "status": "CONFIRMED",
+  "assigned_tables": [
+    {
+      "table_id": 1,
+      "table_number": "T1",
+      "location": "Indoor Main Hall",
+      "assigned_seats": 4
+    }
+  ],
+  "created_at": "2026-10-30T12:00:00"
+}
+
+// 400 / 404 / 500
+{
+  "detail": "message"
+}
+```
+
 ## PUT
 
+## PUT
 
 ## DELETE
