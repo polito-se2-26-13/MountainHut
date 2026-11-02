@@ -3,18 +3,22 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from server.config.config import ORIGIN
-from server.database import Base, engine
-import server.models.DAO  # noqa: F401 - registers models with Base.metadata
-from server.routes import reservation_router
+from server.models.error.app_error import AppError
+from server.middleware.error_middleware import error_handler
+#from server.database import Base, engine
+from server.routes import(
+    user_routes,
+    reservation_router
+)
 
-
+# create all tables on startup if they don't exist
+#Base.metadata.create_all(bind=engine)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Async startup and shutdown lifespan context."""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     yield
-
 
 app = FastAPI(title="Mountain Hut", lifespan=lifespan)
 
@@ -33,3 +37,9 @@ app.include_router(reservation_router)
 async def health():
     """Quick check that the backend is running."""
     return {"status": "ok"}
+
+app.include_router(user_routes.router)
+
+
+app.add_exception_handler(AppError, error_handler)
+app.add_exception_handler(Exception, error_handler)

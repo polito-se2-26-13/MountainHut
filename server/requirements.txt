@@ -7,3 +7,9 @@ pytest-asyncio>=0.21.0
 httpx>=0.24
 pytest-cov
 pydantic>=2.0
+PyJWT
+argon2-cffi
+aiosqlite
+email-validator
+pydantic-extra-types
+phonenumbers
