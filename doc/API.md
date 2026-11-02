@@ -181,7 +181,7 @@ body:
   "role": "Hiker"
 }
 ```
-HTTP Status: 201 ok, 409 email already registered, 422 invalid fields, 500 ISE<br>
+HTTP Status: 201 ok, 400 empty field, 409 email already registered, 422 invalid fields, 500 ISE<br>
 JSON response:
 ```json
 // 201
@@ -208,7 +208,7 @@ body:
   "password": "SecurePassword123!"
 }
 ```
-HTTP Status: 200 ok, 404 not found, 500 ISE<br>
+HTTP Status: 200 ok, 400 empty field, 404 wrong email or password, 422 missing field, 500 ISE<br>
 JSON response:
 ```json
 // 200
@@ -219,7 +219,8 @@ JSON response:
     "email": "manager@mountainhut.com",
     "firstName": "Firstname",
     "lastName": "Lastname",
-    "role": "Manager"  // "Hiker" | "Employee" | "Manager" | "Warden"
+    "role": "Manager",  // "Hiker" | "Employee" | "Manager" | "Warden"
+    "phone": "+393331234567"
   }
 }
 

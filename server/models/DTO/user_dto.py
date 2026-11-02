@@ -3,6 +3,11 @@ from pydantic_extra_types.phone_numbers import PhoneNumber
 from typing import Optional
 from server.models.enum.user_type import UserType
 
+class Phone(PhoneNumber):
+    """A number without prefix, accepted by the registration form, is read as Italian."""
+    default_region_code = "IT"
+    phone_format = "E164"
+
 class UserDTO(BaseModel):
     id: Optional[int] = None
     email: EmailStr= Field(min_length=5, max_length=100)
@@ -10,7 +15,7 @@ class UserDTO(BaseModel):
     role: UserType
     firstName: str =Field(min_length=1, max_length=100)
     lastName: str=Field(min_length=1, max_length=100)
-    phone: Optional[PhoneNumber]= None
+    phone: Optional[Phone]= None
 
 class UserLoginDTO(BaseModel):
     username: str
@@ -25,7 +30,7 @@ class UserCreateDTO(BaseModel):
     role: UserType
     firstName: str =Field(min_length=1, max_length=100)
     lastName: str=Field(min_length=1, max_length=100)
-    phone: Optional[PhoneNumber]= None
+    phone: Optional[Phone]= None
 
 class UserDetailDTO(BaseModel):
     id: Optional[int] = None
@@ -33,7 +38,7 @@ class UserDetailDTO(BaseModel):
     role: UserType
     firstName: str =Field(min_length=1, max_length=100)
     lastName: str=Field(min_length=1, max_length=100)
-    phone: Optional[PhoneNumber]= None
+    phone: Optional[Phone]= None
 
 class UserLoginResponse(BaseModel):
     token: str

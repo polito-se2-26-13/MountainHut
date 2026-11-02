@@ -2,11 +2,11 @@
 import pytest
 from datetime import date, time, timedelta
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import select
+from sqlalchemy import event, select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
-from server.database import Base, get_db
+from server.database import Base, get_db, set_sqlite_pragma
 from server.main import app
 from server.const import SlotStatus, ReservationStatus, UserRole
 from server.models.DAO import UserDAO, TableDAO, TimeSlotDAO, SlotTableDAO, ReservationDAO
@@ -22,6 +22,7 @@ from server.service.booking_service import (
 async def test_db():
     """In-memory SQLite session with sample slot and tables."""
     engine = create_async_engine("sqlite+aiosqlite:///:memory:", poolclass=StaticPool)
+    event.listen(engine.sync_engine, "connect", set_sqlite_pragma)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     TestingSession = async_sessionmaker(engine, expire_on_commit=False)

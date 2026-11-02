@@ -135,6 +135,7 @@ def assign_tables_for_party(
         )
 
     # Best-fit: among the sets of that many tables, the one with the fewest free seats
+    # shortcut: exponential above about 20 tables per slot, rewrite if a hut ever has more
     chosen = min(
         (tables for tables in combinations(available_tables, needed)
          if sum(st.free_seats for st in tables) >= party_size),

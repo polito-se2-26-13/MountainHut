@@ -1,11 +1,11 @@
 """Unit tests for MH-42: Table Splitting and 2-Hour Cutoff Rule."""
 import pytest
 from datetime import date, time, datetime, timedelta
-from sqlalchemy import select
+from sqlalchemy import event, select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
-from server.database import Base
+from server.database import Base, set_sqlite_pragma
 from server.const import SlotStatus, ReservationStatus, UserRole
 from server.models.DAO import UserDAO, TableDAO, TimeSlotDAO, SlotTableDAO, ReservationDAO
 from server.models.DTO.reservation_dto import ReservationCreate
@@ -21,6 +21,7 @@ from server.service.booking_service import (
 async def split_test_db():
     """In-memory SQLite database setup for testing splitting and 2-hour rule."""
     engine = create_async_engine("sqlite+aiosqlite:///:memory:", poolclass=StaticPool)
+    event.listen(engine.sync_engine, "connect", set_sqlite_pragma)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     TestingSession = async_sessionmaker(engine, expire_on_commit=False)
