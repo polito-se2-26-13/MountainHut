@@ -181,20 +181,19 @@ body:
   "role": "Hiker"
 }
 ```
-HTTP Status: 201 ok, 500 ISE, 404 Not Found (unknown service)<br>
+HTTP Status: 201 ok, 409 email already registered, 422 invalid fields, 500 ISE<br>
 JSON response:
 ```json
 // 201
 {
-  "userId": 101,
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "role": "Hiker",
-  "message": "Registration successful"
+  "id": 101
 }
 
-// 404 / 500
+// 409 / 500
 {
-  "detail": "message"
+  "code": 409,
+  "message": "message",
+  "name": "ConflictError"
 }
 ```
 
@@ -220,13 +219,15 @@ JSON response:
     "email": "manager@mountainhut.com",
     "firstName": "Firstname",
     "lastName": "Lastname",
-    "role": "Manager"  // "Hiker" | "Employee" | "Manager"
+    "role": "Manager"  // "Hiker" | "Employee" | "Manager" | "Warden"
   }
 }
 
 // 404 / 500
 {
-  "detail": "message"
+  "code": 404,
+  "message": "email or password wrong",
+  "name": "NotFoundError"
 }
 ```
 
