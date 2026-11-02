@@ -1,11 +1,14 @@
 """Hut table model."""
 from datetime import datetime
-from typing import Optional, List
+from typing import TYPE_CHECKING, Optional, List
 
 from sqlalchemy import String, Integer, Boolean, DateTime, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from server.database import Base
+
+if TYPE_CHECKING:
+    from server.models.DAO.time_slot import SlotTableDAO
 
 
 class TableDAO(Base):
@@ -26,7 +29,7 @@ class TableDAO(Base):
 
     # Relationship to slot-specific availability configurations
     slot_tables: Mapped[List["SlotTableDAO"]] = relationship(
-        "SlotTableDAO", back_populates="table", cascade="all, delete-orphan"
+        "SlotTableDAO", back_populates="table", cascade="all, delete-orphan", lazy="selectin"
     )
 
     def to_dict(self) -> dict:
@@ -42,4 +45,3 @@ class TableDAO(Base):
 
     def __repr__(self) -> str:
         return f"<TableDAO(id={self.id}, table_number='{self.table_number}', capacity={self.capacity})>"
-

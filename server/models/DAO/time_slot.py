@@ -1,6 +1,6 @@
 """Time slot and slot-table capacity models."""
 from datetime import date, time, datetime
-from typing import Optional, List
+from typing import TYPE_CHECKING, Optional, List
 
 from sqlalchemy import (
     String,
@@ -17,6 +17,11 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from server.database import Base
 from server.const import SlotStatus
+
+if TYPE_CHECKING:
+    from server.models.DAO.user import UserDAO
+    from server.models.DAO.table import TableDAO
+    from server.models.DAO.reservation import ReservationDAO, ReservationTableAssignmentDAO
 
 
 class TimeSlotDAO(Base):
@@ -40,13 +45,13 @@ class TimeSlotDAO(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
 
-    # Relationships
-    creator: Mapped[Optional["UserDAO"]] = relationship("UserDAO", back_populates="created_slots")
+    # Relationships with eager selectin loading for async operations
+    creator: Mapped[Optional["UserDAO"]] = relationship("UserDAO", back_populates="created_slots", lazy="selectin")
     slot_tables: Mapped[List["SlotTableDAO"]] = relationship(
-        "SlotTableDAO", back_populates="slot", cascade="all, delete-orphan"
+        "SlotTableDAO", back_populates="slot", cascade="all, delete-orphan", lazy="selectin"
     )
     reservations: Mapped[List["ReservationDAO"]] = relationship(
-        "ReservationDAO", back_populates="slot", cascade="all, delete-orphan"
+        "ReservationDAO", back_populates="slot", cascade="all, delete-orphan", lazy="selectin"
     )
 
     @property
@@ -110,11 +115,11 @@ class SlotTableDAO(Base):
     available_seats: Mapped[int] = mapped_column(Integer, nullable=False)
     is_available: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
-    # Relationships
-    slot: Mapped["TimeSlotDAO"] = relationship("TimeSlotDAO", back_populates="slot_tables")
-    table: Mapped["TableDAO"] = relationship("TableDAO", back_populates="slot_tables")
+    # Relationships with eager selectin loading for async operations
+    slot: Mapped["TimeSlotDAO"] = relationship("TimeSlotDAO", back_populates="slot_tables", lazy="selectin")
+    table: Mapped["TableDAO"] = relationship("TableDAO", back_populates="slot_tables", lazy="selectin")
     assignments: Mapped[List["ReservationTableAssignmentDAO"]] = relationship(
-        "ReservationTableAssignmentDAO", back_populates="slot_table", cascade="all, delete-orphan"
+        "ReservationTableAssignmentDAO", back_populates="slot_table", cascade="all, delete-orphan", lazy="selectin"
     )
 
     @property
@@ -150,4 +155,3 @@ class SlotTableDAO(Base):
             f"<SlotTableDAO(id={self.id}, slot_id={self.slot_id}, "
             f"table_id={self.table_id}, available_seats={self.available_seats})>"
         )
-
