@@ -2,8 +2,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from server.models.enum.user_type import UserType
 from server.models.DTO.user_dto import UserCreateDTO
-from server.models.DAO.user_dao import UserDAO
-from server.utils import throw_conflict_if_found, find_or_throw_not_found
+from server.models.DAO.user import UserDAO
 from server.database import AsyncSessionLocal
 from typing import Optional
 
@@ -16,19 +15,18 @@ class UserRepository:
     async def _get_session(self) -> AsyncSession:
         return self._session or AsyncSessionLocal()
 
-    async def create_user(self, user:UserCreateDTO,passHash:str,salt:str) -> UserDAO:
+    async def create_user(self, user:UserCreateDTO,passHash:str) -> UserDAO:
         """
         Create user or throw ConflictError if email exists
         """
         async with await self._get_session() as session:
             userDao = UserDAO(
                 email=user.email,
-                password=passHash,
-                salt=salt,
-                name=user.name,
-                surname=user.surname,
+                password_hash=passHash,
+                first_name=user.firstName,
+                last_name=user.lastName,
                 phone=user.phone,
-                role=user.role
+                role=user.role.value
             )
             session.add(userDao)
             await session.commit()
