@@ -122,7 +122,7 @@ async def test_party_split_over_more_tables(split_test_db):
     split party across minimum number of tables.
     Party of 11:
     Single tables: T3 (8), T1 (6), T2 (4). None can fit 11.
-    System uses as few tables as possible: T3 (takes 8) + T1 (takes 3).
+    System uses as few tables as possible, on the smallest set of seats: T3 (takes 8) + T2 (takes 3).
     """
     slot = (await split_test_db.execute(select(TimeSlotDAO).filter_by(id=1))).scalar_one()
     allocations = assign_tables_for_party(slot, party_size=11)
@@ -134,8 +134,8 @@ async def test_party_split_over_more_tables(split_test_db):
     assert allocations[0][0].table.table_number == "T3"
     assert allocations[0][1] == 8
 
-    # Second table takes remaining 3 seats from next largest table (T1)
-    assert allocations[1][0].table.table_number == "T1"
+    # Second table takes remaining 3 seats from the smallest table that fits (T2)
+    assert allocations[1][0].table.table_number == "T2"
     assert allocations[1][1] == 3
 
     # Total seats equals party size
@@ -157,14 +157,14 @@ async def test_full_split_reservation_lifecycle(split_test_db):
 
     assert res.id is not None
     assert res.party_size == 12
-    # Verify split across 2 tables: T3 (8) + T1 (4)
+    # Verify split across 2 tables: T3 (8) + T2 (4)
     assert len(res.table_assignments) == 2
 
     assigned_numbers = {
         ta.slot_table.table.table_number: ta.assigned_seats
         for ta in res.table_assignments
     }
-    assert assigned_numbers == {"T3": 8, "T1": 4}
+    assert assigned_numbers == {"T3": 8, "T2": 4}
 
     # Verify slot remaining capacity: 18 - 12 = 6
     avail = await get_slot_availability(split_test_db, 1)
