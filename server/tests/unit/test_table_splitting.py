@@ -1,8 +1,8 @@
 """Unit tests for MH-42: Table Splitting and 2-Hour Cutoff Rule."""
 import pytest
 from datetime import date, time, datetime, timedelta
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy import event, select
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
 from server.database import Base, set_sqlite_pragma
@@ -13,21 +13,18 @@ from server.service.booking_service import (
     create_reservation,
     validate_two_hour_rule,
     assign_tables_for_party,
+    get_slot_availability,
 )
 
 
 @pytest.fixture
-def split_test_db():
+async def split_test_db():
     """In-memory SQLite database setup for testing splitting and 2-hour rule."""
-    engine = create_engine(
-        "sqlite:///:memory:",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
-    set_sqlite_pragma(engine.raw_connection(), None)
-    Base.metadata.create_all(bind=engine)
-    TestingSession = sessionmaker(bind=engine)
-    session = TestingSession()
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:", poolclass=StaticPool)
+    event.listen(engine.sync_engine, "connect", set_sqlite_pragma)
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    TestingSession = async_sessionmaker(engine, expire_on_commit=False)
 
     # Users
     u1 = UserDAO(id=1, email="h1@test.com", password_hash="dummy", first_name="Hiker", last_name="One")
@@ -53,19 +50,19 @@ def split_test_db():
     st2 = SlotTableDAO(id=2, slot_id=1, table_id=2, available_seats=4)
     st3 = SlotTableDAO(id=3, slot_id=1, table_id=3, available_seats=8)
 
-    session.add_all([u1, u2, u3, t1, t2, t3, slot, st1, st2, st3])
-    session.commit()
+    async with TestingSession() as seed:
+        seed.add_all([u1, u2, u3, t1, t2, t3, slot, st1, st2, st3])
+        await seed.commit()
 
-    try:
+    # a new session, like the one each request gets
+    async with TestingSession() as session:
         yield session
-    finally:
-        session.close()
-        Base.metadata.drop_all(bind=engine)
+    await engine.dispose()
 
 
-def test_two_hour_cutoff_rule(split_test_db):
+async def test_two_hour_cutoff_rule(split_test_db):
     """Test MH-01 / MH-42: Hiker can reserve a seat up to 2 hours before the due time."""
-    slot = split_test_db.query(TimeSlotDAO).filter_by(id=1).first()
+    slot = (await split_test_db.execute(select(TimeSlotDAO).filter_by(id=1))).scalar_one()
 
     # Slot time is 2026-11-15 12:00 -> Cutoff is 2026-11-15 10:00
 
@@ -84,7 +81,7 @@ def test_two_hour_cutoff_rule(split_test_db):
         validate_two_hour_rule(slot, current_time=datetime(2026, 11, 15, 12, 15))
 
 
-def test_two_hour_cutoff_in_create_reservation(split_test_db):
+async def test_two_hour_cutoff_in_create_reservation(split_test_db):
     """Test create_reservation enforces the 2-hour cutoff rule."""
     payload = ReservationCreate(
         slot_id=1,
@@ -96,22 +93,22 @@ def test_two_hour_cutoff_in_create_reservation(split_test_db):
     # Attempt booking 1 hour before due time
     late_time = datetime(2026, 11, 15, 11, 0)
     with pytest.raises(ValueError, match="at least 2 hours before"):
-        create_reservation(split_test_db, payload, current_time=late_time)
+        await create_reservation(split_test_db, payload, current_time=late_time)
 
     # Attempt booking 3 hours before due time -> Success
     valid_time = datetime(2026, 11, 15, 9, 0)
-    res = create_reservation(split_test_db, payload, current_time=valid_time)
+    res = await create_reservation(split_test_db, payload, current_time=valid_time)
     assert res.id is not None
     assert res.status == ReservationStatus.CONFIRMED.value
 
 
-def test_best_fit_single_table_allocation(split_test_db):
+async def test_best_fit_single_table_allocation(split_test_db):
     """
     Test MH-01: Keep party together at one table using the smallest set of seats.
     T2 has 4 seats, T1 has 6 seats, T3 has 8 seats.
     Party of 4 should pick T2 (best fit), leaving T1 and T3 open.
     """
-    slot = split_test_db.query(TimeSlotDAO).filter_by(id=1).first()
+    slot = (await split_test_db.execute(select(TimeSlotDAO).filter_by(id=1))).scalar_one()
     allocations = assign_tables_for_party(slot, party_size=4)
 
     assert len(allocations) == 1
@@ -120,15 +117,15 @@ def test_best_fit_single_table_allocation(split_test_db):
     assert seats == 4
 
 
-def test_party_split_over_more_tables(split_test_db):
+async def test_party_split_over_more_tables(split_test_db):
     """
     Test MH-01 & MH-42: When party size exceeds any single table,
     split party across minimum number of tables.
     Party of 11:
     Single tables: T3 (8), T1 (6), T2 (4). None can fit 11.
-    System uses as few tables as possible: T3 (takes 8) + T1 (takes 3).
+    System uses as few tables as possible, on the smallest set of seats: T3 (takes 8) + T2 (takes 3).
     """
-    slot = split_test_db.query(TimeSlotDAO).filter_by(id=1).first()
+    slot = (await split_test_db.execute(select(TimeSlotDAO).filter_by(id=1))).scalar_one()
     allocations = assign_tables_for_party(slot, party_size=11)
 
     # Must use 2 tables (not 3)
@@ -138,15 +135,15 @@ def test_party_split_over_more_tables(split_test_db):
     assert allocations[0][0].table.table_number == "T3"
     assert allocations[0][1] == 8
 
-    # Second table takes remaining 3 seats from next largest table (T1)
-    assert allocations[1][0].table.table_number == "T1"
+    # Second table takes remaining 3 seats from the smallest table that fits (T2)
+    assert allocations[1][0].table.table_number == "T2"
     assert allocations[1][1] == 3
 
     # Total seats equals party size
     assert sum(seats for _, seats in allocations) == 11
 
 
-def test_full_split_reservation_lifecycle(split_test_db):
+async def test_full_split_reservation_lifecycle(split_test_db):
     """Full database lifecycle test for a split party booking."""
     payload = ReservationCreate(
         slot_id=1,
@@ -157,20 +154,20 @@ def test_full_split_reservation_lifecycle(split_test_db):
         special_requirements="All outdoor gear",
     )
     valid_time = datetime(2026, 11, 15, 8, 0)
-    res = create_reservation(split_test_db, payload, current_time=valid_time)
+    res = await create_reservation(split_test_db, payload, current_time=valid_time)
 
     assert res.id is not None
     assert res.party_size == 12
-    # Verify split across 2 tables: T3 (8) + T1 (4)
+    # Verify split across 2 tables: T3 (8) + T2 (4)
     assert len(res.table_assignments) == 2
 
     assigned_numbers = {
         ta.slot_table.table.table_number: ta.assigned_seats
         for ta in res.table_assignments
     }
-    assert assigned_numbers == {"T3": 8, "T1": 4}
+    assert assigned_numbers == {"T3": 8, "T2": 4}
 
     # Verify slot remaining capacity: 18 - 12 = 6
-    slot = split_test_db.query(TimeSlotDAO).filter_by(id=1).first()
-    assert slot.reserved_seats == 12
-    assert slot.remaining_seats == 6
+    avail = await get_slot_availability(split_test_db, 1)
+    assert avail["reserved_seats"] == 12
+    assert avail["remaining_seats"] == 6

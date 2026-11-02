@@ -1,9 +1,9 @@
 """Unit and API tests for MH-44 Core Booking and Capacity Deduction."""
 import pytest
-from datetime import date, time
-from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from datetime import date, time, timedelta
+from httpx import ASGITransport, AsyncClient
+from sqlalchemy import event, select
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
 from server.database import Base, get_db, set_sqlite_pragma
@@ -19,17 +19,13 @@ from server.service.booking_service import (
 
 
 @pytest.fixture
-def test_db():
+async def test_db():
     """In-memory SQLite session with sample slot and tables."""
-    engine = create_engine(
-        "sqlite:///:memory:",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
-    set_sqlite_pragma(engine.raw_connection(), None)
-    Base.metadata.create_all(bind=engine)
-    TestingSession = sessionmaker(bind=engine)
-    session = TestingSession()
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:", poolclass=StaticPool)
+    event.listen(engine.sync_engine, "connect", set_sqlite_pragma)
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    TestingSession = async_sessionmaker(engine, expire_on_commit=False)
 
     # Create hiker user
     hiker = UserDAO(
@@ -47,7 +43,7 @@ def test_db():
     # Create open slot
     slot = TimeSlotDAO(
         id=1,
-        date=date(2026, 11, 10),
+        date=date.today() + timedelta(days=7),
         start_time=time(12, 30),
         end_time=time(13, 30),
         meal_type="Lunch",
@@ -57,34 +53,32 @@ def test_db():
     st1 = SlotTableDAO(id=1, slot_id=1, table_id=1, available_seats=6)
     st2 = SlotTableDAO(id=2, slot_id=1, table_id=2, available_seats=4)
 
-    session.add_all([hiker, t1, t2, slot, st1, st2])
-    session.commit()
+    async with TestingSession() as seed:
+        seed.add_all([hiker, t1, t2, slot, st1, st2])
+        await seed.commit()
 
-    try:
+    # a new session, like the one each request gets
+    async with TestingSession() as session:
         yield session
-    finally:
-        session.close()
-        Base.metadata.drop_all(bind=engine)
+    await engine.dispose()
 
 
 @pytest.fixture
-def client(test_db):
-    """FastAPI TestClient overriding get_db with test_db fixture."""
-    def override_get_db():
-        try:
-            yield test_db
-        finally:
-            pass
+async def client(test_db):
+    """HTTP client on the app in the same event loop, overriding get_db with test_db fixture."""
+    async def override_get_db():
+        yield test_db
 
     app.dependency_overrides[get_db] = override_get_db
-    yield TestClient(app)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as http:
+        yield http
     app.dependency_overrides.clear()
 
 
-def test_core_booking_and_capacity_deduction(test_db):
+async def test_core_booking_and_capacity_deduction(test_db):
     """Test successful booking and automatic capacity deduction (MH-44)."""
     # Check initial availability
-    avail_before = get_slot_availability(test_db, slot_id=1)
+    avail_before = await get_slot_availability(test_db, slot_id=1)
     assert avail_before["total_capacity"] == 10
     assert avail_before["reserved_seats"] == 0
     assert avail_before["remaining_seats"] == 10
@@ -99,7 +93,7 @@ def test_core_booking_and_capacity_deduction(test_db):
         contact_phone="+39 340 1112233",
         special_requirements="No peanuts",
     )
-    res = create_reservation(test_db, payload)
+    res = await create_reservation(test_db, payload)
 
     assert res.id is not None
     assert res.booking_reference.startswith("MH-")
@@ -109,12 +103,12 @@ def test_core_booking_and_capacity_deduction(test_db):
     assert res.table_assignments[0].assigned_seats == 4
 
     # Check capacity after deduction
-    avail_after = get_slot_availability(test_db, slot_id=1)
+    avail_after = await get_slot_availability(test_db, slot_id=1)
     assert avail_after["reserved_seats"] == 4
     assert avail_after["remaining_seats"] == 6
 
 
-def test_capacity_exceeded_rejected(test_db):
+async def test_capacity_exceeded_rejected(test_db):
     """Test booking is rejected when party exceeds remaining capacity (MH-44)."""
     # Attempt to book 11 seats when capacity is 10
     payload = ReservationCreate(
@@ -125,10 +119,10 @@ def test_capacity_exceeded_rejected(test_db):
         contact_email="hiker@test.com",
     )
     with pytest.raises(ValueError, match="Not enough seats available"):
-        create_reservation(test_db, payload)
+        await create_reservation(test_db, payload)
 
 
-def test_one_booking_per_hiker_per_slot(test_db):
+async def test_one_booking_per_hiker_per_slot(test_db):
     """Test constraint: only one booking per time slot on a date per hiker."""
     payload1 = ReservationCreate(
         slot_id=1,
@@ -137,7 +131,7 @@ def test_one_booking_per_hiker_per_slot(test_db):
         contact_name="Alice Walker",
         contact_email="hiker@test.com",
     )
-    create_reservation(test_db, payload1)
+    await create_reservation(test_db, payload1)
 
     payload2 = ReservationCreate(
         slot_id=1,
@@ -147,14 +141,14 @@ def test_one_booking_per_hiker_per_slot(test_db):
         contact_email="hiker@test.com",
     )
     with pytest.raises(ValueError, match="already has a confirmed booking"):
-        create_reservation(test_db, payload2)
+        await create_reservation(test_db, payload2)
 
 
-def test_closed_slot_rejected(test_db):
+async def test_closed_slot_rejected(test_db):
     """Test booking is rejected if slot is closed."""
-    slot = test_db.query(TimeSlotDAO).filter_by(id=1).first()
+    slot = (await test_db.execute(select(TimeSlotDAO).filter_by(id=1))).scalar_one()
     slot.status = SlotStatus.CLOSED.value
-    test_db.commit()
+    await test_db.commit()
 
     payload = ReservationCreate(
         slot_id=1,
@@ -164,13 +158,13 @@ def test_closed_slot_rejected(test_db):
         contact_email="hiker@test.com",
     )
     with pytest.raises(ValueError, match="cannot accept reservations"):
-        create_reservation(test_db, payload)
+        await create_reservation(test_db, payload)
 
 
-def test_api_booking_endpoint_flow(client):
+async def test_api_booking_endpoint_flow(client):
     """Test POST /api/reservations and GET /api/reservations/{ref}."""
     # 1. Post reservation
-    response = client.post(
+    response = await client.post(
         "/api/reservations",
         json={
             "slot_id": 1,
@@ -190,12 +184,12 @@ def test_api_booking_endpoint_flow(client):
     assert len(data["assigned_tables"]) > 0
 
     # 2. Check slot availability reflects the deduction
-    avail_res = client.get("/api/slots/1/availability")
+    avail_res = await client.get("/api/slots/1/availability")
     assert avail_res.status_code == 200
     assert avail_res.json()["remaining_seats"] == 7
 
     # 3. Retrieve reservation by reference
-    get_res = client.get(f"/api/reservations/{ref}")
+    get_res = await client.get(f"/api/reservations/{ref}")
     assert get_res.status_code == 200
     assert get_res.json()["booking_reference"] == ref
     assert get_res.json()["special_requirements"] == "Gluten-free bread"

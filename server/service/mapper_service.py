@@ -1,6 +1,6 @@
 from server.models.DTO.error_dto import ErrorDTO
 from server.models.DTO.user_dto import UserResponseDTO,UserLoginResponse,UserDTO, UserDetailDTO
-from server.models.DAO.user_dao import UserDAO
+from server.models.DAO.user import UserDAO
 
 def create_error_dto(code: int, message: str, name: str) -> ErrorDTO:
     """Create an ErrorDTO instance"""
@@ -18,11 +18,10 @@ def userdao_to_userdto(user:UserDAO)->UserDTO:
     return UserDTO(
         id=user.id,
         email=user.email,
-        password=user.password,
+        password=user.password_hash,
         role=user.role,
-        salt=user.salt,
-        name=user.name,
-        surname=user.surname,
+        firstName=user.first_name,
+        lastName=user.last_name,
         phone=user.phone
     )
 def userdao_to_userdto_detail(user:UserDAO)->UserDetailDTO:
@@ -30,7 +29,7 @@ def userdao_to_userdto_detail(user:UserDAO)->UserDetailDTO:
         id=user.id,
         email=user.email,
         role=user.role,
-        name=user.name,
-        surname=user.surname,
+        firstName=user.first_name,
+        lastName=user.last_name,
         phone=user.phone
     )

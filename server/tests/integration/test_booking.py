@@ -112,6 +112,18 @@ def test_split_uses_as_few_tables_as_possible(client, db):
     assert seats_by_table(response) == {f"{slot}-3": 5, f"{slot}-4": 3}
 
 
+def test_split_leaves_the_larger_tables_free_for_the_next_party(client, db):
+    anna = add_hiker(db)
+    marco = add_hiker(db, "marco@example.com")
+    slot = add_slot(db, [8, 6, 4])
+
+    first = book(client, anna, slot, 11)
+    second = book(client, marco, slot, 5)
+
+    assert seats_by_table(first) == {f"{slot}-1": 8, f"{slot}-3": 3}
+    assert seats_by_table(second) == {f"{slot}-2": 5}
+
+
 def test_party_larger_than_the_free_seats_is_refused(client, db):
     hiker = add_hiker(db)
     slot = add_slot(db, [4, 2])
