@@ -3,24 +3,16 @@ import { createContext, useContext, useMemo, useState } from 'react';
 
 const AuthContext = createContext(null);
 const STORAGE_KEY = 'mountainhut.auth';
+const SIGNED_OUT_KEY = 'mountainhut.signedOut';
 
-const DEV_MOCK_SESSION = {
-  isAuthenticated: true,
-  token: 'mock-dev-jwt-token',
-  userProfile: {
-    id: 'dev-user-001',
-    email: 'dev@mountainhut.com',
-    fullName: 'Dev User',
-    role: 'Hiker',
-  },
-};
 
 function readStoredSession() {
   try {
+    if (localStorage.getItem(SIGNED_OUT_KEY) === 'true') return null;
     const stored = localStorage.getItem(STORAGE_KEY);
-    return stored ? JSON.parse(stored) : DEV_MOCK_SESSION;
+    return stored ? JSON.parse(stored) : null;
   } catch {
-    return DEV_MOCK_SESSION;
+    return null;
   }
 }
 
@@ -35,12 +27,19 @@ export function AuthProvider({ children }) {
       role: user.role,
     };
     const nextSession = { isAuthenticated: true, token, userProfile };
+    localStorage.removeItem(SIGNED_OUT_KEY);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(nextSession));
     setSession(nextSession);
     return nextSession;
   }
 
-  const value = useMemo(() => ({ session, signIn }), [session]);
+  function signOut() {
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.setItem(SIGNED_OUT_KEY, 'true');
+    setSession(null);
+  }
+
+  const value = useMemo(() => ({ session, signIn, signOut }), [session]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

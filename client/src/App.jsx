@@ -7,12 +7,14 @@ import RoleHomePage from './pages/RoleHomePage.jsx'
 import { AuthProvider } from './auth/AuthContext.jsx'
 import EmployeeSlotConfigPage from './pages/EmployeeSlotConfigPage.jsx'
 import CustomerBookingPage from './pages/CustomerBookingPage.jsx'
+import AccountMenu from './components/AccountMenu.jsx'
 import './App.css'
 
 function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
+        <AccountMenu />
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/login" element={<LoginPage />} />

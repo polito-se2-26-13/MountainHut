@@ -8,8 +8,8 @@ const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 function routeForRole(role) {
   return {
-    Hiker: '/home/hiker',
-    Employee: '/home/employee',
+    Hiker: '/customer/book-table',
+    Employee: '/employee/slots',
     Manager: '/home/manager',
   }[role]
 }

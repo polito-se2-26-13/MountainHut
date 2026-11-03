@@ -223,6 +223,66 @@
   color: #067647;
 }
 
+.success-modal-backdrop {
+  position: fixed;
+  z-index: 2000;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgb(15 23 42 / 55%);
+  backdrop-filter: blur(3px);
+}
+
+.success-modal {
+  width: min(100%, 27rem);
+  padding: 2rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 1rem;
+  background: #fff;
+  box-shadow: 0 1.5rem 4rem rgb(15 23 42 / 25%);
+  text-align: center;
+  animation: success-modal-enter 180ms ease-out;
+}
+
+.success-modal-icon {
+  display: grid;
+  width: 3.5rem;
+  height: 3.5rem;
+  margin: 0 auto 1rem;
+  place-items: center;
+  border-radius: 50%;
+  background: #dcfce7;
+  color: #15803d;
+  font-size: 1.7rem;
+  font-weight: 800;
+}
+
+.success-modal .eyebrow {
+  margin-bottom: 0.45rem;
+  color: #15803d !important;
+}
+
+.success-modal h2 {
+  margin-bottom: 0.65rem;
+  color: #18212f;
+  font-size: 1.5rem;
+}
+
+.success-modal > p:not(.eyebrow) {
+  color: #64748b;
+  font-size: 0.92rem;
+}
+
+.success-modal .submit-button {
+  margin-top: 1.5rem;
+}
+
+@keyframes success-modal-enter {
+  from { opacity: 0; transform: translateY(0.5rem) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
 .error-alert {
   background: #fef3f2;
   color: #b42318;
@@ -735,6 +795,104 @@
   font-size: 0.82rem;
   text-align: center;
   text-decoration: none;
+}
+
+.account-menu-position {
+  position: absolute;
+  z-index: 1000;
+  top: 1rem;
+  right: max(1rem, calc((100vw - 74rem) / 2));
+}
+
+.account-menu {
+  position: relative;
+}
+
+.account-avatar {
+  display: grid;
+  width: 2.8rem;
+  height: 2.8rem;
+  place-items: center;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #1769aa, #1d8b78);
+  box-shadow: 0 0.35rem 1rem rgb(24 33 47 / 18%);
+  color: #fff;
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 750;
+  list-style: none;
+}
+
+.account-avatar::-webkit-details-marker {
+  display: none;
+}
+
+.account-avatar::marker {
+  content: '';
+}
+
+.account-avatar:focus-visible {
+  outline: 3px solid rgb(23 105 170 / 35%);
+  outline-offset: 3px;
+}
+
+.account-dropdown {
+  position: absolute;
+  top: calc(100% + 0.65rem);
+  right: 0;
+  width: min(17rem, calc(100vw - 2rem));
+  padding: 0.55rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.8rem;
+  background: #fff;
+  box-shadow: 0 1rem 2.5rem rgb(15 23 42 / 16%);
+}
+
+.account-identity {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.7rem 0.75rem 0.85rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.account-identity strong {
+  overflow: hidden;
+  color: #18212f;
+  font-size: 0.87rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-identity span {
+  color: #64748b;
+  font-size: 0.77rem;
+}
+
+.account-signout {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 0.35rem;
+  padding: 0.65rem 0.75rem;
+  border: 0;
+  border-radius: 0.5rem;
+  background: transparent;
+  color: #b42318;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.85rem;
+  text-align: left;
+}
+
+.account-signout:hover {
+  background: #fef3f2;
+}
+
+.slot-page,
+.booking-page {
+  padding-top: 5rem;
 }
 
 .booking-confirmation {
