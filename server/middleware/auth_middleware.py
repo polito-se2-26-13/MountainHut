@@ -1,14 +1,18 @@
 from fastapi import  HTTPException, Header, status
 from typing import Optional, List
+from fastapi import Depends
+from fastapi.security import HTTPBearer,HTTPAuthorizationCredentials
 from server.service.auth_service import process_token
 from server.models.enum.user_type import UserType
 from server.models.error.unauthorized_error import UnauthorizedError
+security = HTTPBearer()
 
-# Factory: returns an async dependency callable
 def authenticate_user(allowed_roles: List[UserType]):
-    async def _dep(authorization: Optional[str] = Header(None, alias="Authorization")):
-        if authorization is None:
-            raise UnauthorizedError(message="Authorization header missing")
-        # process_token should raise if the role isn't allowed
+    async def _dep(
+        credentials: HTTPAuthorizationCredentials = Depends(security)
+    ):
+        authorization = f"{credentials.scheme} {credentials.credentials}"
+
         return await process_token(authorization, allowed_roles)
+
     return _dep

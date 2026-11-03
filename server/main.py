@@ -9,7 +9,8 @@ from server.database import Base, engine
 import server.models.DAO  # noqa: F401 - registers models with Base.metadata
 from server.routes import(
     user_routes,
-    reservation_router
+    res_routes,
+    slot_routes,
 )
 
 
@@ -30,7 +31,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(reservation_router)
+#app.include_router(reservation_router)
 
 
 @app.get("/api/health")
@@ -39,7 +40,8 @@ async def health():
     return {"status": "ok"}
 
 app.include_router(user_routes.router)
-
+app.include_router(res_routes.router)
+app.include_router(slot_routes.router)
 
 app.add_exception_handler(AppError, error_handler)
 app.add_exception_handler(Exception, error_handler)
