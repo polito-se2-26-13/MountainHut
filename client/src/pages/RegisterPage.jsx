@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Link } from 'react-router'
+import { useEffect, useRef, useState } from 'react'
+import { Link, useNavigate } from 'react-router'
 import { apiRequest } from '../api/api.js'
 
 const initialValues = {
@@ -33,6 +33,12 @@ function RegisterPage() {
   const [loading, setLoading] = useState(false)
   const [formError, setFormError] = useState('')
   const [success, setSuccess] = useState('')
+  const loginButtonRef = useRef(null)
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    if (success) loginButtonRef.current?.focus()
+  }, [success])
 
   const errors = Object.fromEntries(
     Object.keys(initialValues).map((name) => [name, validateField(name, values)]),
@@ -96,7 +102,6 @@ function RegisterPage() {
         <h1 id="register-title">Create your account</h1>
         <p className="form-intro">Join the MountainHut community.</p>
 
-        {success && <div className="form-alert success-alert" role="status">{success}</div>}
         {formError && <div className="form-alert error-alert" role="alert">{formError}</div>}
 
         <form onSubmit={handleSubmit} noValidate>
@@ -153,6 +158,30 @@ function RegisterPage() {
           <p className="required-note"><span className="required-mark">*</span> Required fields</p>
         </form>
       </section>
+      {success && (
+        <div className="success-modal-backdrop">
+          <section
+            className="success-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="registration-success-title"
+            aria-describedby="registration-success-message"
+          >
+            <div className="success-modal-icon" aria-hidden="true">✓</div>
+            <p className="eyebrow">ACCOUNT READY</p>
+            <h2 id="registration-success-title">Registration successful</h2>
+            <p id="registration-success-message">{success} You can now sign in to your account.</p>
+            <button
+              className="submit-button"
+              type="button"
+              ref={loginButtonRef}
+              onClick={() => navigate('/login', { replace: true })}
+            >
+              Return to sign in
+            </button>
+          </section>
+        </div>
+      )}
     </main>
   )
 }
