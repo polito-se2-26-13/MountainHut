@@ -106,10 +106,10 @@ INSERT OR IGNORE INTO tables (id, table_number, capacity, location, is_active) V
 -- 4. Seed Time Slots (MH-01 & MH-02: Lunch & Dinner flexible slots)
 -- --------------------------------------------------------------------
 INSERT OR IGNORE INTO time_slots (id, date, start_time, end_time, meal_type, status, notes, created_by_id) VALUES
-(1, '2026-10-30', '12:00:00', '13:00:00', 'Lunch', 'OPEN', 'Lunch Service 1 - Sunny day seating active', 2),
-(2, '2026-10-30', '13:00:00', '14:00:00', 'Lunch', 'OPEN', 'Lunch Service 2 - Sunny day seating active', 2),
-(3, '2026-10-30', '19:00:00', '20:30:00', 'Dinner', 'OPEN', 'Dinner Service 1 - Indoor only', 2),
-(4, '2026-10-30', '20:30:00', '22:00:00', 'Dinner', 'OPEN', 'Dinner Service 2 - Indoor only', 2);
+(1, date('now', '+7 days'), '12:00:00', '13:00:00', 'Lunch', 'OPEN', 'Lunch Service 1 - Sunny day seating active', 2),
+(2, date('now', '+7 days'), '13:00:00', '14:00:00', 'Lunch', 'OPEN', 'Lunch Service 2 - Sunny day seating active', 2),
+(3, date('now', '+7 days'), '19:00:00', '20:30:00', 'Dinner', 'OPEN', 'Dinner Service 1 - Indoor only', 2),
+(4, date('now', '+7 days'), '20:30:00', '22:00:00', 'Dinner', 'OPEN', 'Dinner Service 2 - Indoor only', 2);
 
 -- --------------------------------------------------------------------
 -- 5. Seed Slot Table Capacity (MH-02)
