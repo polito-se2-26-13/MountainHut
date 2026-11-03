@@ -47,6 +47,8 @@ Error response:
 {
   "detail": "message"
 }
+```
+
 **get slot availability**
 
 name: `/api/slots/{slot_id}/availability`<br>
@@ -323,8 +325,6 @@ JSON response:
   "detail": "message"
 }
 ```
-
-## PUT
 
 ## PUT
 
