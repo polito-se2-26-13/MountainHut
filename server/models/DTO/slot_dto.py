@@ -21,10 +21,9 @@ class SlotCreation(BaseModel):
     tables: list[Table]
 
 class SlotDetail(BaseModel):
-    date: date
+    slotid: int
+    date:date
     startTime: time
     endTime: time
     mealType: str
-    status: str
-    notes: str
-    create_by: int
+    tables:list[Table]

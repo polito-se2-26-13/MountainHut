@@ -67,7 +67,34 @@ class SlotRepository:
             await session.commit()
             return table_list
 
-    async def get_slot_time(self):
+    async def get_slot_time(self, date: Optional[date] = None):
         async with await self._get_session() as session:
-            result=await session.execute(select(TimeSlotDAO))
-            return result.scalars().all()
+            if date is None:
+                query = (
+                    select(TimeSlotDAO, SlotTableDAO.table_id,SlotTableDAO.available_seats
+                    )
+                    .where(TimeSlotDAO.id == SlotTableDAO.slot_id)
+                )
+            else:
+                query = (
+                    select(TimeSlotDAO, SlotTableDAO.table_id,SlotTableDAO.available_seats
+                    )
+                    .where(TimeSlotDAO.id == SlotTableDAO.slot_id, TimeSlotDAO.date==date)
+                )
+
+            result = await session.execute(query)
+            rows = result.all()
+
+            slots = {}
+            for slot, table_id, available_seats in rows:
+                if slot.id not in slots:
+                    slots[slot.id] = [slot, []]
+                if table_id is not None:
+                    slots[slot.id][1].append({
+                        "table_id": table_id,
+                        "available_seats": available_seats
+                    })
+            return [
+                (slot, tables)
+                for slot, tables in slots.values()
+            ]

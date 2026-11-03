@@ -5,6 +5,9 @@ from server.models.enum.user_type import UserType
 from server.config.config import ROUTES
 from server.controllers.slot_controller import SlotController
 from server.models.DTO.slot_dto import SlotDetail
+from datetime import date
+from typing import Optional
+
 router=APIRouter(prefix=ROUTES['SLOT'],tags=["SLOT"])
 controller=SlotController()
 @router.post("/setUp",
@@ -19,5 +22,5 @@ async def setUpSlot(slot: SlotCreation):
             response_model=list[SlotDetail],
             status_code=status.HTTP_200_OK,
             dependencies=[Depends(authenticate_user([UserType.Employee]))])
-async def getSlotTime():
-    return await controller.getSlotTime()
+async def getSlotTime(date:Optional[date]=None):
+    return await controller.getSlotTime(date)

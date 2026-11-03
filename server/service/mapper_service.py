@@ -79,16 +79,28 @@ def slotTableDto_to_response(slotTime:TimeSlotDAO,table_list:list)->SlotResponse
         message="Slot created successfully"
     ) 
 
-def slots_deatils_to_response(slots:list[TimeSlotDAO])->list[SlotDetail]:
+def slots_deatils_to_response(slots:list[tuple[TimeSlotDAO, list[dict[str, int]]]])->SlotDetail:
     results:list[SlotDetail]=[]
-    for s in slots:
+    for slot,tables in slots:
         results.append(SlotDetail(
-            date=s.date,
-            startTime=s.start_time,
-            endTime=s.end_time,
-            mealType=s.meal_type,
-            status=s.status,
-            notes=s.notes,
-            create_by=s.created_by_id
+            slotid=slot.id,
+            date= slot.date,
+            startTime=slot.start_time,
+            endTime=slot.end_time,
+            mealType=slot.meal_type,
+            tables=tableList(tables)
         ))
     return results
+
+def tableList(tables: list[dict]):
+    tablesDto = []
+
+    for table in tables:
+        tablesDto.append(
+            Table(
+                tableNumber=str(table["table_id"]),
+                seats=table["available_seats"]
+            )
+        )
+
+    return tablesDto

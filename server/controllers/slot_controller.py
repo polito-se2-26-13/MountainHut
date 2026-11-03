@@ -7,6 +7,8 @@ from server.service.mapper_service import slotTableDto_to_response
 from server.models.error.unprocessable_content import UnprocessableContent
 from server.models.DTO.slot_dto import SlotDetail
 from server.service.mapper_service import slots_deatils_to_response
+from datetime import date
+
 class SlotController():
     def __init__(self):
         self.repo=SlotRepository()
@@ -34,6 +36,6 @@ class SlotController():
         result=await self.repo.transaction_add_table(slotTime,tables)
         return slotTableDto_to_response(slotTime,result)
 
-    async def getSlotTime(self)->list[SlotDetail]:
-        result=await self.repo.get_slot_time()
+    async def getSlotTime(self,date:date)->list[SlotDetail]:
+        result=await self.repo.get_slot_time(date)
         return slots_deatils_to_response(result)
