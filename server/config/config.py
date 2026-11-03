@@ -9,7 +9,7 @@ ORIGIN = [
 ]
 # route keys
 URL_AUTH = "auth"
-URL_RESERVATION = "reservation"
+URL_RESERVATION = "reservations"
 URL_SLOT  = "slots"
 
 ROUTES = {

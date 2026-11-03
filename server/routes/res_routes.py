@@ -15,3 +15,10 @@ controller=ReservationController()
              )
 async def create_reservation(reservation:ReservationCreate):
      return await controller.create_reservation(reservation)
+
+@router.get("/{referce}",
+            response_model=ReservationResponse,
+            status_code=status.HTTP_200_OK)
+async def get_reservation_by_reference(reference:str):
+     return await controller.get_reservation_by_reference(reference)
+     

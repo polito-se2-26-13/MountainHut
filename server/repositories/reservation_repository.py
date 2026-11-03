@@ -8,6 +8,7 @@ from server.models.DAO.reservation import ReservationDAO, ReservationTableAssign
 from server.models.DTO.reservation_dto import ReservationCreate
 from server.const import ReservationStatus
 from server.models.error.notfound_error import NotFoundError
+from datetime import datetime
 
 class ReservationRepository:
 
@@ -110,3 +111,26 @@ class ReservationRepository:
                 await session.rollback()
                 raise ValueError(f"Failed to create reservation due to database constraint")
         return [res,assignments]
+
+    async def get_reservation_by_reference(self,reference:str)->tuple[ReservationDAO,list[dict]]:
+        async with await self._get_session() as session:
+            result =await session.execute(select(
+                ReservationDAO,
+                ReservationTableAssignmentDAO.slot_table_id,
+                ReservationTableAssignmentDAO.assigned_seats,
+                TableDAO.table_number)
+                    .where(ReservationTableAssignmentDAO.reservation_id==ReservationDAO.id,TableDAO.id==ReservationTableAssignmentDAO.slot_table_id,
+                           ReservationDAO.booking_reference==reference))
+        rows = result.all()
+        if not rows:
+            return None,[]
+        
+        res = rows[0][0]
+        assignments:List[dict]=[]
+        for reservation, slot_table_id, assigned_seats , table_number in rows:
+            assignments.append({
+                "slotTableId": slot_table_id,
+                "tableNumber": table_number,
+                "assignedSeats": assigned_seats
+            })
+        return res, assignments

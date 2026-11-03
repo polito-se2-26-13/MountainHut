@@ -39,3 +39,10 @@ class ReservationController():
         table_allocations = assign_tables_for_party(timeSlot, reservation.party_size)
         res,tables= await self.repo.transaction_add_reservation(reservation,table_allocations)
         return reservationDTO_to_response(res,tables)
+
+    async def get_reservation_by_reference(self,reference:str):
+        res,tables= await self.repo.get_reservation_by_reference(reference)
+        if not res :
+            raise NotFoundError("booking reference not found")
+        
+        return reservationDTO_to_response(res,tables)
