@@ -9,13 +9,13 @@ ORIGIN = [
 ]
 # route keys
 URL_AUTH = "auth"
-URL_SERVICE = "services"
-URL_TICKET  = "tickets"
+URL_RESERVATION = "reservation"
+URL_SLOT  = "slots"
 
 ROUTES = {
     "AUTH": BASEURL + URL_AUTH,
-    "SERVICE": BASEURL + URL_SERVICE,
-    "TICKET":  BASEURL + URL_TICKET,
+    "RESERVATION": BASEURL + URL_RESERVATION,
+    "SLOT":  BASEURL + URL_SLOT,
 }
 
 # JWT Configuration

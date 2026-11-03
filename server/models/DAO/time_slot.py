@@ -129,7 +129,8 @@ class SlotTableDAO(Base):
         return sum(
             assignment.assigned_seats
             for assignment in self.assignments
-            if assignment.reservation.status == ReservationStatus.CONFIRMED.value
+            if assignment.reservation is not None
+            and assignment.reservation.status == ReservationStatus.CONFIRMED.value
         )
 
     @property

@@ -11,7 +11,7 @@ from server.models.DTO.reservation_dto import (
     SlotAvailabilityResponse,
 )
 from server.service.booking_service import (
-    create_reservation,
+    #create_reservation,
     get_reservation_by_reference,
     get_user_reservations,
     get_slot_availability,
@@ -51,7 +51,7 @@ def _to_response_dto(res) -> ReservationResponse:
         created_at=res.created_at.isoformat() if res.created_at else None,
     )
 
-
+'''
 @router.post("/reservations", response_model=ReservationResponse, status_code=status.HTTP_201_CREATED)
 async def book_table(payload: ReservationCreate, db: AsyncSession = Depends(get_db)):
     """Book a table for a party in a selected time slot and deduct capacity asynchronously."""
@@ -65,7 +65,7 @@ async def book_table(payload: ReservationCreate, db: AsyncSession = Depends(get_
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"An unexpected error occurred: {str(e)}",
         )
-
+'''
 
 @router.get("/reservations/{reference}", response_model=ReservationResponse)
 async def get_reservation(reference: str, db: AsyncSession = Depends(get_db)):

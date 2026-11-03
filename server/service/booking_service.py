@@ -11,7 +11,7 @@ from server.models.DAO.user import UserDAO
 from server.models.DAO.time_slot import TimeSlotDAO, SlotTableDAO
 from server.models.DAO.reservation import ReservationDAO, ReservationTableAssignmentDAO
 from server.models.DTO.reservation_dto import ReservationCreate
-
+from server.models.error.conflict_error import ConflictError
 
 def validate_two_hour_rule(
     slot: TimeSlotDAO, current_time: Optional[datetime] = None
@@ -25,7 +25,7 @@ def validate_two_hour_rule(
     cutoff = slot_datetime - timedelta(hours=2)
 
     if now > cutoff:
-        raise ValueError(
+        raise ConflictError(
             f"Reservations must be made at least 2 hours before the time slot. "
             f"Cutoff was {cutoff.strftime('%Y-%m-%d %H:%M')}, current time is {now.strftime('%Y-%m-%d %H:%M')}."
         )
@@ -151,17 +151,16 @@ def assign_tables_for_party(
 
     return assignments
 
-
+"""
 async def create_reservation(
     db: AsyncSession,
     data: ReservationCreate,
     current_time: Optional[datetime] = None,
 ) -> ReservationDAO:
-    """
     Create a new table reservation and deduct capacity asynchronously.
     Enforces user existence, slot status, 2-hour rule (MH-42),
     one-booking rule (MH-01), capacity check, and table assignment.
-    """
+
     # 1. Validate User
     result = await db.execute(select(UserDAO).where(UserDAO.id == data.user_id))
     hiker = result.scalar_one_or_none()
@@ -232,3 +231,4 @@ async def create_reservation(
         raise ValueError(f"Failed to create reservation due to database constraint: {e}")
 
     return reservation
+"""
