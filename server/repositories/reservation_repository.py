@@ -134,3 +134,35 @@ class ReservationRepository:
                 "assignedSeats": assigned_seats
             })
         return res, assignments
+
+    async def get_reservation_by_user_id(self,user_id:str)->tuple[ReservationDAO,list[dict]]:
+            async with await self._get_session() as session:
+                result =await session.execute(select(
+                    ReservationDAO,
+                    ReservationTableAssignmentDAO.slot_table_id,
+                    ReservationTableAssignmentDAO.assigned_seats,
+                    TableDAO.table_number)
+                        .where(ReservationTableAssignmentDAO.reservation_id == ReservationDAO.id,
+                                SlotTableDAO.id == ReservationTableAssignmentDAO.slot_table_id,
+                                TableDAO.id == SlotTableDAO.table_id,
+                                ReservationDAO.user_id == user_id))
+            rows = result.all()
+            if not rows:
+                return []
+            
+            reservations = {}
+            for res, slot_table_id, assigned_seats, table_number in rows:
+                if res.id not in reservations:
+                    reservations[res.id] = [res, []]
+
+                reservations[res.id][1].append(({
+                    "slotTableId": slot_table_id,
+                    "assignedSeats": assigned_seats,
+                    "tableNumber": table_number
+                }))
+            return [
+                (res, assignments)
+                for res, assignments in reservations.values()
+            ]
+
+            

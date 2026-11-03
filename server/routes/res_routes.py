@@ -21,4 +21,9 @@ async def create_reservation(reservation:ReservationCreate):
             status_code=status.HTTP_200_OK)
 async def get_reservation_by_reference(reference:str):
      return await controller.get_reservation_by_reference(reference)
-     
+
+@router.get("/user/{user_id}",
+            response_model=list[ReservationResponse],
+            status_code=status.HTTP_200_OK)
+async def get_reservation_by_user_id(user_id:str):
+     return await controller.get_reservation_by_user_id(user_id)
