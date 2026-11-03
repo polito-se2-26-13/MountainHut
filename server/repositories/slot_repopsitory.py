@@ -66,3 +66,8 @@ class SlotRepository:
             
             await session.commit()
             return table_list
+
+    async def get_slot_time(self):
+        async with await self._get_session() as session:
+            result=await session.execute(select(TimeSlotDAO))
+            return result.scalars().all()

@@ -4,7 +4,7 @@ from server.models.DTO.user_dto import UserResponseDTO,UserLoginResponse,UserDTO
 from server.models.DAO.user import UserDAO
 from server.models.DTO.reservation_dto import ReservationResponse, AssignedTableInfo
 from server.models.DAO.reservation import ReservationDAO,ReservationTableAssignmentDAO
-from server.models.DTO.slot_dto import SlotResponse,Table
+from server.models.DTO.slot_dto import SlotResponse,Table,SlotDetail
 from typing import List
 
 def create_error_dto(code: int, message: str, name: str) -> ErrorDTO:
@@ -78,3 +78,17 @@ def slotTableDto_to_response(slotTime:TimeSlotDAO,table_list:list)->SlotResponse
         tables=tables,
         message="Slot created successfully"
     ) 
+
+def slots_deatils_to_response(slots:list[TimeSlotDAO])->list[SlotDetail]:
+    results:list[SlotDetail]=[]
+    for s in slots:
+        results.append(SlotDetail(
+            date=s.date,
+            startTime=s.start_time,
+            endTime=s.end_time,
+            mealType=s.meal_type,
+            status=s.status,
+            notes=s.notes,
+            create_by=s.created_by_id
+        ))
+    return results

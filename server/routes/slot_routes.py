@@ -4,6 +4,7 @@ from server.middleware.auth_middleware import authenticate_user
 from server.models.enum.user_type import UserType
 from server.config.config import ROUTES
 from server.controllers.slot_controller import SlotController
+from server.models.DTO.slot_dto import SlotDetail
 router=APIRouter(prefix=ROUTES['SLOT'],tags=["SLOT"])
 controller=SlotController()
 @router.post("/setUp",
@@ -13,3 +14,10 @@ controller=SlotController()
              )
 async def setUpSlot(slot: SlotCreation):
     return await controller.setUpSlot(slot)
+
+@router.get("/",
+            response_model=list[SlotDetail],
+            status_code=status.HTTP_200_OK,
+            dependencies=[Depends(authenticate_user([UserType.Employee]))])
+async def getSlotTime():
+    return await controller.getSlotTime()

@@ -19,3 +19,12 @@ class SlotCreation(BaseModel):
     endTime: time
     mealType: str
     tables: list[Table]
+
+class SlotDetail(BaseModel):
+    date: date
+    startTime: time
+    endTime: time
+    mealType: str
+    status: str
+    notes: str
+    create_by: int
