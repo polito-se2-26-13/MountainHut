@@ -206,6 +206,9 @@ def test_party_size_is_required_and_positive(client, db):
 
 def test_booking_can_be_read_by_its_reference(client, db):
     hiker = add_hiker(db)
+    # a table outside the slot, so that a table id and a slot table id are different numbers
+    db.add(TableDAO(table_number="spare", capacity=2))
+    db.commit()
     slot = add_slot(db, [6])
     booking = book(client, hiker, slot, 2).json()
 
@@ -213,4 +216,5 @@ def test_booking_can_be_read_by_its_reference(client, db):
 
     assert response.status_code == 200
     assert response.json()["id"] == booking["id"]
+    assert response.json()["assigned_tables"][0]["table_number"] == f"{slot}-1"
     assert client.get("/api/reservations/NOPE").status_code == 404

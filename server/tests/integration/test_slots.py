@@ -104,6 +104,15 @@ def test_saving_the_same_times_again_does_not_create_a_second_slot(client, db):
     assert db.query(TimeSlotDAO).count() == 1
 
 
+def test_saving_a_table_again_changes_its_seats(client, db):
+    employee = login_as(db, "Employee")
+    client.post("/api/slots", json=slot([("T1", 4)]), headers=employee)
+
+    client.post("/api/slots", json=slot([("T1", 6)]), headers=employee)
+
+    assert client.get(f"/api/slots?date={DAY}", headers=employee).json()[0]["tables"] == [{"tableNumber": "T1", "seats": 6}]
+
+
 def test_refused_request_leaves_nothing_behind(client, db):
     employee = login_as(db, "Employee")
 
