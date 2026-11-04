@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, Navigate } from 'react-router'
 import { apiRequest } from '../api/api.js'
 import { useAuth } from '../auth/AuthContext.jsx'
+import { useToast } from '../components/ToastProvider.jsx'
 
 const TWO_HOURS_MS = 2 * 60 * 60 * 1000
 
@@ -58,9 +59,9 @@ function CustomerBookingPage() {
   const [isLoadingSlots, setIsLoadingSlots] = useState(true)
   const [isCheckingAvailability, setIsCheckingAvailability] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [errorMessage, setErrorMessage] = useState('')
   const [bookingSuccessData, setBookingSuccessData] = useState(null)
   const [touched, setTouched] = useState({})
+  const notify = useToast()
   const selectedSlot = slotOptionsDate === slotDate
     ? slotOptions.find((slot) => String(getSlotId(slot)) === String(slotId))
     : undefined
@@ -82,14 +83,14 @@ function CustomerBookingPage() {
         return upcomingSlots
       })
       .catch((error) => {
-        if (active) setErrorMessage(error.message || 'Could not load service times for this date.')
+        if (active) notify(error.message || 'Could not load service times for this date.')
         return []
       })
       .finally(() => {
         if (active) setIsLoadingSlots(false)
       })
     return () => { active = false }
-  }, [slotDate, session])
+  }, [slotDate, session, notify])
 
   useEffect(() => {
     if (!selectedSlot) return undefined
@@ -101,13 +102,13 @@ function CustomerBookingPage() {
         if (active) setAvailability(result)
       })
       .catch((error) => {
-        if (active) setErrorMessage(error.message || 'Could not check remaining seats for this time.')
+        if (active) notify(error.message || 'Could not check remaining seats for this time.')
       })
       .finally(() => {
         if (active) setIsCheckingAvailability(false)
       })
     return () => { active = false }
-  }, [selectedSlot, session])
+  }, [selectedSlot, session, notify])
 
   const remainingSeats = Number(availability?.remaining_seats ?? availability?.remainingSeats ?? 0)
   const isSlotOpen = (availability?.status || '').toUpperCase() === 'OPEN'
@@ -139,41 +140,38 @@ function CustomerBookingPage() {
     setSlotId('')
     setAvailability(null)
     setIsCheckingAvailability(false)
-    setErrorMessage('')
     setSlotDate(value)
     setBookingSuccessData(null)
   }
 
-  function clearFeedback() {
-    setErrorMessage('')
+  function clearBookingConfirmation() {
     setBookingSuccessData(null)
   }
 
   async function handleSubmit(event) {
     event.preventDefault()
     setTouched({ partySize: true, contactName: true, contactEmail: true })
-    setErrorMessage('')
     setBookingSuccessData(null)
 
     if (!selectedSlot) {
-      setErrorMessage('Choose a service time before continuing.')
+      notify('Choose a service time before continuing.')
       return
     }
     if (!selectedTimeStillValid) {
-      setErrorMessage('Bookings must be made at least 2 hours before the service time.')
+      notify('Bookings must be made at least 2 hours before the service time.')
       return
     }
     if (!availability || !isSlotOpen || isCheckingAvailability) {
-      setErrorMessage('This service time is not currently available.')
+      notify('This service time is not currently available.')
       return
     }
     if (partySizeError || contactNameError || contactEmailError) {
-      setErrorMessage(partySizeError || contactNameError || contactEmailError)
+      notify(partySizeError || contactNameError || contactEmailError)
       return
     }
     const userId = Number(session.userProfile.id)
     if (!Number.isInteger(userId) || userId < 1) {
-      setErrorMessage('Your account is missing a valid user ID. Please sign in again.')
+      notify('Your account is missing a valid user ID. Please sign in again.')
       return
     }
 
@@ -207,7 +205,7 @@ function CustomerBookingPage() {
       setPartySize(2)
       setSpecialReqs('')
     } catch (error) {
-      setErrorMessage(error.message || 'Your booking could not be completed. Please try again.')
+      notify(error.message || 'Your booking could not be completed. Please try again.')
     } finally {
       setIsSubmitting(false)
     }
@@ -219,7 +217,7 @@ function CustomerBookingPage() {
     <main className="page booking-page">
       <header className="booking-header">
         <div>
-          <Link className="back-link" to="/home/hiker">Hiker home</Link>
+          {/* <Link className="back-link" to="/home/hiker">Hiker home</Link> */}
           <p className="eyebrow">MOUNTAINHUT · GUEST BOOKING</p>
           <h1>Book a table</h1>
           <p className="form-intro">Choose a service time, tell us how many are joining, and we’ll take care of the seating.</p>
@@ -227,7 +225,6 @@ function CustomerBookingPage() {
         <div className="booking-header-mark" aria-hidden="true">MH</div>
       </header>
 
-      {errorMessage && <div className="form-alert error-alert" role="alert">{errorMessage}</div>}
       {bookingSuccessData && (
         <section className="booking-confirmation" role="status" aria-labelledby="booking-confirmation-title">
           <div className="confirmation-icon" aria-hidden="true">✓</div>
@@ -264,7 +261,7 @@ function CustomerBookingPage() {
               </label>
               <label className="form-field">
                 <span>Service time <span className="required-mark" aria-hidden="true">*</span></span>
-                <select value={slotId} required onChange={(event) => { setSlotId(event.target.value); setAvailability(null); setIsCheckingAvailability(Boolean(event.target.value)); clearFeedback() }} disabled={isLoadingSlots || slotOptions.length === 0}>
+                <select value={slotId} required onChange={(event) => { setSlotId(event.target.value); setAvailability(null); setIsCheckingAvailability(Boolean(event.target.value)); clearBookingConfirmation() }} disabled={isLoadingSlots || slotOptions.length === 0}>
                   <option value="">{isLoadingSlots ? 'Loading service times…' : slotOptions.length ? 'Select a time' : 'No bookable times for this date'}</option>
                   {slotOptions.map((slot) => {
                     const start = getSlotStart(slot)
@@ -276,7 +273,7 @@ function CustomerBookingPage() {
               </label>
             </div>
             {isLoadingSlots && <p className="availability-hint">Finding service times for your selected date…</p>}
-            {!isLoadingSlots && slotOptions.length === 0 && !errorMessage && <p className="availability-hint">Only times at least 2 hours from now can be booked.</p>}
+            {!isLoadingSlots && slotOptions.length === 0 && <p className="availability-hint">Only times at least 2 hours from now can be booked.</p>}
             {isCheckingAvailability && <p className="availability-hint" role="status">Checking remaining seats…</p>}
             {availability && (
               <div className={`availability-card${isSlotOpen && remainingSeats > 0 ? '' : ' unavailable'}`} role="status">
@@ -293,7 +290,7 @@ function CustomerBookingPage() {
             </div>
             <label className="form-field party-size-field">
               <span>Number of guests <span className="required-mark" aria-hidden="true">*</span></span>
-              <input type="number" min="1" max={availability ? remainingSeats : undefined} step="1" value={partySize} onChange={(event) => { setPartySize(event.target.value); clearFeedback() }} onBlur={() => setTouched((current) => ({ ...current, partySize: true }))} aria-invalid={Boolean(touched.partySize && partySizeError)} />
+              <input type="number" min="1" max={availability ? remainingSeats : undefined} step="1" value={partySize} onChange={(event) => { setPartySize(event.target.value); clearBookingConfirmation() }} onBlur={() => setTouched((current) => ({ ...current, partySize: true }))} aria-invalid={Boolean(touched.partySize && partySizeError)} />
               {touched.partySize && partySizeError && <small className="field-error">{partySizeError}</small>}
               {availability && !partySizeError && <small className="field-hint">Up to {remainingSeats} guests can be booked for this time.</small>}
             </label>
@@ -307,21 +304,21 @@ function CustomerBookingPage() {
             <div className="booking-fields">
               <label className="form-field">
                 <span>Contact name <span className="required-mark" aria-hidden="true">*</span></span>
-                <input value={contactName} autoComplete="name" onChange={(event) => { setContactName(event.target.value); clearFeedback() }} onBlur={() => setTouched((current) => ({ ...current, contactName: true }))} aria-invalid={Boolean(touched.contactName && contactNameError)} />
+                <input value={contactName} autoComplete="name" onChange={(event) => { setContactName(event.target.value); clearBookingConfirmation() }} onBlur={() => setTouched((current) => ({ ...current, contactName: true }))} aria-invalid={Boolean(touched.contactName && contactNameError)} />
                 {touched.contactName && contactNameError && <small className="field-error">{contactNameError}</small>}
               </label>
               <label className="form-field">
                 <span>Email <span className="required-mark" aria-hidden="true">*</span></span>
-                <input type="email" value={contactEmail} autoComplete="email" onChange={(event) => { setContactEmail(event.target.value); clearFeedback() }} onBlur={() => setTouched((current) => ({ ...current, contactEmail: true }))} aria-invalid={Boolean(touched.contactEmail && contactEmailError)} />
+                <input type="email" value={contactEmail} autoComplete="email" onChange={(event) => { setContactEmail(event.target.value); clearBookingConfirmation() }} onBlur={() => setTouched((current) => ({ ...current, contactEmail: true }))} aria-invalid={Boolean(touched.contactEmail && contactEmailError)} />
                 {touched.contactEmail && contactEmailError && <small className="field-error">{contactEmailError}</small>}
               </label>
               <label className="form-field">
                 <span>Phone <span className="optional-mark">(optional)</span></span>
-                <input type="tel" value={contactPhone} autoComplete="tel" onChange={(event) => { setContactPhone(event.target.value); clearFeedback() }} />
+                <input type="tel" value={contactPhone} autoComplete="tel" onChange={(event) => { setContactPhone(event.target.value); clearBookingConfirmation() }} />
               </label>
               <label className="form-field form-field-wide">
                 <span>Special requirements <span className="optional-mark">(optional)</span></span>
-                <textarea rows="4" value={specialReqs} placeholder="Dietary needs, allergies, or anything else we should know" onChange={(event) => { setSpecialReqs(event.target.value); clearFeedback() }} />
+                <textarea rows="4" value={specialReqs} placeholder="Dietary needs, allergies, or anything else we should know" onChange={(event) => { setSpecialReqs(event.target.value); clearBookingConfirmation() }} />
               </label>
             </div>
           </section>

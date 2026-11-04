@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, Navigate } from 'react-router';
 import { apiRequest } from '../api/api.js';
 import { useAuth } from '../auth/AuthContext.jsx';
+import { useToast } from '../components/ToastProvider.jsx';
 
 function localDateString() {
   const now = new Date();
@@ -52,9 +53,7 @@ function EmployeeSlotConfigPage() {
   const [isCopying, setIsCopying] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [sourceRefreshKey, setSourceRefreshKey] = useState(0);
-  const [errorMessage, setErrorMessage] = useState('');
-  const [successMessage, setSuccessMessage] = useState('');
-  const [submitted, setSubmitted] = useState(false);
+  const notify = useToast();
 
   useEffect(() => {
     if (!session?.isAuthenticated || session.userProfile.role !== 'Employee') return undefined;
@@ -73,7 +72,7 @@ function EmployeeSlotConfigPage() {
         if (active) setCopySourceOptions(readSlotsResponse(result));
       })
       .catch(error => {
-        if (active) setErrorMessage(error.message || 'Could not load saved time slots.');
+        if (active) notify(error.message || 'Could not load saved time slots.');
       })
       .finally(() => {
         if (active) setIsLoadingSources(false);
@@ -81,7 +80,7 @@ function EmployeeSlotConfigPage() {
     return () => {
       active = false;
     };
-  }, [formData.slotDate, session, sourceRefreshKey]);
+  }, [formData.slotDate, session, sourceRefreshKey, notify]);
 
   const totalCapacity = useMemo(
     () => formData.tables.reduce((total, table) => total + (Number(table.seats) || 0), 0),
@@ -94,8 +93,6 @@ function EmployeeSlotConfigPage() {
 
   function updateForm(field, value) {
     setFormData(current => ({ ...current, [field]: value }));
-    setErrorMessage('');
-    setSuccessMessage('');
   }
 
   function updateTable(tableId, field, value) {
@@ -105,14 +102,10 @@ function EmployeeSlotConfigPage() {
         table.id === tableId ? { ...table, [field]: value } : table
       ),
     }));
-    setErrorMessage('');
-    setSuccessMessage('');
   }
 
   function addTable() {
     setFormData(current => ({ ...current, tables: [...current.tables, createTable()] }));
-    setErrorMessage('');
-    setSuccessMessage('');
   }
 
   function removeTable(tableId) {
@@ -120,25 +113,21 @@ function EmployeeSlotConfigPage() {
       ...current,
       tables: current.tables.filter(table => table.id !== tableId),
     }));
-    setErrorMessage('');
-    setSuccessMessage('');
   }
 
   async function copyTables() {
     if (!selectedSourceSlotId) {
-      setErrorMessage('Choose a saved time slot to copy first.');
+      notify('Choose a saved time slot to copy first.');
       return;
     }
     const source = copySourceOptions.find(
       slot => String(slotId(slot)) === String(selectedSourceSlotId)
     );
     if (!source) {
-      setErrorMessage('The selected saved time slot is no longer available.');
+      notify('The selected saved time slot is no longer available.');
       return;
     }
     setIsCopying(true);
-    setErrorMessage('');
-    setSuccessMessage('');
     try {
       const sourceTables = source.tables;
       if (!Array.isArray(sourceTables))
@@ -149,11 +138,9 @@ function EmployeeSlotConfigPage() {
           createTable(String(table.tableNumber ?? ''), Number(table.seats) || 1)
         ),
       }));
-      setSuccessMessage(
-        `Copied ${sourceTables.length} table${sourceTables.length === 1 ? '' : 's'} from the selected time slot.`
-      );
+      notify(`Copied ${sourceTables.length} table${sourceTables.length === 1 ? '' : 's'} from the selected time slot.`, 'success');
     } catch (error) {
-      setErrorMessage(error.message || 'Could not copy the saved table configuration.');
+      notify(error.message || 'Could not copy the saved table configuration.');
     } finally {
       setIsCopying(false);
     }
@@ -180,12 +167,9 @@ function EmployeeSlotConfigPage() {
 
   async function handleSubmit(event) {
     event.preventDefault();
-    setSubmitted(true);
-    setErrorMessage('');
-    setSuccessMessage('');
     const validationMessage = validate();
     if (validationMessage) {
-      setErrorMessage(validationMessage);
+      notify(validationMessage);
       return;
     }
 
@@ -208,11 +192,10 @@ function EmployeeSlotConfigPage() {
           })),
         }),
       });
-      setSuccessMessage(result?.message || 'Time slot and table configuration saved.');
-      setSubmitted(false);
+      notify(result?.message || 'Time slot and table configuration saved.', 'success');
       setSourceRefreshKey(current => current + 1);
     } catch (error) {
-      setErrorMessage(error.message || 'Could not save this time slot.');
+      notify(error.message || 'Could not save this time slot.');
     } finally {
       setIsSaving(false);
     }
@@ -222,9 +205,9 @@ function EmployeeSlotConfigPage() {
     <main className="page slot-page">
       <header className="slot-page-header">
         <div>
-          <Link className="back-link" to="/home/employee">
+          {/* <Link className="back-link" to="/home/employee">
             Employee home
-          </Link>
+          </Link> */}
           <p className="eyebrow">MOUNTAINHUT · EMPLOYEE TOOLS</p>
           <h1>Service slots &amp; table setup</h1>
           <p className="form-intro">Set service times and build a table layout for any date.</p>
@@ -235,17 +218,6 @@ function EmployeeSlotConfigPage() {
           <small>seats in this slot</small>
         </div>
       </header>
-
-      {errorMessage && (
-        <div className="form-alert error-alert" role="alert">
-          {errorMessage}
-        </div>
-      )}
-      {successMessage && (
-        <div className="form-alert success-alert" role="status">
-          {successMessage}
-        </div>
-      )}
 
       <form className="slot-form" onSubmit={handleSubmit} noValidate>
         <section className="slot-panel" aria-labelledby="slot-details-title">
@@ -410,9 +382,6 @@ function EmployeeSlotConfigPage() {
           <button className="add-table-button" type="button" onClick={addTable}>
             + Add a table
           </button>
-          {submitted && errorMessage && (
-            <p className="slot-validation-note">Review the time and table details above.</p>
-          )}
         </section>
 
         <footer className="slot-form-footer">
