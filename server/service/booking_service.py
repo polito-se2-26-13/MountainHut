@@ -110,7 +110,7 @@ def assign_tables_for_party(
     ]
 
     if not available_tables:
-        raise ValueError("No available tables configured for this time slot.")
+        raise ConflictError("No available tables configured for this time slot.")
 
     # 1. Single table attempt (Keep party together):
     single_fits = [st for st in available_tables if st.free_seats >= party_size]
@@ -130,7 +130,7 @@ def assign_tables_for_party(
         None,
     )
     if needed is None:
-        raise ValueError(
+        raise ConflictError(
             f"Unable to seat party of {party_size}. Not enough free seats on the tables."
         )
 

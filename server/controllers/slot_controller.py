@@ -1,8 +1,8 @@
 from server.models.DAO.table import TableDAO
 from server.models.DTO.slot_dto import SlotCreation
 from server.repositories.slot_repopsitory import SlotRepository
+from server.repositories.reservation_repository import ReservationRepository
 from server.models.error.conflict_error import ConflictError
-from server.models.error.notfound_error import NotFoundError
 from server.service.mapper_service import slotTableDto_to_response
 from server.models.error.unprocessable_content import UnprocessableContent
 from server.models.DTO.slot_dto import SlotDetail
@@ -14,24 +14,25 @@ class SlotController():
         self.repo=SlotRepository()
 
     async def setUpSlot(self,slot: SlotCreation):
-        #search time slot
         if(slot.startTime>=slot.endTime):
             raise ConflictError("start time must be less then end time")
-        slotTime=await self.repo.find_slot_time(slot.date,slot.startTime,slot.endTime,slot.mealType)
-        if slotTime is None:
-            raise NotFoundError("slot time not found")
+        # checked before saving anything, so a refused request leaves no slot or table behind
+        for t in slot.tables:
+            if t.seats<=0:
+                raise UnprocessableContent("seats can not be negative or 0")
 
-        #search table
+        #search time slot, or create it: the employee chooses date and times freely (MH-02)
+        slotTime=await self.repo.find_slot_time(slot.date,slot.startTime,slot.endTime)
+        if slotTime is None:
+            slotTime=await self.repo.add_slot_time(slot)
+
+        #search table, or create it: there is no fixed set of tables and seats differ per slot (PO issue 17)
         tables: list[tuple[TableDAO,int]]=[]
         for t in slot.tables:
             table=await self.repo.find_table(t.tableNumber)
             if table is None:
-                raise NotFoundError(f"table {t.tableNumber} not found")
-            if t.seats>table.capacity:
-                raise ConflictError(f"you can not add more seats tath the capacity of the table")
+                table=await self.repo.add_table(t.tableNumber,t.seats)
             tables.append((table,t.seats))
-            if t.seats<=0:
-                raise UnprocessableContent("seats can not be negative or 0")
         #add table
         result=await self.repo.transaction_add_table(slotTime,tables)
         return slotTableDto_to_response(slotTime,result)
@@ -39,3 +40,6 @@ class SlotController():
     async def getSlotTime(self,date:date)->list[SlotDetail]:
         result=await self.repo.get_slot_time(date)
         return slots_deatils_to_response(result)
+
+    async def getSlotAvailability(self,slot_id:int)->dict:
+        return await ReservationRepository().get_slot_availability(slot_id)

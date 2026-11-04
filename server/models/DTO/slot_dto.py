@@ -5,11 +5,11 @@ class Table(BaseModel):
     seats: int
 
 class SlotResponse(BaseModel):
-    slotid: int
+    slotId: int
     date:date
-    startTime: time
-    endTime: time
-    mealType: str
+    startTime: str
+    endTime: str
+    mealType: str|None
     tables:list[Table]
     message:str
 
@@ -17,13 +17,13 @@ class SlotCreation(BaseModel):
     date: date
     startTime: time
     endTime: time
-    mealType: str
+    mealType: str|None=None
     tables: list[Table]
 
 class SlotDetail(BaseModel):
-    slotid: int
+    slotId: int
     date:date
-    startTime: time
-    endTime: time
-    mealType: str
+    startTime: str
+    endTime: str
+    mealType: str|None
     tables:list[Table]

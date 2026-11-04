@@ -16,7 +16,8 @@ def create_app_error(err: Any) -> ErrorDTO:
     # Default error
     model_error = create_error_dto(
         500,
-        getattr(err, 'message', None) or str(err) or "Internal Server Error",
+        # never str(err): for a database error it holds the SQL and the personal data of the request
+        "Internal Server Error",
         "InternalServerError"
     )
     

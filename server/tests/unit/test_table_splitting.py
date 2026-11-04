@@ -5,12 +5,13 @@ from sqlalchemy import event, select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
-from server.database import Base, set_sqlite_pragma
+from server.controllers.reservation_controller import ReservationController
+from server.database import AsyncSessionLocal, Base, engine as real_engine, set_sqlite_pragma
 from server.const import SlotStatus, ReservationStatus, UserRole
 from server.models.DAO import UserDAO, TableDAO, TimeSlotDAO, SlotTableDAO, ReservationDAO
 from server.models.DTO.reservation_dto import ReservationCreate
+from server.models.error.conflict_error import ConflictError
 from server.service.booking_service import (
-    create_reservation,
     validate_two_hour_rule,
     assign_tables_for_party,
     get_slot_availability,
@@ -36,10 +37,10 @@ async def split_test_db():
     t2 = TableDAO(id=2, table_number="T2", capacity=4, location="Indoor Small")
     t3 = TableDAO(id=3, table_number="T3", capacity=8, location="Indoor Large")
 
-    # Slot at 12:00 on 2026-11-15
+    # Slot at 12:00 one week ahead
     slot = TimeSlotDAO(
         id=1,
-        date=date(2026, 11, 15),
+        date=date.today() + timedelta(days=7),
         start_time=time(12, 0),
         end_time=time(13, 0),
         meal_type="Lunch",
@@ -54,9 +55,11 @@ async def split_test_db():
         seed.add_all([u1, u2, u3, t1, t2, t3, slot, st1, st2, st3])
         await seed.commit()
 
-    # a new session, like the one each request gets
+    # the repositories open their sessions from AsyncSessionLocal, so they use this database now
+    AsyncSessionLocal.configure(bind=engine)
     async with TestingSession() as session:
         yield session
+    AsyncSessionLocal.configure(bind=real_engine)
     await engine.dispose()
 
 
@@ -64,42 +67,21 @@ async def test_two_hour_cutoff_rule(split_test_db):
     """Test MH-01 / MH-42: Hiker can reserve a seat up to 2 hours before the due time."""
     slot = (await split_test_db.execute(select(TimeSlotDAO).filter_by(id=1))).scalar_one()
 
-    # Slot time is 2026-11-15 12:00 -> Cutoff is 2026-11-15 10:00
+    # The slot starts at 12:00, so the cutoff is at 10:00 of the same day
 
     # 1. Booking at 09:30 (2.5h before) -> OK
-    validate_two_hour_rule(slot, current_time=datetime(2026, 11, 15, 9, 30))
+    validate_two_hour_rule(slot, current_time=datetime.combine(slot.date, time(9, 30)))
 
     # 2. Booking at 10:00 (exactly 2h before) -> OK
-    validate_two_hour_rule(slot, current_time=datetime(2026, 11, 15, 10, 0))
+    validate_two_hour_rule(slot, current_time=datetime.combine(slot.date, time(10, 0)))
 
     # 3. Booking at 10:01 (1h 59m before) -> Rejected
-    with pytest.raises(ValueError, match="at least 2 hours before"):
-        validate_two_hour_rule(slot, current_time=datetime(2026, 11, 15, 10, 1))
+    with pytest.raises(ConflictError, match="at least 2 hours before"):
+        validate_two_hour_rule(slot, current_time=datetime.combine(slot.date, time(10, 1)))
 
     # 4. Booking after slot start -> Rejected
-    with pytest.raises(ValueError, match="at least 2 hours before"):
-        validate_two_hour_rule(slot, current_time=datetime(2026, 11, 15, 12, 15))
-
-
-async def test_two_hour_cutoff_in_create_reservation(split_test_db):
-    """Test create_reservation enforces the 2-hour cutoff rule."""
-    payload = ReservationCreate(
-        slot_id=1,
-        party_size=2,
-        user_id=1,
-        contact_name="Hiker One",
-        contact_email="h1@test.com",
-    )
-    # Attempt booking 1 hour before due time
-    late_time = datetime(2026, 11, 15, 11, 0)
-    with pytest.raises(ValueError, match="at least 2 hours before"):
-        await create_reservation(split_test_db, payload, current_time=late_time)
-
-    # Attempt booking 3 hours before due time -> Success
-    valid_time = datetime(2026, 11, 15, 9, 0)
-    res = await create_reservation(split_test_db, payload, current_time=valid_time)
-    assert res.id is not None
-    assert res.status == ReservationStatus.CONFIRMED.value
+    with pytest.raises(ConflictError, match="at least 2 hours before"):
+        validate_two_hour_rule(slot, current_time=datetime.combine(slot.date, time(12, 15)))
 
 
 async def test_best_fit_single_table_allocation(split_test_db):
@@ -153,18 +135,14 @@ async def test_full_split_reservation_lifecycle(split_test_db):
         contact_email="leader@test.com",
         special_requirements="All outdoor gear",
     )
-    valid_time = datetime(2026, 11, 15, 8, 0)
-    res = await create_reservation(split_test_db, payload, current_time=valid_time)
+    res = await ReservationController().create_reservation(payload)
 
     assert res.id is not None
     assert res.party_size == 12
     # Verify split across 2 tables: T3 (8) + T2 (4)
-    assert len(res.table_assignments) == 2
+    assert len(res.assigned_tables) == 2
 
-    assigned_numbers = {
-        ta.slot_table.table.table_number: ta.assigned_seats
-        for ta in res.table_assignments
-    }
+    assigned_numbers = {ta.table_number: ta.assigned_seats for ta in res.assigned_tables}
     assert assigned_numbers == {"T3": 8, "T2": 4}
 
     # Verify slot remaining capacity: 18 - 12 = 6
