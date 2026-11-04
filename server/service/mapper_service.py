@@ -2,7 +2,7 @@ from server.models.DAO.time_slot import TimeSlotDAO
 from server.models.DTO.error_dto import ErrorDTO
 from server.models.DTO.user_dto import UserResponseDTO,UserLoginResponse,UserDTO, UserDetailDTO
 from server.models.DAO.user import UserDAO
-from server.models.DTO.reservation_dto import ReservationResponse, AssignedTableInfo
+from server.models.DTO.reservation_dto import ReservationResponse, AssignedTableInfo,ReservationMailDTO
 from server.models.DAO.reservation import ReservationDAO,ReservationTableAssignmentDAO
 from server.models.DTO.slot_dto import SlotResponse,Table,SlotDetail
 from typing import List
@@ -104,3 +104,22 @@ def tableList(tables: list[dict]):
         )
 
     return tablesDto
+
+def reservationEmailDto_to_email(
+        ref:str,
+        email:str,
+        date:str,
+        timeSlot:str,
+        partySize:int,
+        spReq:str,
+        table:dict):
+    
+    return ReservationMailDTO(
+        booking_reference=ref,
+        contact_email=email,
+        date_str=date,
+        time_slot=timeSlot,
+        party_size=partySize,
+        special_reqs=spReq,
+        tables=table
+    )

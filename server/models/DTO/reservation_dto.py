@@ -3,6 +3,7 @@ from typing import Optional, List
 from pydantic import ConfigDict
 from pydantic import BaseModel, EmailStr, Field
 from server.models.DTO.user_dto import Phone
+from server.models.DTO.slot_dto import Table
 
 class ReservationCreate(BaseModel):
     """Payload to book a table for a party in a specific time slot."""
@@ -53,3 +54,12 @@ class SlotAvailabilityResponse(BaseModel):
     reserved_seats: int
     remaining_seats: int
 
+class ReservationMailDTO(BaseModel):
+    hiker_name:Optional[str]="Valued Guest"
+    booking_reference: str
+    contact_email:str
+    date_str: str
+    time_slot: str
+    party_size: int
+    special_reqs: Optional[str]= "None specified"
+    tables: list[dict]
