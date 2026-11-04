@@ -119,7 +119,9 @@ class ReservationRepository:
                 ReservationTableAssignmentDAO.slot_table_id,
                 ReservationTableAssignmentDAO.assigned_seats,
                 TableDAO.table_number)
-                    .where(ReservationTableAssignmentDAO.reservation_id==ReservationDAO.id,TableDAO.id==ReservationTableAssignmentDAO.slot_table_id,
+                    .where(ReservationTableAssignmentDAO.reservation_id==ReservationDAO.id,
+                           SlotTableDAO.id==ReservationTableAssignmentDAO.slot_table_id,
+                           TableDAO.id==SlotTableDAO.table_id,
                            ReservationDAO.booking_reference==reference))
         rows = result.all()
         if not rows:

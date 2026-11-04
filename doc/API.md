@@ -1,7 +1,7 @@
 # API List
 
 All paths start with `/api` (the Vite dev server forwards them to the backend).<br>
-Errors return `{"detail": "message"}`. Live docs: http://localhost:8000/docs
+Errors return `{"code": 409, "message": "message", "name": "ConflictError"}`, while invalid requests and login errors return `{"detail": "message"}`. Live docs: http://localhost:8000/docs
 
 ## GET
 
@@ -9,7 +9,7 @@ Errors return `{"detail": "message"}`. Live docs: http://localhost:8000/docs
 
 name: `/api/slots?date={date}`<br>
 parameter: `date` (required, query, `YYYY-MM-DD`) — date whose existing service slots should be returned.<br>
-header: `Authorization: Bearer <token>` (Employee access)<br>
+header: `Authorization: Bearer <token>` (Hiker, Employee or Warden)<br>
 
 HTTP Status: 200 ok, 401 unauthorized, 403 forbidden, 422 invalid date, 500 ISE<br>
 JSON response:
@@ -238,7 +238,7 @@ JSON response:
 
 name: `/api/slots`<br>
 parameter: -<br>
-header: `Authorization: Bearer <token>` (Employee access)<br>
+header: `Authorization: Bearer <token>` (Employee or Warden)<br>
 body:
 ```json
 {
@@ -254,7 +254,8 @@ body:
 }
 ```
 `mealType` is optional. Suggested values: `Lunch`, `Dinner`, `Snack`.<br>
-HTTP Status: 201 created, 401 unauthorized, 403 forbidden, 404 Not Found (unknown service), 422 invalid request, 500 ISE<br>
+A slot with the same date and times is updated instead of created twice. A table number used for the first time creates the table.<br>
+HTTP Status: 201 created, 401 unauthorized, 403 forbidden, 409 start time after end time, 422 invalid request, 500 ISE<br>
 JSON response:
 ```json
 // 201
@@ -270,11 +271,6 @@ JSON response:
     { "tableNumber": "T3", "seats": 6 }
   ],
   "message": "Slot created successfully"
-}
-
-// Error response
-{
-  "detail": "message"
 }
 ```
 
@@ -294,7 +290,7 @@ body:
   "special_requirements": "2 vegetarian meals, 1 gluten allergy"
 }
 ```
-HTTP Status: 201 ok, 400 bad request, 404 not found, 500 ISE<br>
+HTTP Status: 201 created, 404 slot not found, 409 slot closed, too late, already booked or not enough seats, 422 invalid request, 500 ISE<br>
 JSON response:
 ```json
 // 201
@@ -320,9 +316,11 @@ JSON response:
   "created_at": "2026-10-30T12:00:00"
 }
 
-// 400 / 404 / 500
+// 404 / 409 / 500
 {
-  "detail": "message"
+  "code": 409,
+  "message": "message",
+  "name": "ConflictError"
 }
 ```
 

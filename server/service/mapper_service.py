@@ -70,10 +70,10 @@ def slotTableDto_to_response(slotTime:TimeSlotDAO,table_list:list)->SlotResponse
             seats=t["seats"]
         ))
     return SlotResponse(
-        slotid=slotTime.id,
+        slotId=slotTime.id,
         date=slotTime.date,
-        startTime=slotTime.start_time,
-        endTime=slotTime.end_time,
+        startTime=slotTime.start_time.strftime("%H:%M"),
+        endTime=slotTime.end_time.strftime("%H:%M"),
         mealType=slotTime.meal_type,
         tables=tables,
         message="Slot created successfully"
@@ -83,10 +83,10 @@ def slots_deatils_to_response(slots:list[tuple[TimeSlotDAO, list[dict[str, int]]
     results:list[SlotDetail]=[]
     for slot,tables in slots:
         results.append(SlotDetail(
-            slotid=slot.id,
+            slotId=slot.id,
             date= slot.date,
-            startTime=slot.start_time,
-            endTime=slot.end_time,
+            startTime=slot.start_time.strftime("%H:%M"),
+            endTime=slot.end_time.strftime("%H:%M"),
             mealType=slot.meal_type,
             tables=tableList(tables)
         ))
@@ -98,7 +98,7 @@ def tableList(tables: list[dict]):
     for table in tables:
         tablesDto.append(
             Table(
-                tableNumber=str(table["table_id"]),
+                tableNumber=table["table_number"],
                 seats=table["available_seats"]
             )
         )
