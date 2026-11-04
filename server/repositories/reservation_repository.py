@@ -102,6 +102,7 @@ class ReservationRepository:
                         "slotTableId":slot_table.id,
                         "tableNumber":number,
                         "assignedSeats":seats,
+                        "tableLocation":""
                     })
             
             try:
