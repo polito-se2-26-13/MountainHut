@@ -112,7 +112,7 @@ def reservationEmailDto_to_email(
         timeSlot:str,
         partySize:int,
         spReq:str,
-        table:dict):
+        hikerName:str):
     
     return ReservationMailDTO(
         booking_reference=ref,
@@ -121,5 +121,5 @@ def reservationEmailDto_to_email(
         time_slot=timeSlot,
         party_size=partySize,
         special_reqs=spReq,
-        tables=table
+        hiker_name=hikerName
     )

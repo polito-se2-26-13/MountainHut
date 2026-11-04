@@ -55,11 +55,10 @@ class SlotAvailabilityResponse(BaseModel):
     remaining_seats: int
 
 class ReservationMailDTO(BaseModel):
-    hiker_name:Optional[str]="Valued Guest"
+    hiker_name:str
     booking_reference: str
     contact_email:str
     date_str: str
     time_slot: str
     party_size: int
     special_reqs: Optional[str]= "None specified"
-    tables: list[dict]
