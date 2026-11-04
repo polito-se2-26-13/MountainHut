@@ -1,14 +1,14 @@
 # API List
 
 All paths start with `/api` (the Vite dev server forwards them to the backend).<br>
-Errors return `{"code": 409, "message": "message", "name": "ConflictError"}`, while invalid requests and login errors return `{"detail": "message"}`. Live docs: http://localhost:8000/docs
+Errors return `{"code": 409, "message": "message", "name": "ConflictError"}`. Invalid requests and token errors return `{"detail": ...}` instead. Live docs: http://localhost:8000/docs
 
 ## GET
 
 **get slots for copy**
 
 name: `/api/slots?date={date}`<br>
-parameter: `date` (required, query, `YYYY-MM-DD`) — date whose existing service slots should be returned.<br>
+parameter: `date` (query, `YYYY-MM-DD`) — date whose existing service slots should be returned. Without it, all slots are returned.<br>
 header: `Authorization: Bearer <token>` (Hiker, Employee or Warden)<br>
 
 HTTP Status: 200 ok, 401 unauthorized, 403 forbidden, 422 invalid date, 500 ISE<br>
@@ -71,7 +71,9 @@ JSON response:
 
 // 404
 {
-  "detail": "Time slot with id 1 not found."
+  "code": 404,
+  "message": "Time slot with id 1 not found.",
+  "name": "NotFoundError"
 }
 ```
 
@@ -107,29 +109,9 @@ JSON response:
 
 // 404
 {
-  "detail": "Reservation with reference 'MH-20261030-ALX01' not found."
-}
-```
-
-**preview booking confirmation email**
-
-name: `/api/reservations/{reference}/email-preview`<br>
-parameter: `reference` (path, string)<br>
-HTTP Status: 200 ok, 404 not found, 500 ISE<br>
-JSON response:
-```json
-// 200
-{
-  "booking_reference": "MH-20261030-ALX01",
-  "recipient_email": "hiker1@example.com",
-  "subject": "Mountain Hut Booking Confirmation [MH-20261030-ALX01]",
-  "email_text": "...",
-  "email_html": "..."
-}
-
-// 404
-{
-  "detail": "Reservation with reference 'MH-20261030-ALX01' not found."
+  "code": 404,
+  "message": "booking reference not found",
+  "name": "NotFoundError"
 }
 ```
 
@@ -137,7 +119,7 @@ JSON response:
 
 name: `/api/reservations/user/{user_id}`<br>
 parameter: `user_id` (path, integer)<br>
-HTTP Status: 200 ok, 500 ISE<br>
+HTTP Status: 200 ok, 404 no bookings, 500 ISE<br>
 JSON response:
 ```json
 // 200
@@ -254,7 +236,7 @@ body:
 }
 ```
 `mealType` is optional. Suggested values: `Lunch`, `Dinner`, `Snack`.<br>
-A slot with the same date and times is updated instead of created twice. A table number used for the first time creates the table.<br>
+Saving the same date and times again adds or updates only the listed tables, while the meal and the other tables stay as they are. A table number used for the first time creates the table.<br>
 HTTP Status: 201 created, 401 unauthorized, 403 forbidden, 409 start time after end time, 422 invalid request, 500 ISE<br>
 JSON response:
 ```json

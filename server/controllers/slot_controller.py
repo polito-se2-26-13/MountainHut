@@ -26,7 +26,7 @@ class SlotController():
         if slotTime is None:
             slotTime=await self.repo.add_slot_time(slot)
 
-        #search table, or create it: there is no fixed set of tables and seats differ per slot (#17)
+        #search table, or create it: there is no fixed set of tables and seats differ per slot (PO issue 17)
         tables: list[tuple[TableDAO,int]]=[]
         for t in slot.tables:
             table=await self.repo.find_table(t.tableNumber)
