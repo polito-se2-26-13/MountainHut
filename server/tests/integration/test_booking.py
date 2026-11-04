@@ -130,7 +130,7 @@ def test_party_larger_than_the_free_seats_is_refused(client, db):
 
     response = book(client, hiker, slot, 7)
 
-    assert response.status_code == 400
+    assert response.status_code == 409
     assert db.query(ReservationDAO).count() == 0
 
 
@@ -140,7 +140,7 @@ def test_slot_without_tables_cannot_be_booked(client, db):
 
     response = book(client, hiker, slot, 1)
 
-    assert response.status_code == 400
+    assert response.status_code == 409
     assert client.get(f"/api/slots/{slot}/availability").json()["total_capacity"] == 0
 
 
@@ -149,7 +149,7 @@ def test_booking_closes_two_hours_before_the_slot(client, db):
     too_late = add_slot(db, [4], hours_ahead=1)
     in_time = add_slot(db, [4], hours_ahead=3)
 
-    assert book(client, hiker, too_late, 2).status_code == 400
+    assert book(client, hiker, too_late, 2).status_code == 409
     assert book(client, hiker, in_time, 2).status_code == 201
 
 
@@ -159,7 +159,7 @@ def test_one_booking_per_hiker_in_a_slot(client, db):
     other_slot = add_slot(db, [6], hours_ahead=30)
 
     assert book(client, hiker, slot, 2).status_code == 201
-    assert book(client, hiker, slot, 2).status_code == 400
+    assert book(client, hiker, slot, 2).status_code == 409
     assert book(client, hiker, other_slot, 2).status_code == 201
     assert client.get(f"/api/slots/{slot}/availability").json()["reserved_seats"] == 2
 
@@ -168,7 +168,7 @@ def test_closed_slot_cannot_be_booked(client, db):
     hiker = add_hiker(db)
     slot = add_slot(db, [6], status="CLOSED")
 
-    assert book(client, hiker, slot, 2).status_code == 400
+    assert book(client, hiker, slot, 2).status_code == 409
 
 
 def test_availability_counts_the_booked_seats(client, db):
@@ -188,7 +188,7 @@ def test_availability_counts_the_booked_seats(client, db):
 def test_unknown_slot(client, db):
     hiker = add_hiker(db)
 
-    assert book(client, hiker, 999, 2).status_code == 400
+    assert book(client, hiker, 999, 2).status_code == 404
     assert client.get("/api/slots/999/availability").status_code == 404
 
 
