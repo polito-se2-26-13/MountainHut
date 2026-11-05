@@ -35,6 +35,31 @@ uvicorn server.main:app --reload
 
 The API runs on http://localhost:8000 and its documentation on http://localhost:8000/docs.
 
+## Database setup & migrations
+
+The database uses SQLite and SQLAlchemy with foreign key constraints enabled.
+
+Run commands from the project root (with Python virtual environment active):
+
+- **Apply pending migrations:**
+  ```powershell
+  python -m server.scripts.db_setup migrate
+  ```
+- **Seed sample data (users, tables, slots, bookings):**
+  ```powershell
+  python -m server.scripts.db_setup seed
+  ```
+- **Reset database (drop all, re-create, and seed):**
+  ```powershell
+  python -m server.scripts.db_setup reset
+  ```
+- **Inspect database status and row counts:**
+  ```powershell
+  python -m server.scripts.db_setup status
+  ```
+
+Complete SQL DDL and seed scripts are also available in `doc/sql.txt` and `server/migrations/`.
+
 ## Run the frontend
 
 ```
