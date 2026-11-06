@@ -22,7 +22,6 @@ def format_booking_email_text(reservation: ReservationMailDTO) -> str:
     - party size
     - possible party requirements (allergies)
     - name of the hiker who made the reservation
-    - assigned tables
     """
     """
     conf = reservation.to_confirmation_dict()
@@ -34,20 +33,12 @@ def format_booking_email_text(reservation: ReservationMailDTO) -> str:
     special_reqs = conf.get("specialRequirements") or "None specified"
     tables = conf.get("assignedTables") or []
 """
-    hiker_name="Valued Guest"
+    hiker_name=reservation.hiker_name
     ref= reservation.booking_reference
     date_str = reservation.date_str
     time_slot = reservation.time_slot
     party_size = reservation.party_size
-    special_reqs = reservation.special_reqs
-    tables = reservation.tables
-    
-    table_lines = []
-    for t in tables:
-        loc = f" ({t['tableLocation']})" if t.get("tableLocation") else ""
-        table_lines.append(f"  - Table {t['tableNumber']}{loc}: {t['assignedSeats']} seat(s)")
-    tables_formatted = "\n".join(table_lines) if table_lines else "  - Assigned upon arrival"
-
+    special_reqs = reservation.special_reqs or "None specified"
     text = f"""============================================================
            MOUNTAIN HUT - RESERVATION CONFIRMATION
 ============================================================
@@ -65,23 +56,6 @@ BOOKING DETAILS (Reference: {ref})
 * Time Slot:           {time_slot}
 * Party Size:          {party_size} person(s)
 * Special Requests:    {special_reqs}
-
-------------------------------------------------------------
-TABLE ASSIGNMENT
-------------------------------------------------------------
-{tables_formatted}
-
-Note: Sharing tables is standard practice in alpine huts.
-If your party exceeds a single table's capacity, you may be
-seated across adjacent tables.
-
-------------------------------------------------------------
-IMPORTANT INFORMATION FOR YOUR VISIT
-------------------------------------------------------------
-* Arrival: Please arrive 10 minutes prior to your time slot.
-* Modifications: Changes can be made up to 2 hours before the due time.
-* Mountain Safety: Mountain weather changes quickly. If your party
-  encounters unexpected delays on the trail, please contact the hut team.
 
 We look forward to welcoming you to the hut!
 
@@ -104,23 +78,12 @@ def format_booking_email_html(reservation: ReservationMailDTO) -> str:
     party_size = conf.get("partySize") or 1
     special_reqs = conf.get("specialRequirements") or "None specified"
     tables = conf.get("assignedTables") or []'''
-    hiker_name="Valued Guest"
+    hiker_name=reservation.hiker_name
     ref= reservation.booking_reference
     date_str = reservation.date_str
     time_slot = reservation.time_slot
     party_size = reservation.party_size
-    special_reqs = reservation.special_reqs
-    tables = reservation.tables
-
-    table_rows = "".join(
-        f"<tr><td style='padding: 8px 12px; border-bottom: 1px solid #e2e8f0; font-weight: 600;'>Table {t['tableNumber']}</td>"
-        f"<td style='padding: 8px 12px; border-bottom: 1px solid #e2e8f0; color: #64748b;'>{t.get('tableLocation', 'Main Hall')}</td>"
-        f"<td style='padding: 8px 12px; border-bottom: 1px solid #e2e8f0; text-align: right;'>{t['assignedSeats']} seat(s)</td></tr>"
-        for t in tables
-    )
-    if not table_rows:
-        table_rows = "<tr><td colspan='3' style='padding: 8px 12px; text-align: center; color: #64748b;'>Assigned upon arrival</td></tr>"
-
+    special_reqs = reservation.special_reqs or "None specified"
     html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -170,26 +133,6 @@ def format_booking_email_html(reservation: ReservationMailDTO) -> str:
           <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; font-weight: 500; color: #334155;">{special_reqs}</td>
         </tr>
       </table>
-
-      <!-- Table Assignment Sub-table -->
-      <h3 style="font-size: 15px; margin: 18px 0 10px; color: #0f172a;">Assigned Tables</h3>
-      <table style="width: 100%; border-collapse: collapse; background-color: #f8fafc; border-radius: 8px; font-size: 13px; margin-bottom: 24px;">
-        <thead>
-          <tr style="background-color: #f1f5f9; text-align: left; color: #64748b;">
-            <th style="padding: 8px 12px;">Table</th>
-            <th style="padding: 8px 12px;">Location</th>
-            <th style="padding: 8px 12px; text-align: right;">Seats</th>
-          </tr>
-        </thead>
-        <tbody>
-          {table_rows}
-        </tbody>
-      </table>
-
-      <!-- Note / Guidance -->
-      <div style="background-color: #fffbeb; border: 1px solid #fef3c7; border-radius: 8px; padding: 12px 16px; margin-bottom: 24px; font-size: 13px; color: #92400e;">
-        <strong>Alpine Hospitality Note:</strong> Table sharing is common at mountain huts. Please arrive 10 minutes prior to your time slot. Changes can be requested up to 2 hours before the slot.
-      </div>
 
       <p style="margin-bottom: 0; font-size: 14px; color: #475569;">
         We look forward to seeing you at the hut!<br>
