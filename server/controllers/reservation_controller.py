@@ -44,13 +44,15 @@ class ReservationController():
                 res.booking_reference,
                 res.contact_email,
                 timeSlot.date.strftime("%d/%m/%Y"),
-                f"{timeSlot.start_time}-{timeSlot.end_time}",
+                f"{timeSlot.start_time:%H:%M}-{timeSlot.end_time:%H:%M}",
                 res.party_size,
                 res.special_requirements,
-                tables
+                res.hiker.full_name
             )
         )
-        print(mail)
+        # the booking stands even if the mail fails, and this is the only trace of it
+        if mail["status"]!="SENT":
+            print(f"confirmation email not sent for {res.booking_reference}: {mail['error']}")
         return reservationDTO_to_response(res,tables)
 
     async def get_reservation_by_reference(self,reference:str):

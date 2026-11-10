@@ -11,9 +11,10 @@ from server.database import AsyncSessionLocal, Base, engine as real_engine, set_
 from server.main import app
 from server.const import SlotStatus, ReservationStatus, UserRole
 from server.models.DAO import UserDAO, TableDAO, TimeSlotDAO, SlotTableDAO, ReservationDAO
-from server.models.DTO.reservation_dto import ReservationCreate
+from server.models.DTO.reservation_dto import ReservationCreate, ReservationMailDTO
 from server.models.error.conflict_error import ConflictError
 from server.service.booking_service import get_slot_availability
+from server.service.email_service import format_booking_email_html, format_booking_email_text
 
 
 @pytest.fixture
@@ -188,3 +189,49 @@ async def test_api_booking_endpoint_flow(client):
     assert get_res.status_code == 200
     assert get_res.json()["booking_reference"] == ref
     assert get_res.json()["special_requirements"] == "Gluten-free bread"
+
+
+async def test_confirmation_email_follows_the_product_owner(test_db, monkeypatch):
+    """MH-03 and issue #24: the name of the hiker who booked and the details, no table numbers."""
+    sent = []
+    monkeypatch.setattr(
+        "server.controllers.reservation_controller.send_booking_confirmation_email",
+        lambda mail: sent.append(mail) or {"status": "SENT"},
+    )
+    payload = ReservationCreate(
+        slot_id=1,
+        party_size=4,
+        user_id=1,
+        contact_name="Somebody Else",
+        contact_email="other@example.com",
+        special_requirements="Gluten-free bread",
+    )
+
+    res = await ReservationController().create_reservation(payload)
+
+    assert sent[0].contact_email == "other@example.com"
+    for body in (format_booking_email_text(sent[0]), format_booking_email_html(sent[0])):
+        assert "Alice Walker" in body
+        assert "Somebody Else" not in body
+        assert res.booking_reference in body
+        assert (date.today() + timedelta(days=7)).strftime("%d/%m/%Y") in body
+        assert "12:30-13:30" in body
+        assert "4 person(s)" in body
+        assert "Gluten-free bread" in body
+        assert "T1" not in body and "T2" not in body
+        assert "Assigned" not in body and "adjacent" not in body and "2 hours" not in body
+
+
+def test_confirmation_email_without_requirements_says_so():
+    mail = ReservationMailDTO(
+        hiker_name="Alice Walker",
+        booking_reference="MH-1",
+        contact_email="alice@example.com",
+        date_str="01/12/2026",
+        time_slot="12:30-13:30",
+        party_size=2,
+        special_reqs=None,
+    )
+
+    assert "None specified" in format_booking_email_text(mail)
+    assert "None specified" in format_booking_email_html(mail)
