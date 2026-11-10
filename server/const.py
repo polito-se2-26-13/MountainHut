@@ -24,3 +24,6 @@ class ReservationStatus(str, Enum):
     COMPLETED = "COMPLETED"
     NO_SHOW = "NO_SHOW"
 
+class MealType(str,Enum):
+    LUNCH="Lunch"
+    DINNER="Dinner"

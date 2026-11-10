@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { useAuth } from '../auth/AuthContext.jsx'
+import { useToast } from '../components/ToastProvider.jsx'
 import { apiRequest } from '../api/api.js'
 
 const roles = ['Hiker', 'Employee', 'Manager']
@@ -21,9 +22,9 @@ function LoginPage() {
   const [touched, setTouched] = useState({})
   const [submitted, setSubmitted] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [errorMessage, setErrorMessage] = useState('')
   const [fieldErrors, setFieldErrors] = useState({})
   const { signIn } = useAuth()
+  const notify = useToast()
   const navigate = useNavigate()
 
   const emailError = !username.trim()
@@ -40,7 +41,6 @@ function LoginPage() {
     setSubmitted(true)
     setTouched({ username: true, password: true })
     setFieldErrors({})
-    setErrorMessage('')
     if (emailError || passwordError) return
 
     setLoading(true)
@@ -67,7 +67,7 @@ function LoginPage() {
       navigate(destination, { replace: true })
     } catch (error) {
       setFieldErrors(error.fieldErrors || {})
-      setErrorMessage(error.message || 'Invalid email or password.')
+      notify(error.message || 'Invalid email or password.')
     } finally {
       setLoading(false)
     }
@@ -77,7 +77,6 @@ function LoginPage() {
     if (field === 'username') setUsername(value)
     if (field === 'password') setPassword(value)
     setTouched((current) => ({ ...current, [field]: true }))
-    setErrorMessage('')
     setFieldErrors((current) => ({ ...current, [field]: '' }))
   }
 
@@ -97,15 +96,12 @@ function LoginPage() {
               aria-pressed={role === option}
               onClick={() => {
                 setRole(option)
-                setErrorMessage('')
               }}
             >
               {option}
             </button>
           ))}
         </div>
-
-        {errorMessage && <div className="form-alert error-alert" role="alert">{errorMessage}</div>}
 
         <form onSubmit={handleSubmit} noValidate>
           <div className="login-fields">

@@ -1,9 +1,19 @@
 """Email Template & Formatting Service (MH-03: Receive Confirmation)."""
 from typing import Dict, Any, Optional
 from server.models.DAO.reservation import ReservationDAO
+import os
+import smtplib
+from email.message import EmailMessage
+from dotenv import load_dotenv
+from server.models.DTO.reservation_dto import ReservationMailDTO
+from pathlib import Path
+from dotenv import load_dotenv
 
+BASE_DIR = Path(__file__).resolve().parents[1]
+ENV_PATH = BASE_DIR / ".env"
+load_dotenv(ENV_PATH, override=True)
 
-def format_booking_email_text(reservation: ReservationDAO) -> str:
+def format_booking_email_text(reservation: ReservationMailDTO) -> str:
     """
     Generate plain text confirmation email for a reservation (MH-03).
     Includes:
@@ -14,6 +24,7 @@ def format_booking_email_text(reservation: ReservationDAO) -> str:
     - name of the hiker who made the reservation
     - assigned tables
     """
+    """
     conf = reservation.to_confirmation_dict()
     hiker_name = conf.get("hikerName") or "Valued Guest"
     ref = conf.get("bookingReference") or "N/A"
@@ -22,11 +33,19 @@ def format_booking_email_text(reservation: ReservationDAO) -> str:
     party_size = conf.get("partySize") or 1
     special_reqs = conf.get("specialRequirements") or "None specified"
     tables = conf.get("assignedTables") or []
-
+"""
+    hiker_name="Valued Guest"
+    ref= reservation.booking_reference
+    date_str = reservation.date_str
+    time_slot = reservation.time_slot
+    party_size = reservation.party_size
+    special_reqs = reservation.special_reqs
+    tables = reservation.tables
+    
     table_lines = []
     for t in tables:
         loc = f" ({t['tableLocation']})" if t.get("tableLocation") else ""
-        table_lines.append(f"  - Table {t['tableNumber']}{loc}: {t['seatsAssigned']} seat(s)")
+        table_lines.append(f"  - Table {t['tableNumber']}{loc}: {t['assignedSeats']} seat(s)")
     tables_formatted = "\n".join(table_lines) if table_lines else "  - Assigned upon arrival"
 
     text = f"""============================================================
@@ -73,23 +92,30 @@ The Mountain Hut Team
     return text.strip()
 
 
-def format_booking_email_html(reservation: ReservationDAO) -> str:
+def format_booking_email_html(reservation: ReservationMailDTO) -> str:
     """
     Generate a clean, responsive HTML email template for booking confirmation (MH-03).
     """
-    conf = reservation.to_confirmation_dict()
+    '''conf = reservation.to_confirmation_dict()
     hiker_name = conf.get("hikerName") or "Valued Guest"
     ref = conf.get("bookingReference") or "N/A"
     date_str = conf.get("date") or "N/A"
     time_slot = conf.get("timeSlot") or "N/A"
     party_size = conf.get("partySize") or 1
     special_reqs = conf.get("specialRequirements") or "None specified"
-    tables = conf.get("assignedTables") or []
+    tables = conf.get("assignedTables") or []'''
+    hiker_name="Valued Guest"
+    ref= reservation.booking_reference
+    date_str = reservation.date_str
+    time_slot = reservation.time_slot
+    party_size = reservation.party_size
+    special_reqs = reservation.special_reqs
+    tables = reservation.tables
 
     table_rows = "".join(
         f"<tr><td style='padding: 8px 12px; border-bottom: 1px solid #e2e8f0; font-weight: 600;'>Table {t['tableNumber']}</td>"
         f"<td style='padding: 8px 12px; border-bottom: 1px solid #e2e8f0; color: #64748b;'>{t.get('tableLocation', 'Main Hall')}</td>"
-        f"<td style='padding: 8px 12px; border-bottom: 1px solid #e2e8f0; text-align: right;'>{t['seatsAssigned']} seat(s)</td></tr>"
+        f"<td style='padding: 8px 12px; border-bottom: 1px solid #e2e8f0; text-align: right;'>{t['assignedSeats']} seat(s)</td></tr>"
         for t in tables
     )
     if not table_rows:
@@ -181,18 +207,40 @@ def format_booking_email_html(reservation: ReservationDAO) -> str:
     return html
 
 
-def send_booking_confirmation_email(reservation: ReservationDAO) -> Dict[str, Any]:
-    """
-    Format and dispatch the booking confirmation email to the hiker (MH-03).
-    Returns delivery metadata including recipient, subject, text, and html body.
-    """
-    subject = f"Mountain Hut Booking Confirmation [{reservation.booking_reference}]"
-    to_email = reservation.contact_email
-    text_content = format_booking_email_text(reservation)
-    html_content = format_booking_email_html(reservation)
+def send_booking_confirmation_email(reservation: ReservationMailDTO) -> Dict[str, Any]:
+  """
+  Format and dispatch the booking confirmation email to the hiker (MH-03).
+  Returns delivery metadata including recipient, subject, text, and html body.
+  """
+  subject = f"Mountain Hut Booking Confirmation [{reservation.booking_reference}]"
+  to_email = reservation.contact_email
+  text_content = format_booking_email_text(reservation)
+  html_content = format_booking_email_html(reservation)
 
-    # In production, SMTP or an email delivery provider (SendGrid, SES, Mailgun) would send it here.
-    # We return the email dispatch payload for verification and logging.
+  message=EmailMessage()
+  message["Subject"]=subject
+  message["From"]=os.getenv("SMTP_EMAIL")
+  message["To"] = to_email
+
+  message.set_content(text_content)
+  message.add_alternative(html_content, subtype="html")
+  try:
+    host = os.getenv("SMTP_HOST")
+    port = int(os.getenv("SMTP_PORT", 587))
+    email = os.getenv("SMTP_EMAIL")
+    password = os.getenv("SMTP_PASSWORD")
+
+    if not all([host, email, password]):
+        raise ValueError("Missing SMTP configuration in .env")
+
+    with smtplib.SMTP(host, port, timeout=20) as server:
+        server.ehlo()
+        server.starttls()
+        server.ehlo()
+
+        server.login(email, password)
+        server.send_message(message)
+
     return {
         "status": "SENT",
         "to": to_email,
@@ -201,4 +249,12 @@ def send_booking_confirmation_email(reservation: ReservationDAO) -> Dict[str, An
         "text_content": text_content,
         "html_content": html_content,
     }
+  except Exception as e:
+        return {
+            "status": "FAILED",
+            "to": to_email,
+            "subject": subject,
+            "booking_reference": reservation.booking_reference,
+            "error": str(e)
+        }  
 

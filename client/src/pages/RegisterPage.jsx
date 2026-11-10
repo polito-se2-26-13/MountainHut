@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { apiRequest } from '../api/api.js'
+import { useToast } from '../components/ToastProvider.jsx'
 
 const initialValues = {
   email: '',
@@ -31,8 +32,8 @@ function RegisterPage() {
   const [touched, setTouched] = useState({})
   const [submitted, setSubmitted] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [formError, setFormError] = useState('')
   const [success, setSuccess] = useState('')
+  const notify = useToast()
   const loginButtonRef = useRef(null)
   const navigate = useNavigate()
 
@@ -53,7 +54,6 @@ function RegisterPage() {
       [name]: true,
       ...(name === 'password' && values.confirmPassword ? { confirmPassword: true } : {}),
     }))
-    setFormError('')
     setSuccess('')
   }
 
@@ -69,7 +69,6 @@ function RegisterPage() {
     if (Object.values(errors).some(Boolean)) return
 
     setLoading(true)
-    setFormError('')
     try {
       const payload = {
         email: values.email.trim(),
@@ -89,7 +88,7 @@ function RegisterPage() {
       setTouched({})
       setSubmitted(false)
     } catch (error) {
-      setFormError(error.message || 'Registration failed. Please try again.')
+      notify(error.message || 'Registration failed. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -101,8 +100,6 @@ function RegisterPage() {
         <Link className="back-link" to="/">MountainHut</Link>
         <h1 id="register-title">Create your account</h1>
         <p className="form-intro">Join the MountainHut community.</p>
-
-        {formError && <div className="form-alert error-alert" role="alert">{formError}</div>}
 
         <form onSubmit={handleSubmit} noValidate>
           <div className="form-grid">

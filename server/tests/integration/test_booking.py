@@ -130,7 +130,7 @@ def test_party_larger_than_the_free_seats_is_refused(client, db):
 
     response = book(client, hiker, slot, 7)
 
-    assert response.status_code == 400
+    assert response.status_code == 409
     assert db.query(ReservationDAO).count() == 0
 
 
@@ -140,7 +140,7 @@ def test_slot_without_tables_cannot_be_booked(client, db):
 
     response = book(client, hiker, slot, 1)
 
-    assert response.status_code == 400
+    assert response.status_code == 409
     assert client.get(f"/api/slots/{slot}/availability").json()["total_capacity"] == 0
 
 
@@ -149,7 +149,7 @@ def test_booking_closes_two_hours_before_the_slot(client, db):
     too_late = add_slot(db, [4], hours_ahead=1)
     in_time = add_slot(db, [4], hours_ahead=3)
 
-    assert book(client, hiker, too_late, 2).status_code == 400
+    assert book(client, hiker, too_late, 2).status_code == 409
     assert book(client, hiker, in_time, 2).status_code == 201
 
 
@@ -159,7 +159,7 @@ def test_one_booking_per_hiker_in_a_slot(client, db):
     other_slot = add_slot(db, [6], hours_ahead=30)
 
     assert book(client, hiker, slot, 2).status_code == 201
-    assert book(client, hiker, slot, 2).status_code == 400
+    assert book(client, hiker, slot, 2).status_code == 409
     assert book(client, hiker, other_slot, 2).status_code == 201
     assert client.get(f"/api/slots/{slot}/availability").json()["reserved_seats"] == 2
 
@@ -168,7 +168,7 @@ def test_closed_slot_cannot_be_booked(client, db):
     hiker = add_hiker(db)
     slot = add_slot(db, [6], status="CLOSED")
 
-    assert book(client, hiker, slot, 2).status_code == 400
+    assert book(client, hiker, slot, 2).status_code == 409
 
 
 def test_availability_counts_the_booked_seats(client, db):
@@ -188,7 +188,7 @@ def test_availability_counts_the_booked_seats(client, db):
 def test_unknown_slot(client, db):
     hiker = add_hiker(db)
 
-    assert book(client, hiker, 999, 2).status_code == 400
+    assert book(client, hiker, 999, 2).status_code == 404
     assert client.get("/api/slots/999/availability").status_code == 404
 
 
@@ -206,6 +206,9 @@ def test_party_size_is_required_and_positive(client, db):
 
 def test_booking_can_be_read_by_its_reference(client, db):
     hiker = add_hiker(db)
+    # a table outside the slot, so that a table id and a slot table id are different numbers
+    db.add(TableDAO(table_number="spare", capacity=2))
+    db.commit()
     slot = add_slot(db, [6])
     booking = book(client, hiker, slot, 2).json()
 
@@ -213,4 +216,5 @@ def test_booking_can_be_read_by_its_reference(client, db):
 
     assert response.status_code == 200
     assert response.json()["id"] == booking["id"]
+    assert response.json()["assigned_tables"][0]["table_number"] == f"{slot}-1"
     assert client.get("/api/reservations/NOPE").status_code == 404
