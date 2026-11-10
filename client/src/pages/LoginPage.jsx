@@ -4,19 +4,17 @@ import { useAuth } from '../auth/AuthContext.jsx'
 import { useToast } from '../components/ToastProvider.jsx'
 import { apiRequest } from '../api/api.js'
 
-const roles = ['Hiker', 'Employee', 'Manager']
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 function routeForRole(role) {
   return {
-    Hiker: '/customer/book-table',
-    Employee: '/employee/slots',
-    Manager: '/home/manager',
+    Hiker: '/home/hiker',
+    Employee: '/home/employee',
+    Warden: '/home/warden',
   }[role]
 }
 
 function LoginPage() {
-  const [role, setRole] = useState('Hiker')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [touched, setTouched] = useState({})
@@ -59,10 +57,6 @@ function LoginPage() {
       if (!destination) {
         throw new Error('Your account role is not supported by this application.')
       }
-      if (result.user.role !== role) {
-        throw new Error(`This account is registered as ${result.user.role}. Select that role to continue.`)
-      }
-
       signIn(result.token, result.user)
       navigate(destination, { replace: true })
     } catch (error) {
@@ -85,23 +79,7 @@ function LoginPage() {
       <section className="register-card login-card" aria-labelledby="login-title">
         <Link className="back-link" to="/">MountainHut</Link>
         <h1 id="login-title">Welcome back</h1>
-        <p className="form-intro">Sign in to your {role} account.</p>
-
-        <div className="role-picker" role="group" aria-label="Choose your account role">
-          {roles.map((option) => (
-            <button
-              className={`role-option${role === option ? ' selected' : ''}`}
-              type="button"
-              key={option}
-              aria-pressed={role === option}
-              onClick={() => {
-                setRole(option)
-              }}
-            >
-              {option}
-            </button>
-          ))}
-        </div>
+        <p className="form-intro">Sign in with your email and password.</p>
 
         <form onSubmit={handleSubmit} noValidate>
           <div className="login-fields">
@@ -139,7 +117,7 @@ function LoginPage() {
           </div>
 
           <button className="submit-button" type="submit" disabled={loading}>
-            {loading ? 'Signing in…' : `Sign in as ${role}`}
+            {loading ? 'Signing in…' : 'Sign in'}
           </button>
           <p className="login-register-link">New to MountainHut? <Link to="/register">Create an account</Link></p>
           <p className="required-note"><span className="required-mark">*</span> Required fields</p>

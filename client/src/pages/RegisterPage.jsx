@@ -10,7 +10,6 @@ const initialValues = {
   firstName: '',
   lastName: '',
   phone: '',
-  role: 'Hiker',
 }
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -76,7 +75,7 @@ function RegisterPage() {
         firstName: values.firstName.trim(),
         lastName: values.lastName.trim(),
         ...(values.phone.trim() ? { phone: values.phone.trim() } : {}),
-        role: values.role,
+        role: 'Hiker',
       }
       const result = await apiRequest('/auth/register', {
         method: 'POST',
@@ -133,20 +132,12 @@ function RegisterPage() {
               {showError('confirmPassword') && <small className="field-error">{showError('confirmPassword')}</small>}
             </label>
 
-            <label className="form-field">
+            <label className="form-field form-field-wide">
               <span>Phone <span className="optional-mark">(optional)</span></span>
               <input name="phone" type="tel" autoComplete="tel" value={values.phone} onChange={handleChange} onBlur={handleBlur} aria-invalid={Boolean(showError('phone'))} />
               {showError('phone') && <small className="field-error">{showError('phone')}</small>}
             </label>
 
-            <label className="form-field">
-              <span>Role <span className="required-mark" aria-hidden="true">*</span></span>
-              <select name="role" required value={values.role} onChange={handleChange} onBlur={handleBlur}>
-                <option value="Hiker">Hiker</option>
-                <option value="Employee">Employee</option>
-                <option value="Manager">Manager</option>
-              </select>
-            </label>
           </div>
 
           <button className="submit-button" type="submit" disabled={loading}>
