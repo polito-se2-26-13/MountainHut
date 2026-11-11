@@ -16,7 +16,6 @@ from server.models.DAO import UserDAO, TableDAO, TimeSlotDAO, SlotTableDAO, Rese
 from server.models.DTO.reservation_dto import ReservationCreate, ReservationMailDTO
 from server.models.error.conflict_error import ConflictError
 from server.repositories.reservation_repository import ReservationRepository
-from server.service.booking_service import get_slot_availability
 from server.service.email_service import format_booking_email_html, format_booking_email_text
 
 
@@ -77,7 +76,7 @@ async def client(test_db):
 async def test_core_booking_and_capacity_deduction(test_db):
     """Test successful booking and automatic capacity deduction (MH-44)."""
     # Check initial availability
-    avail_before = await get_slot_availability(test_db, slot_id=1)
+    avail_before = await ReservationRepository().get_slot_availability(1)
     assert avail_before["total_capacity"] == 10
     assert avail_before["reserved_seats"] == 0
     assert avail_before["remaining_seats"] == 10
@@ -102,7 +101,7 @@ async def test_core_booking_and_capacity_deduction(test_db):
     assert res.assigned_tables[0].assigned_seats == 4
 
     # Check capacity after deduction
-    avail_after = await get_slot_availability(test_db, slot_id=1)
+    avail_after = await ReservationRepository().get_slot_availability(1)
     assert avail_after["reserved_seats"] == 4
     assert avail_after["remaining_seats"] == 6
 

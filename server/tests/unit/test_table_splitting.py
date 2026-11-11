@@ -11,10 +11,10 @@ from server.const import SlotStatus, ReservationStatus, UserRole
 from server.models.DAO import UserDAO, TableDAO, TimeSlotDAO, SlotTableDAO, ReservationDAO
 from server.models.DTO.reservation_dto import ReservationCreate
 from server.models.error.conflict_error import ConflictError
+from server.repositories.reservation_repository import ReservationRepository
 from server.service.booking_service import (
     validate_two_hour_rule,
     assign_tables_for_party,
-    get_slot_availability,
 )
 
 
@@ -146,7 +146,7 @@ async def test_full_split_reservation_lifecycle(split_test_db):
     assert assigned_numbers == {"T3": 8, "T2": 4}
 
     # Verify slot remaining capacity: 18 - 12 = 6
-    avail = await get_slot_availability(split_test_db, 1)
+    avail = await ReservationRepository().get_slot_availability(1)
     assert avail["reserved_seats"] == 12
     assert avail["remaining_seats"] == 6
 
