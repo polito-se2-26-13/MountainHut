@@ -38,6 +38,12 @@ class SlotController():
         slotTime=await self.repo.find_slot_time(slot.date,slot.startTime,slot.endTime)
         if slotTime is None:
             slotTime=await self.repo.add_slot_time(slot)
+        else:
+            # saving the slot again cannot leave a table with fewer seats than the ones already booked on it
+            booked={st.table.table_number: st.occupied_seats for st in slotTime.slot_tables}
+            for t in slot.tables:
+                if t.seats<booked.get(t.tableNumber,0):
+                    raise ConflictError(f"table {t.tableNumber} already has {booked[t.tableNumber]} seats booked")
 
         #search table, or create it: there is no fixed set of tables and seats differ per slot (PO issue 17)
         tables: list[tuple[TableDAO,int]]=[]

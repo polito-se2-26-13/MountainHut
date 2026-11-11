@@ -191,3 +191,21 @@ def test_hiker_books_a_slot_created_by_the_employee(client, db):
     assert booking.history == []
     assert booking.json()["assigned_tables"][0]["table_number"] == "T1"
     assert client.get(f"/api/slots/{listed['slotId']}/availability").json()["remaining_seats"] == 0
+
+
+def test_saving_again_keeps_the_seats_already_booked(client, db):
+    employee = login_as(db, "Employee")
+    hiker = login_as(db, "Hiker")
+    created = client.post("/api/slots", json=slot([("T1", 6)]), headers=employee).json()
+    # user_id for the code on dev, the login for the code that takes the hiker from the token
+    client.post("/api/reservations", json={
+        "slot_id": created["slotId"], "party_size": 5, "user_id": db.query(UserDAO).filter_by(role="Hiker").one().id,
+        "contact_name": "Anna Rossi", "contact_email": "anna@example.com",
+    }, headers=hiker)
+
+    refused = client.post("/api/slots", json=slot([("T1", 1)]), headers=employee)
+
+    assert refused.status_code == 409
+    assert "5 seats booked" in refused.json()["message"]
+    assert client.get(f"/api/slots/{created['slotId']}/availability").json()["total_capacity"] == 6
+    assert client.post("/api/slots", json=slot([("T1", 5)]), headers=employee).status_code == 201
