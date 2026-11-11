@@ -26,8 +26,8 @@ class UserResponseDTO(BaseModel):
 
 class UserCreateDTO(BaseModel):
     email: EmailStr=Field(min_length=5, max_length=100)
-    password: str
-    role: UserType
+    password: str=Field(min_length=8)
+    role: UserType=UserType.Hiker
     firstName: str =Field(min_length=1, max_length=100)
     lastName: str=Field(min_length=1, max_length=100)
     phone: Optional[Phone]= None

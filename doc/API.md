@@ -173,7 +173,8 @@ body:
   "role": "Hiker"
 }
 ```
-HTTP Status: 201 ok, 400 empty field, 409 email already registered, 422 invalid fields, 500 ISE<br>
+`role` can be left out and is ignored: the registration always creates a Hiker. The password needs at least 8 characters, and the email is saved in lowercase.<br>
+HTTP Status: 201 ok, 409 email already registered, 422 missing or invalid fields, 500 ISE<br>
 JSON response:
 ```json
 // 201
@@ -200,7 +201,7 @@ body:
   "password": "SecurePassword123!"
 }
 ```
-HTTP Status: 200 ok, 400 empty field, 404 wrong email or password, 422 missing field, 500 ISE<br>
+HTTP Status: 200 ok, 400 empty field, 401 wrong email or password, 422 missing field, 500 ISE<br>
 JSON response:
 ```json
 // 200
@@ -216,11 +217,11 @@ JSON response:
   }
 }
 
-// 404 / 500
+// 401 / 500
 {
-  "code": 404,
+  "code": 401,
   "message": "email or password wrong",
-  "name": "NotFoundError"
+  "name": "UnauthorizedError"
 }
 ```
 

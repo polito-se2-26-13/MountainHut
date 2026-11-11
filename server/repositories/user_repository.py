@@ -1,5 +1,5 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 from server.models.enum.user_type import UserType
 from server.models.DTO.user_dto import UserCreateDTO
 from server.models.DAO.user import UserDAO
@@ -38,7 +38,8 @@ class UserRepository:
             Get user by email or throw NotFoundError if not found
             """
             async with await self._get_session() as session:
-                result = await session.execute(select(UserDAO).filter(UserDAO.email == email))
+                # capitals do not count, also for accounts saved before the registration made emails lowercase
+                result = await session.execute(select(UserDAO).filter(func.lower(UserDAO.email) == email.lower()))
                 users = result.scalars().first()
                 return users
 

@@ -10,6 +10,7 @@ from fastapi import HTTPException
 from server.models.DAO.user import UserDAO
 from server.models.enum.user_type import UserType
 from server.service.auth_service import process_token
+from server.utils.security import hash_password
 
 ANNA = {
     "email": "anna@example.com",
@@ -65,14 +66,42 @@ def test_wrong_password_is_refused(client):
 
     response = client.post("/api/auth/login", json={"username": ANNA["email"], "password": "wrong"})
 
-    assert response.status_code == 404
+    assert response.status_code == 401
     assert "token" not in response.json()
 
 
 def test_unknown_user_is_refused(client):
     response = client.post("/api/auth/login", json={"username": "nobody@example.com", "password": "x"})
 
-    assert response.status_code == 404
+    assert response.status_code == 401
+
+
+def test_registration_always_creates_a_hiker(client, db):
+    response = client.post("/api/auth/register", json={**ANNA, "role": "Warden"})
+
+    assert response.status_code == 201
+    assert db.get(UserDAO, response.json()["id"]).role == "Hiker"
+
+
+def test_password_needs_at_least_8_characters(client):
+    assert client.post("/api/auth/register", json={**ANNA, "password": "Pass123"}).status_code == 422
+
+
+def test_email_is_the_same_whatever_its_capitals(client):
+    client.post("/api/auth/register", json=ANNA)
+
+    assert client.post("/api/auth/register", json={**ANNA, "email": "ANNA@Example.com"}).status_code == 409
+    login = client.post("/api/auth/login", json={"username": "Anna@Example.COM", "password": ANNA["password"]})
+    assert login.status_code == 200
+
+
+def test_an_old_account_saved_with_capitals_can_log_in(client, db):
+    db.add(UserDAO(email="Mario@Example.com", password_hash=hash_password(ANNA["password"]), first_name="Mario", last_name="R", role="Hiker"))
+    db.commit()
+
+    login = client.post("/api/auth/login", json={"username": "mario@example.com", "password": ANNA["password"]})
+
+    assert login.status_code == 200
 
 
 def test_token_opens_only_the_routes_of_its_role(client):
