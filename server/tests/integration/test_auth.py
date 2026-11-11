@@ -1,7 +1,9 @@
 """Integration tests of registration and login: POST /api/auth/register and POST /api/auth/login,
 with the same bodies the frontend sends."""
 import asyncio
+from datetime import datetime, timedelta, timezone
 
+import jwt
 import pytest
 from fastapi import HTTPException
 
@@ -81,3 +83,14 @@ def test_token_opens_only_the_routes_of_its_role(client):
     with pytest.raises(HTTPException) as refused:
         asyncio.run(process_token(f"Bearer {token}", [UserType.Employee]))
     assert refused.value.status_code == 403
+
+
+def test_a_token_signed_with_another_key_is_refused(client):
+    # the old key was public on GitHub, so a token signed with any key but ours must open nothing
+    client.post("/api/auth/register", json=ANNA)
+    forged = jwt.encode({"sub": ANNA["email"], "role": "Hiker", "exp": datetime.now(timezone.utc) + timedelta(hours=1)},
+                        "a key that is not ours but long enough for HS256", algorithm="HS256")
+
+    with pytest.raises(HTTPException) as refused:
+        asyncio.run(process_token(f"Bearer {forged}", [UserType.Hiker]))
+    assert refused.value.status_code == 401
