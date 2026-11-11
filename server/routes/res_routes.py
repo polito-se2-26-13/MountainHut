@@ -1,5 +1,5 @@
 from server.models.DTO.reservation_dto import ReservationResponse,ReservationCreate
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from server.config.config import ROUTES
 from server.middleware.auth_middleware import authenticate_user
 from server.models.enum.user_type import UserType
@@ -13,8 +13,8 @@ controller=ReservationController()
              status_code=status.HTTP_201_CREATED,
              #dependencies=[Depends(authenticate_user([user.value for user in UserType]))],
              )
-async def create_reservation(reservation:ReservationCreate):
-     return await controller.create_reservation(reservation)
+async def create_reservation(reservation:ReservationCreate,background_tasks:BackgroundTasks):
+     return await controller.create_reservation(reservation,background_tasks)
 
 @router.get("/{reference}",
             response_model=ReservationResponse,

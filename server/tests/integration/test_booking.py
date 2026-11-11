@@ -66,6 +66,18 @@ def test_party_gets_a_table_and_the_booking_is_saved(client, db):
     assert saved.party_size == 4
 
 
+def test_booking_sends_the_confirmation_after_the_answer(client, db, monkeypatch):
+    sent = []
+    monkeypatch.setattr(
+        "server.controllers.reservation_controller.send_booking_confirmation_email",
+        lambda mail: sent.append(mail) or {"status": "SENT"},
+    )
+
+    booking = book(client, add_hiker(db), add_slot(db, [6]), 2).json()
+
+    assert [mail.booking_reference for mail in sent] == [booking["booking_reference"]]
+
+
 def test_party_takes_the_smallest_table_that_fits(client, db):
     hiker = add_hiker(db)
     slot = add_slot(db, [6, 4, 2])
