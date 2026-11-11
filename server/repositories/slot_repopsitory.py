@@ -107,10 +107,11 @@ class SlotRepository:
 
     async def get_slot_time(self, date: Optional[date] = None):
         async with await self._get_session() as session:
+            # outer joins, so a slot without tables is listed too, with no tables (PO issue 17: it exists with 0 seats)
             query = (
-                select(TimeSlotDAO, TableDAO.table_number,SlotTableDAO.available_seats
-                )
-                .where(TimeSlotDAO.id == SlotTableDAO.slot_id, TableDAO.id == SlotTableDAO.table_id)
+                select(TimeSlotDAO, TableDAO.table_number,SlotTableDAO.available_seats)
+                .outerjoin(SlotTableDAO, SlotTableDAO.slot_id == TimeSlotDAO.id)
+                .outerjoin(TableDAO, TableDAO.id == SlotTableDAO.table_id)
             )
             if date is not None:
                 query = query.where(TimeSlotDAO.date==date)
@@ -122,6 +123,8 @@ class SlotRepository:
             for slot, table_number, available_seats in rows:
                 if slot.id not in slots:
                     slots[slot.id] = [slot, []]
+                if table_number is None:
+                    continue
                 slots[slot.id][1].append({
                     "table_number": table_number,
                     "available_seats": available_seats

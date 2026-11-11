@@ -168,6 +168,9 @@ def test_slot_without_tables_has_no_seats(client, db):
     created = client.post("/api/slots", json=slot([]), headers=employee).json()
 
     assert client.get(f"/api/slots/{created['slotId']}/availability").json()["total_capacity"] == 0
+    # it is still in the list, so the Employee can find it and add the tables
+    listed = client.get(f"/api/slots?date={DAY}", headers=employee).json()
+    assert [(s["slotId"], s["tables"]) for s in listed] == [(created["slotId"], [])]
 
 
 def test_hiker_books_a_slot_created_by_the_employee(client, db):
