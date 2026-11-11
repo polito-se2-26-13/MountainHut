@@ -38,6 +38,9 @@ function slotLabel(slot) {
   return `${date} ${timeRange} (${tables.length} tables / ${seats} seats)`;
 }
 
+// the warden manages the hut, so they set up times and tables like an employee
+const staffRoles = ['Employee', 'Warden'];
+
 function EmployeeSlotConfigPage() {
   const { session } = useAuth();
   const [formData, setFormData] = useState({
@@ -57,7 +60,7 @@ function EmployeeSlotConfigPage() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!session?.isAuthenticated || session.userProfile.role !== 'Employee') return undefined;
+    if (!session?.isAuthenticated || !staffRoles.includes(session.userProfile.role)) return undefined;
     let active = true;
     queueMicrotask(() => {
       if (active) {
@@ -88,7 +91,7 @@ function EmployeeSlotConfigPage() {
     [formData.tables]
   );
 
-  if (!session?.isAuthenticated || session.userProfile.role !== 'Employee') {
+  if (!session?.isAuthenticated || !staffRoles.includes(session.userProfile.role)) {
     return <Navigate to="/login" replace />;
   }
 
@@ -206,7 +209,7 @@ function EmployeeSlotConfigPage() {
     <main className="page slot-page">
       <header className="slot-page-header">
         <div>
-          <button className="back-link" type="button" onClick={() => window.history.length > 1 ? navigate(-1) : navigate('/home/employee')}>
+          <button className="back-link" type="button" onClick={() => window.history.length > 1 ? navigate(-1) : navigate(`/home/${session.userProfile.role.toLowerCase()}`)}>
             ← Back
           </button>
           <p className="eyebrow">MOUNTAINHUT · EMPLOYEE TOOLS</p>
