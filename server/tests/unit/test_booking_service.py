@@ -6,7 +6,7 @@ from sqlalchemy import event, select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
-from server.controllers.reservation_controller import ReservationController
+from server.controllers.reservation_controller import ReservationController, send_confirmation_with_retry
 from server.database import AsyncSessionLocal, Base, engine as real_engine, set_sqlite_pragma
 from server.main import app
 from server.const import SlotStatus, ReservationStatus, UserRole
@@ -235,3 +235,44 @@ def test_confirmation_email_without_requirements_says_so():
 
     assert "None specified" in format_booking_email_text(mail)
     assert "None specified" in format_booking_email_html(mail)
+
+
+def test_html_typed_by_the_user_reaches_the_mail_as_text():
+    mail = ReservationMailDTO(
+        hiker_name="<b>Alice</b>",
+        booking_reference="MH-1",
+        contact_email="alice@example.com",
+        date_str="01/12/2026",
+        time_slot="12:30-13:30",
+        party_size=2,
+        special_reqs="<a href='http://evil.example'>win</a>",
+    )
+
+    html = format_booking_email_html(mail)
+
+    assert "<b>Alice</b>" not in html and "&lt;b&gt;Alice&lt;/b&gt;" in html
+    assert "<a href" not in html and "&lt;a href" in html
+
+
+def test_confirmation_is_tried_again_and_then_only_logged(monkeypatch, capsys):
+    mail = ReservationMailDTO(
+        hiker_name="Alice Walker", booking_reference="MH-1", contact_email="alice@example.com",
+        date_str="01/12/2026", time_slot="12:30-13:30", party_size=2,
+    )
+    answers = [{"status": "FAILED", "error": "down"}, {"status": "FAILED", "error": "down"}, {"status": "SENT"}]
+    calls = []
+    monkeypatch.setattr(
+        "server.controllers.reservation_controller.send_booking_confirmation_email",
+        lambda m: calls.append(m) or answers[len(calls) - 1],
+    )
+
+    send_confirmation_with_retry(mail, waits=(0, 0))
+    assert len(calls) == 3
+    assert "not sent" not in capsys.readouterr().out
+
+    # a mail server that never answers: three tries, then the error in the log
+    calls.clear()
+    answers[2] = {"status": "FAILED", "error": "down"}
+    send_confirmation_with_retry(mail, waits=(0, 0))
+    assert len(calls) == 3
+    assert "confirmation email not sent for MH-1: down" in capsys.readouterr().out

@@ -7,11 +7,27 @@ from server.const import SlotStatus
 from server.service.booking_service import validate_two_hour_rule,assign_tables_for_party
 from server.service.mapper_service import reservationDTO_to_response,reservationEmailDto_to_email
 from server.service.email_service import send_booking_confirmation_email
+from fastapi import BackgroundTasks
+import time
+
+
+def send_confirmation_with_retry(mail, waits=(5, 10)):
+    """Sends the confirmation, trying again after 5 and then 10 seconds.
+    It runs after the answer, so the booking stands anyway and a failure is only written in the log."""
+    for wait in (*waits, None):
+        result = send_booking_confirmation_email(mail)
+        if result["status"] == "SENT" or wait is None:
+            break
+        time.sleep(wait)
+    if result["status"] != "SENT":
+        print(f"confirmation email not sent for {mail.booking_reference}: {result.get('error')}")
+
+
 class ReservationController():
     def __init__(self):
         self.repo=ReservationRepository()
 
-    async def create_reservation(self,reservation:ReservationCreate)->ReservationResponse:
+    async def create_reservation(self,reservation:ReservationCreate,background_tasks:BackgroundTasks|None=None)->ReservationResponse:
         """Creation reservation"""
         #check time slot
         timeSlot=await self.repo.get_time_slot(reservation.slot_id)
@@ -39,8 +55,7 @@ class ReservationController():
         #allocation
         table_allocations = assign_tables_for_party(timeSlot, reservation.party_size)
         res,tables= await self.repo.transaction_add_reservation(reservation,table_allocations)
-        mail=send_booking_confirmation_email(
-            reservationEmailDto_to_email(
+        mail=reservationEmailDto_to_email(
                 res.booking_reference,
                 res.contact_email,
                 timeSlot.date.strftime("%d/%m/%Y"),
@@ -49,10 +64,11 @@ class ReservationController():
                 res.special_requirements,
                 res.hiker.full_name
             )
-        )
-        # the booking stands even if the mail fails, and this is the only trace of it
-        if mail["status"]!="SENT":
-            print(f"confirmation email not sent for {res.booking_reference}: {mail['error']}")
+        # the answer does not wait for the mail server, which kept the whole backend busy for up to 20 seconds
+        if background_tasks is not None:
+            background_tasks.add_task(send_confirmation_with_retry,mail)
+        else:
+            send_confirmation_with_retry(mail)
         return reservationDTO_to_response(res,tables)
 
     async def get_reservation_by_reference(self,reference:str):
