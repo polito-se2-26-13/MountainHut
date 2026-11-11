@@ -285,3 +285,17 @@ def test_a_hiker_without_bookings_gets_an_empty_list(client, db):
 
     assert response.status_code == 200
     assert response.json() == []
+
+
+def test_a_booking_shows_date_and_time_of_its_slot(client, db):
+    anna = add_hiker(db)
+    slot_id = add_slot(db, [6])
+    slot = db.get(TimeSlotDAO, slot_id)
+    created = book(client, anna, slot_id, 2).json()
+
+    read = client.get(f"/api/reservations/user/{anna}", headers=TOKENS[anna]).json()[0]
+
+    for booking in (created, read):
+        assert booking["date"] == slot.date.isoformat()
+        assert booking["start_time"] == slot.start_time.strftime("%H:%M")
+        assert booking["end_time"] == slot.end_time.strftime("%H:%M")

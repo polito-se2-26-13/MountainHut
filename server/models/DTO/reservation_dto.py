@@ -30,6 +30,9 @@ class ReservationResponse(BaseModel):
     booking_reference: str
     user_id: int
     slot_id: int
+    date: Optional[str] = None
+    start_time: Optional[str] = None
+    end_time: Optional[str] = None
     party_size: int
     special_requirements: Optional[str] = None
     contact_name: str
