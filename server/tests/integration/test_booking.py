@@ -244,9 +244,44 @@ def test_booking_can_be_read_by_its_reference(client, db):
     slot = add_slot(db, [6])
     booking = book(client, hiker, slot, 2).json()
 
-    response = client.get(f"/api/reservations/{booking['booking_reference']}")
+    response = client.get(f"/api/reservations/{booking['booking_reference']}", headers=TOKENS[hiker])
 
     assert response.status_code == 200
     assert response.json()["id"] == booking["id"]
     assert response.json()["assigned_tables"][0]["table_number"] == f"{slot}-1"
-    assert client.get("/api/reservations/NOPE").status_code == 404
+    assert client.get("/api/reservations/NOPE", headers=TOKENS[hiker]).status_code == 404
+
+
+def test_bookings_are_read_only_with_the_login(client, db):
+    anna = add_hiker(db)
+    booking = book(client, anna, add_slot(db, [6]), 2).json()
+
+    assert client.get(f"/api/reservations/user/{anna}").status_code == 401
+    assert client.get(f"/api/reservations/{booking['booking_reference']}").status_code == 401
+
+
+def test_a_hiker_reads_only_their_own_bookings(client, db):
+    anna = add_hiker(db)
+    other = add_hiker(db, email="other@example.com")
+    booking = book(client, anna, add_slot(db, [6]), 2).json()
+    employee = UserDAO(email="employee@example.com", password_hash="x", first_name="E", last_name="E", role="Employee")
+    db.add(employee)
+    db.commit()
+
+    assert client.get(f"/api/reservations/user/{anna}", headers=TOKENS[other]).status_code == 403
+    assert client.get(f"/api/reservations/{booking['booking_reference']}", headers=TOKENS[other]).status_code == 403
+    mine = client.get(f"/api/reservations/user/{anna}", headers=TOKENS[anna])
+    assert mine.status_code == 200
+    assert [b["id"] for b in mine.json()] == [booking["id"]]
+    # the hut staff can look up any booking by its reference
+    staff = client.get(f"/api/reservations/{booking['booking_reference']}", headers={"Authorization": f"Bearer {generate_token(employee)}"})
+    assert staff.status_code == 200
+
+
+def test_a_hiker_without_bookings_gets_an_empty_list(client, db):
+    anna = add_hiker(db)
+
+    response = client.get(f"/api/reservations/user/{anna}", headers=TOKENS[anna])
+
+    assert response.status_code == 200
+    assert response.json() == []

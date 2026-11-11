@@ -81,7 +81,8 @@ JSON response:
 
 name: `/api/reservations/{reference}`<br>
 parameter: `reference` (path, string)<br>
-HTTP Status: 200 ok, 404 not found, 500 ISE<br>
+header: `Authorization: Bearer <token>` (Hiker, Employee or Warden), a hiker can read only their own bookings<br>
+HTTP Status: 200 ok, 401 unauthorized, 403 forbidden, 404 not found, 500 ISE<br>
 JSON response:
 ```json
 // 200
@@ -119,7 +120,8 @@ JSON response:
 
 name: `/api/reservations/user/{user_id}`<br>
 parameter: `user_id` (path, integer)<br>
-HTTP Status: 200 ok, 404 no bookings, 500 ISE<br>
+header: `Authorization: Bearer <token>` (Hiker), only for the id of the hiker of the token<br>
+HTTP Status: 200 ok, an empty list when there are no bookings, 401 unauthorized, 403 forbidden, 422 id not a number, 500 ISE<br>
 JSON response:
 ```json
 // 200

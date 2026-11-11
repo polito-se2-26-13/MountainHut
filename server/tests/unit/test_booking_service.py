@@ -187,7 +187,10 @@ async def test_api_booking_endpoint_flow(client):
     assert avail_res.json()["remaining_seats"] == 7
 
     # 3. Retrieve reservation by reference
-    get_res = await client.get(f"/api/reservations/{ref}")
+    get_res = await client.get(
+        f"/api/reservations/{ref}",
+        headers={"Authorization": f"Bearer {generate_token(UserDAO(email='hiker@test.com', role=UserRole.HIKER.value))}"},
+    )
     assert get_res.status_code == 200
     assert get_res.json()["booking_reference"] == ref
     assert get_res.json()["special_requirements"] == "Gluten-free bread"
