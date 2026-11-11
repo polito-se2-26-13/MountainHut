@@ -1,4 +1,6 @@
 """Tests for MH-44 Core Booking and Capacity Deduction, through the controller and the API."""
+import asyncio
+
 import pytest
 from datetime import date, time, timedelta
 from httpx import ASGITransport, AsyncClient
@@ -13,6 +15,7 @@ from server.const import SlotStatus, ReservationStatus, UserRole
 from server.models.DAO import UserDAO, TableDAO, TimeSlotDAO, SlotTableDAO, ReservationDAO
 from server.models.DTO.reservation_dto import ReservationCreate, ReservationMailDTO
 from server.models.error.conflict_error import ConflictError
+from server.repositories.reservation_repository import ReservationRepository
 from server.service.booking_service import get_slot_availability
 from server.service.email_service import format_booking_email_html, format_booking_email_text
 
@@ -235,6 +238,18 @@ def test_confirmation_email_without_requirements_says_so():
 
     assert "None specified" in format_booking_email_text(mail)
     assert "None specified" in format_booking_email_html(mail)
+
+
+async def test_two_bookings_at_the_same_moment_cannot_take_more_seats_than_the_slot_has(test_db):
+    test_db.add(UserDAO(id=2, email="bob@test.com", password_hash="dummy", first_name="Bob", last_name="Brown", role=UserRole.HIKER.value))
+    await test_db.commit()
+    # two groups of 6 on a slot with 10 seats, sent together
+    payloads = [ReservationCreate(slot_id=1, party_size=6, user_id=user, contact_name="Group", contact_email=f"g{user}@test.com") for user in (1, 2)]
+
+    results = await asyncio.gather(*(ReservationController().create_reservation(p) for p in payloads), return_exceptions=True)
+
+    assert sum(isinstance(r, ConflictError) for r in results) == 1
+    assert (await ReservationRepository().get_slot_availability(1))["reserved_seats"] == 6
 
 
 def test_html_typed_by_the_user_reaches_the_mail_as_text():

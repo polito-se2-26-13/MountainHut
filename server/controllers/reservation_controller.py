@@ -8,7 +8,15 @@ from server.service.booking_service import validate_two_hour_rule,assign_tables_
 from server.service.mapper_service import reservationDTO_to_response,reservationEmailDto_to_email
 from server.service.email_service import send_booking_confirmation_email
 from fastapi import BackgroundTasks
+import asyncio
 import time
+
+# One booking at a time between the check of the free seats and the save, otherwise two bookings sent
+# at the same moment both see the same free seats. Whoever takes or gives back seats (also the change of
+# a booking, MH-06) uses this same lock.
+# shortcut: it works inside one server process, which is how it runs also in Docker; with more processes
+# the lock has to move to the database (a transaction started with BEGIN IMMEDIATE in SQLite)
+booking_lock = asyncio.Lock()
 
 
 def send_confirmation_with_retry(mail, waits=(5, 10)):
@@ -30,32 +38,34 @@ class ReservationController():
 
     async def create_reservation(self,reservation:ReservationCreate,background_tasks:BackgroundTasks|None=None)->ReservationResponse:
         """Creation reservation"""
-        #check time slot
-        timeSlot=await self.repo.get_time_slot(reservation.slot_id)
-        if timeSlot is None:
-            raise NotFoundError("time slot not foud")
+        # the slot is read inside the lock, so its free seats already count the booking saved just before
+        async with booking_lock:
+            #check time slot
+            timeSlot=await self.repo.get_time_slot(reservation.slot_id)
+            if timeSlot is None:
+                raise NotFoundError("time slot not foud")
 
-        #check aviabililty
-        if timeSlot.status!=SlotStatus.OPEN:
-            raise ConflictError("time slot is not open")
+            #check aviabililty
+            if timeSlot.status!=SlotStatus.OPEN:
+                raise ConflictError("time slot is not open")
 
-        #check two hour rule
-        validate_two_hour_rule(timeSlot,None)
+            #check two hour rule
+            validate_two_hour_rule(timeSlot,None)
 
-        # Check rule: Only one booking per time slot on a date per hiker
-        existing_booking_res = await self.repo.get_reservation_confirmed(reservation.user_id,reservation.slot_id)
-        if existing_booking_res is not None:
-            raise ConflictError("Hiker already has a confirmed booking for this time slot.")
+            # Check rule: Only one booking per time slot on a date per hiker
+            existing_booking_res = await self.repo.get_reservation_confirmed(reservation.user_id,reservation.slot_id)
+            if existing_booking_res is not None:
+                raise ConflictError("Hiker already has a confirmed booking for this time slot.")
 
-        # Check available capacity (Capacity Deduction constraint)
-        avail = await self.repo.get_slot_availability(reservation.slot_id)
-        if reservation.party_size > avail["remaining_seats"]:
-            raise ConflictError(
-                f"Not enough seats available (requested {reservation.party_size}, remaining {avail['remaining_seats']})."
-            )
-        #allocation
-        table_allocations = assign_tables_for_party(timeSlot, reservation.party_size)
-        res,tables= await self.repo.transaction_add_reservation(reservation,table_allocations)
+            # Check available capacity (Capacity Deduction constraint)
+            avail = await self.repo.get_slot_availability(reservation.slot_id)
+            if reservation.party_size > avail["remaining_seats"]:
+                raise ConflictError(
+                    f"Not enough seats available (requested {reservation.party_size}, remaining {avail['remaining_seats']})."
+                )
+            #allocation
+            table_allocations = assign_tables_for_party(timeSlot, reservation.party_size)
+            res,tables= await self.repo.transaction_add_reservation(reservation,table_allocations)
         mail=reservationEmailDto_to_email(
                 res.booking_reference,
                 res.contact_email,
