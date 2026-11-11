@@ -1,6 +1,5 @@
 """Core Booking, Table Splitting, and Two-Hour Rule Async Service (MH-44 & MH-42)."""
 from datetime import datetime, timedelta
-from itertools import combinations
 from typing import List, Optional, Tuple
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -134,13 +133,19 @@ def assign_tables_for_party(
             f"Unable to seat party of {party_size}. Not enough free seats on the tables."
         )
 
-    # Best-fit: among the sets of that many tables, the one with the fewest free seats
-    # shortcut: exponential above about 20 tables per slot, rewrite if a hut ever has more
-    chosen = min(
-        (tables for tables in combinations(available_tables, needed)
-         if sum(st.free_seats for st in tables) >= party_size),
-        key=lambda tables: sum(st.free_seats for st in tables),
-    )
+    # Best-fit: among the sets of that many tables, the one with the fewest free seats.
+    # Trying every set took forever with many tables (a party of 20 on 200 tables of 2 blocked the server),
+    # so the sets are built one table at a time: sets[k][total] is one set of k tables with total free seats.
+    # Every total stays below party_size + the largest table, so each sets[k] holds only a few entries.
+    sets = [{} for _ in range(needed + 1)]
+    sets[0][0] = []
+    for st in available_tables:
+        seats = st.free_seats
+        for k in range(needed - 1, -1, -1):  # backwards, so each table enters a set at most once
+            for total, tables in list(sets[k].items()):
+                if total + seats not in sets[k + 1]:
+                    sets[k + 1][total + seats] = tables + [st]
+    chosen = sets[needed][min(total for total in sets[needed] if total >= party_size)]
 
     assignments: List[Tuple[SlotTableDAO, int]] = []
     remaining = party_size

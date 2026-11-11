@@ -1,4 +1,5 @@
 """Email Template & Formatting Service (MH-03: Receive Confirmation)."""
+from html import escape
 from typing import Dict, Any, Optional
 from server.models.DAO.reservation import ReservationDAO
 import os
@@ -78,12 +79,13 @@ def format_booking_email_html(reservation: ReservationMailDTO) -> str:
     party_size = conf.get("partySize") or 1
     special_reqs = conf.get("specialRequirements") or "None specified"
     tables = conf.get("assignedTables") or []'''
-    hiker_name=reservation.hiker_name
+    # name and requests are typed by the user: escaped, so they reach the mail as text and not as HTML or links
+    hiker_name=escape(reservation.hiker_name)
     ref= reservation.booking_reference
     date_str = reservation.date_str
     time_slot = reservation.time_slot
     party_size = reservation.party_size
-    special_reqs = reservation.special_reqs or "None specified"
+    special_reqs = escape(reservation.special_reqs or "None specified")
     html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>

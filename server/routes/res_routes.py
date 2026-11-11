@@ -1,5 +1,5 @@
 from server.models.DTO.reservation_dto import ReservationResponse,ReservationCreate
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from server.config.config import ROUTES
 from server.middleware.auth_middleware import authenticate_user
 from server.models.enum.user_type import UserType
@@ -12,10 +12,10 @@ controller=ReservationController()
              response_model=ReservationResponse, 
              status_code=status.HTTP_201_CREATED,
              )
-async def create_reservation(reservation:ReservationCreate,user=Depends(authenticate_user([UserType.Hiker]))):
+async def create_reservation(reservation:ReservationCreate,background_tasks:BackgroundTasks,user=Depends(authenticate_user([UserType.Hiker]))):
      # from the token and not from the body, otherwise anyone could book in someone else's name
      reservation.user_id=user.id
-     return await controller.create_reservation(reservation)
+     return await controller.create_reservation(reservation,background_tasks)
 
 @router.get("/{reference}",
             response_model=ReservationResponse,
