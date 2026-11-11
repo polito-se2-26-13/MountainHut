@@ -11,9 +11,10 @@ controller=ReservationController()
 @router.post("", 
              response_model=ReservationResponse, 
              status_code=status.HTTP_201_CREATED,
-             #dependencies=[Depends(authenticate_user([user.value for user in UserType]))],
              )
-async def create_reservation(reservation:ReservationCreate):
+async def create_reservation(reservation:ReservationCreate,user=Depends(authenticate_user([UserType.Hiker]))):
+     # from the token and not from the body, otherwise anyone could book in someone else's name
+     reservation.user_id=user.id
      return await controller.create_reservation(reservation)
 
 @router.get("/{reference}",

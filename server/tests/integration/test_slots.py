@@ -140,7 +140,6 @@ def test_hiker_books_a_slot_created_by_the_employee(client, db):
     booking = client.post("/api/reservations", json={
         "slot_id": listed["slotId"],
         "party_size": 8,
-        "user_id": db.query(UserDAO).filter_by(role="Hiker").one().id,
         "contact_name": "Anna Rossi",
         "contact_email": "anna@example.com",
     }, headers=hiker)

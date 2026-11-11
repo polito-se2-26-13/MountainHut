@@ -13,6 +13,7 @@ from server.const import SlotStatus, ReservationStatus, UserRole
 from server.models.DAO import UserDAO, TableDAO, TimeSlotDAO, SlotTableDAO, ReservationDAO
 from server.models.DTO.reservation_dto import ReservationCreate, ReservationMailDTO
 from server.models.error.conflict_error import ConflictError
+from server.service.auth_service import generate_token
 from server.service.booking_service import get_slot_availability
 from server.service.email_service import format_booking_email_html, format_booking_email_text
 
@@ -171,6 +172,7 @@ async def test_api_booking_endpoint_flow(client):
             "contact_phone": "+39 340 1112233",
             "special_requirements": "Gluten-free bread",
         },
+        headers={"Authorization": f"Bearer {generate_token(UserDAO(email='hiker@test.com', role=UserRole.HIKER.value))}"},
     )
     assert response.status_code == 201
     data = response.json()

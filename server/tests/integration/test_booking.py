@@ -6,12 +6,17 @@ from server.models.DAO.reservation import ReservationDAO
 from server.models.DAO.table import TableDAO
 from server.models.DAO.time_slot import SlotTableDAO, TimeSlotDAO
 from server.models.DAO.user import UserDAO
+from server.service.auth_service import generate_token
+
+# the login token of each hiker of the test, by id
+TOKENS = {}
 
 
 def add_hiker(db, email="anna@example.com"):
-    hiker = UserDAO(email=email, password_hash="x", first_name="Anna", last_name="Rossi")
+    hiker = UserDAO(email=email, password_hash="x", first_name="Anna", last_name="Rossi", role="Hiker")
     db.add(hiker)
     db.commit()
+    TOKENS[hiker.id] = {"Authorization": f"Bearer {generate_token(hiker)}"}
     return hiker.id
 
 
@@ -43,7 +48,7 @@ def book(client, hiker, slot, party_size):
         "user_id": hiker,
         "contact_name": "Anna Rossi",
         "contact_email": "anna@example.com",
-    })
+    }, headers=TOKENS[hiker])
 
 
 def seats_by_table(response):
@@ -198,10 +203,37 @@ def test_party_size_is_required_and_positive(client, db):
 
     missing = client.post("/api/reservations", json={
         "slot_id": slot, "user_id": hiker, "contact_name": "Anna Rossi", "contact_email": "anna@example.com",
-    })
+    }, headers=TOKENS[hiker])
 
     assert missing.status_code == 422
     assert book(client, hiker, slot, 0).status_code == 422
+
+
+def test_booking_needs_the_login_of_a_hiker(client, db):
+    slot = add_slot(db, [6])
+    body = {"slot_id": slot, "party_size": 2, "contact_name": "Anna Rossi", "contact_email": "anna@example.com"}
+    employee = UserDAO(email="employee@example.com", password_hash="x", first_name="E", last_name="E", role="Employee")
+    db.add(employee)
+    db.commit()
+
+    assert client.post("/api/reservations", json=body).status_code == 401
+    response = client.post("/api/reservations", json=body, headers={"Authorization": f"Bearer {generate_token(employee)}"})
+
+    assert response.status_code == 403
+    assert db.query(ReservationDAO).count() == 0
+
+
+def test_booking_belongs_to_the_hiker_of_the_token(client, db):
+    anna = add_hiker(db)
+    other = add_hiker(db, email="other@example.com")
+    slot = add_slot(db, [6])
+
+    response = client.post("/api/reservations", json={
+        "slot_id": slot, "party_size": 2, "user_id": other, "contact_name": "Anna Rossi", "contact_email": "anna@example.com",
+    }, headers=TOKENS[anna])
+
+    assert response.status_code == 201
+    assert response.json()["user_id"] == anna
 
 
 def test_booking_can_be_read_by_its_reference(client, db):

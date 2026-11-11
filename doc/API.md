@@ -260,7 +260,8 @@ JSON response:
 
 name: `/api/reservations`<br>
 parameter: -<br>
-body:
+header: `Authorization: Bearer <token>` (Hiker)<br>
+body, where `user_id` can be left out because the hiker comes from the token:
 ```json
 {
   "slot_id": 1,
@@ -272,7 +273,7 @@ body:
   "special_requirements": "2 vegetarian meals, 1 gluten allergy"
 }
 ```
-HTTP Status: 201 created, 404 slot not found, 409 slot closed, too late, already booked or not enough seats, 422 invalid request, 500 ISE<br>
+HTTP Status: 201 created, 401 unauthorized, 403 forbidden, 404 slot not found, 409 slot closed, too late, already booked or not enough seats, 422 invalid request, 500 ISE<br>
 JSON response:
 ```json
 // 201
