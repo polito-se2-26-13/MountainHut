@@ -175,7 +175,7 @@ body:
   "role": "Hiker"
 }
 ```
-`role` can be left out and is ignored: the registration always creates a Hiker. The password needs at least 8 characters, and the email is saved in lowercase. `notes` and `emergencyContact` are optional, at most 555 and 255 characters. Names are saved without the spaces around them, so a name of only spaces is refused.<br>
+`role` can be left out and is ignored: the registration always creates a Hiker. The password needs at least 8 characters, and the email is saved in lowercase. `phone` is required, and a number without prefix is read as Italian. `notes` and `emergencyContact` are optional, at most 555 and 255 characters. Names are saved without the spaces around them, so a name of only spaces is refused.<br>
 HTTP Status: 201 ok, 409 email already registered, 422 missing or invalid fields, 500 ISE<br>
 JSON response:
 ```json

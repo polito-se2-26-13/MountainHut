@@ -41,6 +41,13 @@ def test_phone_without_prefix_is_read_as_italian(client, db):
     assert db.get(UserDAO, response.json()["id"]).phone == "+393331234567"
 
 
+def test_registration_needs_a_phone(client):
+    without_phone = {key: value for key, value in ANNA.items() if key != "phone"}
+
+    assert client.post("/api/auth/register", json=without_phone).status_code == 422
+    assert client.post("/api/auth/register", json={**ANNA, "phone": ""}).status_code == 422
+
+
 def test_registration_saves_notes_and_emergency_contact(client, db):
     response = client.post("/api/auth/register", json={**ANNA, "notes": "registered mountain guide", "emergencyContact": "Marco, +39 333 7654321"})
 

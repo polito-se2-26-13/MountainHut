@@ -33,8 +33,8 @@ class UserCreateDTO(BaseModel):
     role: UserType=UserType.Hiker
     firstName: Name
     lastName: Name
-    phone: Optional[Phone]= None
-    # optional for the PO, issue #22 of the course repository
+    # for the PO the phone of a hiker is required, notes and emergency contact are optional (issue #22 of the course repository)
+    phone: Phone
     notes: Optional[str]=Field(None, max_length=555)
     emergencyContact: Optional[str]=Field(None, max_length=255)
 
