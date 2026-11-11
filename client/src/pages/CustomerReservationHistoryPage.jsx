@@ -78,6 +78,7 @@ function CustomerReservationHistoryPage() {
           {reservations.map((reservation, index) => (
             <li key={reservation.reservation_id ?? reservation.reservationId ?? reservation.id ?? index}>
               <strong>{reservation.booking_reference || 'Booking'}</strong>
+              {reservation.date && <span>{reservation.date} · {reservation.start_time}–{reservation.end_time}</span>}
               <span>{reservation.party_size ?? '—'} guests · {reservation.status || 'Status unavailable'}</span>
               {reservation.created_at && <span>Created {formatCreatedAt(reservation.created_at)}</span>}
               {reservation.assigned_tables?.length > 0 && (
