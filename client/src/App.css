@@ -14,6 +14,88 @@
   color: #536174;
 }
 
+.reservation-history-list {
+  display: grid;
+  gap: 1rem;
+  margin: 1.5rem 0;
+  padding: 0;
+  list-style: none;
+}
+
+.reservation-history-page {
+  width: min(100% - 2rem, 74rem);
+  padding-top: 5rem;
+}
+
+.reservation-history-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2rem;
+  margin-bottom: 2rem;
+}
+
+.reservation-history-header .back-link {
+  margin: 0 0 1.5rem;
+  color: #1769aa;
+  text-decoration: none;
+}
+
+.reservation-history-header h1 {
+  margin-bottom: 0.5rem;
+  font-size: clamp(2rem, 5vw, 3rem);
+}
+
+.reservation-history-header .form-intro {
+  margin: 0;
+}
+
+.history-book-button {
+  display: inline-flex !important;
+  min-height: 3rem;
+  align-items: center;
+  justify-content: center;
+  margin: 1.35rem 0 0 !important;
+  padding: 0.75rem 1.2rem;
+  border: 1px solid #1769aa;
+  border-radius: 0.55rem;
+  background: #1769aa;
+  box-shadow: 0 0.5rem 1.4rem rgb(23 105 170 / 18%);
+  color: #fff !important;
+  font-weight: 700;
+  text-decoration: none;
+  transition: background-color 160ms ease, transform 160ms ease;
+}
+
+.history-book-button:hover {
+  transform: translateY(-2px);
+  background: #125486;
+}
+
+.reservation-history-empty {
+  padding: 1.25rem 1.5rem;
+  border: 1px solid #d8e5ed;
+  border-radius: 0.8rem;
+  background: #fff;
+}
+
+.reservation-history-list li {
+  display: grid;
+  gap: 0.45rem;
+  padding: 1.25rem 1.5rem;
+  border: 1px solid #d8e5ed;
+  border-left: 4px solid #1769aa;
+  border-radius: 0.8rem;
+  background: #fff;
+  box-shadow: 0 0.5rem 1.5rem rgb(24 33 47 / 6%);
+  color: #536174;
+}
+
+.reservation-history-list li strong {
+  color: #173f58;
+  font-size: 1.05rem;
+}
+
 .page a {
   display: inline-block;
   margin-top: 1.5rem;
@@ -54,6 +136,176 @@
   background-image: url('/DSC00372.jpg');
   background-position: center bottom;
   background-size: cover;
+}
+
+.role-home-page {
+  position: relative;
+  display: flex;
+  width: 100%;
+  min-height: 100vh;
+  min-height: 100svh;
+  align-items: center;
+  margin: 0;
+  padding: clamp(5.5rem, 11vh, 8rem) clamp(1.25rem, 8vw, 8rem) clamp(3rem, 8vh, 6rem);
+  overflow: hidden;
+  isolation: isolate;
+  background-color: #193c4f;
+  background-image: var(--role-home-image);
+  background-position: center;
+  background-size: cover;
+}
+
+.role-home-page::before {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background: linear-gradient(90deg, rgb(249 247 237 / 82%) 0%, rgb(249 247 237 / 64%) 40%, rgb(249 247 237 / 14%) 100%),
+    linear-gradient(0deg, rgb(249 247 237 / 16%), transparent 58%);
+  content: '';
+}
+
+.role-home-content {
+  width: min(100%, 66rem);
+  color: #fff;
+  animation: home-copy-enter 550ms ease-out both;
+}
+
+.role-home-kicker {
+  margin: 0 0 1rem;
+  color: #1769aa !important;
+  font-size: 0.76rem;
+  font-weight: 750;
+  letter-spacing: 0.2em;
+}
+
+.role-home-greeting {
+  margin: 0 0 0.5rem !important;
+  color: #304d50 !important;
+  font-size: 1rem;
+}
+
+.role-home-content h1 {
+  max-width: 15ch;
+  margin: 0;
+  color: #12313a;
+  font-size: clamp(2.7rem, 6.5vw, 5.7rem);
+  font-weight: 740;
+  letter-spacing: -0.05em;
+  line-height: 1.02;
+  text-wrap: balance;
+}
+
+.role-home-description {
+  max-width: 42rem;
+  margin: 1rem 0 0 !important;
+  color: #304d50 !important;
+  font-size: clamp(1rem, 1.7vw, 1.2rem);
+  line-height: 1.6;
+}
+
+.role-home-actions {
+  display: grid;
+  width: min(100%, 53rem);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
+  gap: 1rem;
+  margin-top: clamp(2rem, 5vh, 3.5rem);
+}
+
+.role-home-card {
+  display: grid;
+  min-height: 8.5rem;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 1rem;
+  margin: 0 !important;
+  padding: 1.35rem 1.5rem;
+  border: 1px solid rgb(255 255 255 / 48%);
+  border-radius: 1rem;
+  background: rgb(255 255 255 / 78%);
+  box-shadow: 0 1rem 2.8rem rgb(8 29 42 / 18%);
+  color: #173f58 !important;
+  text-decoration: none;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  transition: transform 180ms ease, background-color 180ms ease, box-shadow 180ms ease;
+}
+
+.role-home-card:hover {
+  transform: translateY(-4px);
+  background: rgb(255 255 255 / 90%);
+  box-shadow: 0 1.25rem 3rem rgb(8 29 42 / 26%);
+}
+
+.role-home-card:focus-visible {
+  outline: 3px solid #bde6ff;
+  outline-offset: 4px;
+}
+
+.role-home-card-icon {
+  display: grid;
+  width: 2.8rem;
+  height: 2.8rem;
+  place-items: center;
+  border-radius: 0.8rem;
+  background: #1769aa;
+  color: #fff;
+  font-size: 1.35rem;
+  font-weight: 700;
+}
+
+.role-home-card-copy {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.role-home-card-copy strong {
+  color: #173f58;
+  font-size: 1.05rem;
+}
+
+.role-home-card-copy > span {
+  color: #536174;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.role-home-card-arrow {
+  color: #1769aa;
+  font-size: 1.5rem;
+}
+
+.role-home-role {
+  margin: 1.5rem 0 0 !important;
+  color: #536174 !important;
+  font-size: 0.85rem;
+}
+
+@media (max-width: 600px) {
+  .role-home-page {
+    align-items: flex-end;
+    padding-top: 7rem;
+    padding-bottom: 2.5rem;
+    background-position: 58% center;
+  }
+
+  .role-home-page::before {
+    background: linear-gradient(0deg, rgb(249 247 237 / 92%) 0%, rgb(249 247 237 / 78%) 58%, rgb(249 247 237 / 18%) 100%);
+  }
+
+  .role-home-content h1 {
+    font-size: clamp(2.7rem, 12vw, 4.2rem);
+  }
+
+  .role-home-actions {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+    margin-top: 1.5rem;
+  }
+
+  .role-home-card {
+    min-height: 6.5rem;
+    padding: 1rem 1.1rem;
+  }
 }
 
 .home-page::before {
@@ -188,6 +440,15 @@
   color: #1769aa;
   font-weight: 650;
   text-decoration: none;
+}
+
+button.back-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+  color: #1769aa;
 }
 
 .register-card h1 {
@@ -1074,6 +1335,23 @@
   text-align: left;
 }
 
+.account-menu-link {
+  display: flex !important;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0 !important;
+  padding: 0.65rem 0.75rem;
+  border-radius: 0.5rem;
+  color: #1769aa !important;
+  font-size: 0.85rem;
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.account-menu-link:hover {
+  background: #eff6ff;
+}
+
 .account-signout:hover {
   background: #fef3f2;
 }
@@ -1171,6 +1449,16 @@
 
   .booking-header {
     align-items: flex-start;
+  }
+
+  .reservation-history-header {
+    align-items: flex-start;
+  }
+
+  .reservation-history-header .booking-header-mark {
+    width: 3.3rem;
+    height: 3.3rem;
+    border-radius: 1rem;
   }
 
   .booking-header-mark {

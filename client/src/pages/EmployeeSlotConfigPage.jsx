@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Navigate } from 'react-router';
+import { Navigate, useNavigate } from 'react-router';
 import { apiRequest } from '../api/api.js';
 import { useAuth } from '../auth/AuthContext.jsx';
 import { useToast } from '../components/ToastProvider.jsx';
@@ -54,6 +54,7 @@ function EmployeeSlotConfigPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [sourceRefreshKey, setSourceRefreshKey] = useState(0);
   const notify = useToast();
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (!session?.isAuthenticated || session.userProfile.role !== 'Employee') return undefined;
@@ -205,9 +206,9 @@ function EmployeeSlotConfigPage() {
     <main className="page slot-page">
       <header className="slot-page-header">
         <div>
-          {/* <Link className="back-link" to="/home/employee">
-            Employee home
-          </Link> */}
+          <button className="back-link" type="button" onClick={() => window.history.length > 1 ? navigate(-1) : navigate('/home/employee')}>
+            ← Back
+          </button>
           <p className="eyebrow">MOUNTAINHUT · EMPLOYEE TOOLS</p>
           <h1>Service slots &amp; table setup</h1>
           <p className="form-intro">Set service times and build a table layout for any date.</p>

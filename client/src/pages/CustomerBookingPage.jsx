@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, Navigate } from 'react-router'
+import { Link, Navigate, useNavigate } from 'react-router'
 import { apiRequest } from '../api/api.js'
 import { useAuth } from '../auth/AuthContext.jsx'
 import { useToast } from '../components/ToastProvider.jsx'
@@ -62,6 +62,7 @@ function CustomerBookingPage() {
   const [bookingSuccessData, setBookingSuccessData] = useState(null)
   const [touched, setTouched] = useState({})
   const notify = useToast()
+  const navigate = useNavigate()
   const selectedSlot = slotOptionsDate === slotDate
     ? slotOptions.find((slot) => String(getSlotId(slot)) === String(slotId))
     : undefined
@@ -217,7 +218,9 @@ function CustomerBookingPage() {
     <main className="page booking-page">
       <header className="booking-header">
         <div>
-          {/* <Link className="back-link" to="/home/hiker">Hiker home</Link> */}
+          <button className="back-link" type="button" onClick={() => window.history.length > 1 ? navigate(-1) : navigate('/home/hiker')}>
+            ← Back
+          </button>
           <p className="eyebrow">MOUNTAINHUT · GUEST BOOKING</p>
           <h1>Book a table</h1>
           <p className="form-intro">Choose a service time, tell us how many are joining, and we’ll take care of the seating.</p>
