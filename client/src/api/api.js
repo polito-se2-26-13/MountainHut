@@ -21,6 +21,7 @@ export async function apiRequest(path, options = {}) {
       || (Array.isArray(detail) ? detail.map((item) => item.msg).join(', ') : null)
       || `Request failed (${response.status})`
     const error = new Error(message)
+    error.status = response.status
     if (Array.isArray(detail)) {
       error.fieldErrors = Object.fromEntries(
         detail
