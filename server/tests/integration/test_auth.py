@@ -41,6 +41,22 @@ def test_phone_without_prefix_is_read_as_italian(client, db):
     assert db.get(UserDAO, response.json()["id"]).phone == "+393331234567"
 
 
+def test_registration_saves_notes_and_emergency_contact(client, db):
+    response = client.post("/api/auth/register", json={**ANNA, "notes": "registered mountain guide", "emergencyContact": "Marco, +39 333 7654321"})
+
+    assert response.status_code == 201
+    saved = db.get(UserDAO, response.json()["id"])
+    assert saved.notes == "registered mountain guide"
+    assert saved.emergency_contact == "Marco, +39 333 7654321"
+
+
+def test_names_are_saved_without_spaces_around_and_cannot_be_only_spaces(client, db):
+    response = client.post("/api/auth/register", json={**ANNA, "firstName": "  Anna ", "lastName": " Li"})
+
+    assert db.get(UserDAO, response.json()["id"]).first_name == "Anna"
+    assert client.post("/api/auth/register", json={**ANNA, "email": "spaces@example.com", "firstName": "   "}).status_code == 422
+
+
 def test_same_email_cannot_register_twice(client):
     client.post("/api/auth/register", json=ANNA)
 

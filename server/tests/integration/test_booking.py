@@ -209,6 +209,16 @@ def test_party_size_is_required_and_positive(client, db):
     assert book(client, hiker, slot, 0).status_code == 422
 
 
+def test_contact_name_cannot_be_only_spaces(client, db):
+    hiker = add_hiker(db)
+
+    response = client.post("/api/reservations", json={
+        "slot_id": add_slot(db, [6]), "party_size": 2, "contact_name": "   ", "contact_email": "anna@example.com",
+    }, headers=TOKENS[hiker])
+
+    assert response.status_code == 422
+
+
 def test_booking_needs_the_login_of_a_hiker(client, db):
     slot = add_slot(db, [6])
     body = {"slot_id": slot, "party_size": 2, "contact_name": "Anna Rossi", "contact_email": "anna@example.com"}

@@ -1,12 +1,15 @@
-from pydantic import BaseModel, EmailStr,Field
+from pydantic import BaseModel, EmailStr,Field, StringConstraints
 from pydantic_extra_types.phone_numbers import PhoneNumber
-from typing import Optional
+from typing import Annotated, Optional
 from server.models.enum.user_type import UserType
 
 class Phone(PhoneNumber):
     """A number without prefix, accepted by the registration form, is read as Italian."""
     default_region_code = "IT"
     phone_format = "E164"
+
+# a name typed by a person: the spaces around it are removed, so a name of only spaces is refused
+Name = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
 
 class UserDTO(BaseModel):
     id: Optional[int] = None
@@ -28,9 +31,12 @@ class UserCreateDTO(BaseModel):
     email: EmailStr=Field(min_length=5, max_length=100)
     password: str=Field(min_length=8)
     role: UserType=UserType.Hiker
-    firstName: str =Field(min_length=1, max_length=100)
-    lastName: str=Field(min_length=1, max_length=100)
+    firstName: Name
+    lastName: Name
     phone: Optional[Phone]= None
+    # optional for the PO, issue #22 of the course repository
+    notes: Optional[str]=Field(None, max_length=555)
+    emergencyContact: Optional[str]=Field(None, max_length=255)
 
 class UserDetailDTO(BaseModel):
     id: Optional[int] = None

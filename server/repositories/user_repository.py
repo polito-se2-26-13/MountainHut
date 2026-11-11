@@ -26,6 +26,8 @@ class UserRepository:
                 first_name=user.firstName,
                 last_name=user.lastName,
                 phone=user.phone,
+                notes=user.notes,
+                emergency_contact=user.emergencyContact,
                 role=user.role.value
             )
             session.add(userDao)

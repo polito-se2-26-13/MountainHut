@@ -170,10 +170,12 @@ body:
   "firstName": "Firstname",
   "lastName": "Lastname",
   "phone": "+39 333 1234567",
+  "notes": "registered mountain guide",
+  "emergencyContact": "Marco Rossi, +39 333 7654321",
   "role": "Hiker"
 }
 ```
-`role` can be left out and is ignored: the registration always creates a Hiker. The password needs at least 8 characters, and the email is saved in lowercase.<br>
+`role` can be left out and is ignored: the registration always creates a Hiker. The password needs at least 8 characters, and the email is saved in lowercase. `notes` and `emergencyContact` are optional, at most 555 and 255 characters. Names are saved without the spaces around them, so a name of only spaces is refused.<br>
 HTTP Status: 201 ok, 409 email already registered, 422 missing or invalid fields, 500 ISE<br>
 JSON response:
 ```json
