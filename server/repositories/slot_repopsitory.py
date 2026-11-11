@@ -27,8 +27,24 @@ class SlotRepository:
             )
 
             return result.scalar_one_or_none()
-    
-        
+
+    async def find_overlapping_slot(self, date:date,startTime:time,endTime:time)->TimeSlotDAO|None:
+        """Another slot of the same day that starts before this one ends and ends after it starts.
+        The slot with exactly the same times is the one being saved again, so it does not count."""
+        start,end=startTime.strftime("%H:%M:%S"),endTime.strftime("%H:%M:%S")
+        # func.time reads both formats the database holds, 12:00:00 and 12:00:00.000000
+        slot_start,slot_end=func.time(TimeSlotDAO.start_time),func.time(TimeSlotDAO.end_time)
+        async with await self._get_session() as session:
+            result = await session.execute(
+                select(TimeSlotDAO).where(
+                    TimeSlotDAO.date == date,
+                    slot_start < end,
+                    slot_end > start,
+                    ~((slot_start == start) & (slot_end == end)),
+                )
+            )
+            return result.scalars().first()
+
     async def add_slot_time(self,slot:SlotCreation)->TimeSlotDAO:
         async with await self._get_session() as session:
             slotTime=TimeSlotDAO(
