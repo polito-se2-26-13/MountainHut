@@ -20,7 +20,8 @@ def send_confirmation_with_retry(mail, waits=(5, 10)):
             break
         time.sleep(wait)
     if result["status"] != "SENT":
-        print(f"confirmation email not sent for {mail.booking_reference}: {result.get('error')}")
+        # flush, otherwise the line waits in a buffer when the output goes to a file or to Docker
+        print(f"confirmation email not sent for {mail.booking_reference}: {result.get('error')}", flush=True)
 
 
 class ReservationController():
