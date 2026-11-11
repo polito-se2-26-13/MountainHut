@@ -38,8 +38,9 @@ async def process_token(auth_header: str, allowed_roles: list[UserType] = []):
 
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token expired")
-    except jwt.InvalidTokenError as e:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=f"Invalid token: {str(e)}")
+    except jwt.InvalidTokenError:
+        # the decoding error stays inside the server, it only tells an attacker what to try next
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 
 
 def extract_bearer_token(auth_header: str) -> str:

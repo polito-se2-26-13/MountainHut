@@ -146,3 +146,4 @@ def test_a_token_signed_with_another_key_is_refused(client):
     with pytest.raises(HTTPException) as refused:
         asyncio.run(process_token(f"Bearer {forged}", [UserType.Hiker]))
     assert refused.value.status_code == 401
+    assert refused.value.detail == "Invalid token"
