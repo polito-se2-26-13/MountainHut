@@ -1,0 +1,21 @@
+# Runs the server tests on every pull request towards dev and main.
+# The ruleset of dev and main lets a pull request be merged only when this check is green.
+name: tests
+
+on:
+  pull_request:
+    branches: [dev, main]
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: server/requirements.txt
+      - run: pip install -r server/requirements.txt
+      - run: python -m pytest
+        working-directory: server
