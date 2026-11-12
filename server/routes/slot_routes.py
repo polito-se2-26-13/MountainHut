@@ -14,7 +14,7 @@ controller=SlotController()
 @router.post("",
              response_model=SlotResponse,
              status_code=status.HTTP_201_CREATED,
-             dependencies=[Depends(authenticate_user([UserType.Employee,UserType.Warden]))]
+             dependencies=[Depends(authenticate_user([UserType.EMPLOYEE,UserType.WARDEN]))]
              )
 async def setUpSlot(slot: SlotCreation):
     return await controller.setUpSlot(slot)
@@ -22,7 +22,7 @@ async def setUpSlot(slot: SlotCreation):
 @router.get("",
             response_model=list[SlotDetail],
             status_code=status.HTTP_200_OK,
-            dependencies=[Depends(authenticate_user([UserType.Hiker,UserType.Employee,UserType.Warden]))])
+            dependencies=[Depends(authenticate_user([UserType.HIKER,UserType.EMPLOYEE,UserType.WARDEN]))])
 async def getSlotTime(date:Optional[date]=None):
     return await controller.getSlotTime(date)
 

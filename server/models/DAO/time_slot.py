@@ -16,7 +16,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from server.database import Base
-from server.const import SlotStatus
+from server.models.enum.slot_status import SlotStatus
 
 if TYPE_CHECKING:
     from server.models.DAO.user import UserDAO

@@ -5,7 +5,8 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 
-from server.const import SlotStatus, ReservationStatus
+from server.models.enum.slot_status import SlotStatus
+from server.models.enum.reservation_status import ReservationStatus
 from server.models.DAO.user import UserDAO
 from server.models.DAO.time_slot import TimeSlotDAO, SlotTableDAO
 from server.models.DAO.reservation import ReservationDAO, ReservationTableAssignmentDAO

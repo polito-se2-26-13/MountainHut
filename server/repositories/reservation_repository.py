@@ -6,7 +6,7 @@ from server.models.DAO.table import TableDAO
 from server.models.DAO.time_slot import SlotTableDAO, TimeSlotDAO
 from server.models.DAO.reservation import ReservationDAO, ReservationTableAssignmentDAO
 from server.models.DTO.reservation_dto import ReservationCreate
-from server.const import ReservationStatus
+from server.models.enum.reservation_status import ReservationStatus
 from server.models.error.notfound_error import NotFoundError
 from datetime import datetime
 

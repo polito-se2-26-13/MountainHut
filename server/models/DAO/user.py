@@ -6,7 +6,7 @@ from sqlalchemy import String, Text, Boolean, DateTime, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from server.database import Base
-from server.const import UserRole
+from server.models.enum.user_type import UserType
 from server.utils.security import hash_password, verify_password
 
 if TYPE_CHECKING:
@@ -24,7 +24,7 @@ class UserDAO(Base):
     first_name: Mapped[str] = mapped_column(String(100), nullable=False)
     last_name: Mapped[str] = mapped_column(String(100), nullable=False)
     phone: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
-    role: Mapped[str] = mapped_column(String(50), nullable=False, default=UserRole.HIKER.value)
+    role: Mapped[str] = mapped_column(String(50), nullable=False, default=UserType.HIKER.value)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # e.g. "registered mountain guide"
     emergency_contact: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)

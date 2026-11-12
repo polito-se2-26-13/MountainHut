@@ -3,7 +3,7 @@ from server.models.DTO.reservation_dto import ReservationCreate,ReservationRespo
 from server.models.DAO.time_slot import TimeSlotDAO
 from server.models.error.notfound_error import NotFoundError
 from server.models.error.conflict_error import ConflictError
-from server.const import SlotStatus
+from server.models.enum.slot_status import SlotStatus
 from server.service.booking_service import validate_two_hour_rule,assign_tables_for_party
 from server.service.mapper_service import reservationDTO_to_response,reservationEmailDto_to_email
 from server.service.email_service import send_booking_confirmation_email
