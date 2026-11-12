@@ -16,6 +16,7 @@ from server.models.DAO import UserDAO, TableDAO, TimeSlotDAO, SlotTableDAO, Rese
 from server.models.DTO.reservation_dto import ReservationCreate, ReservationMailDTO
 from server.models.error.conflict_error import ConflictError
 from server.repositories.reservation_repository import ReservationRepository
+from server.service.auth_service import generate_token
 from server.service.email_service import format_booking_email_html, format_booking_email_text
 
 
@@ -173,6 +174,7 @@ async def test_api_booking_endpoint_flow(client):
             "contact_phone": "+39 340 1112233",
             "special_requirements": "Gluten-free bread",
         },
+        headers={"Authorization": f"Bearer {generate_token(UserDAO(email='hiker@test.com', role=UserRole.HIKER.value))}"},
     )
     assert response.status_code == 201
     data = response.json()
@@ -187,7 +189,10 @@ async def test_api_booking_endpoint_flow(client):
     assert avail_res.json()["remaining_seats"] == 7
 
     # 3. Retrieve reservation by reference
-    get_res = await client.get(f"/api/reservations/{ref}")
+    get_res = await client.get(
+        f"/api/reservations/{ref}",
+        headers={"Authorization": f"Bearer {generate_token(UserDAO(email='hiker@test.com', role=UserRole.HIKER.value))}"},
+    )
     assert get_res.status_code == 200
     assert get_res.json()["booking_reference"] == ref
     assert get_res.json()["special_requirements"] == "Gluten-free bread"

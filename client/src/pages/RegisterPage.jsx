@@ -18,7 +18,7 @@ const phonePattern = /^\+?[0-9][0-9\s().-]{6,19}$/
 function validateField(name, values) {
   const value = values[name]
 
-  if (name !== 'phone' && !value.trim()) return 'This field is required.'
+  if (!value.trim()) return 'This field is required.'
   if (name === 'email' && value && !emailPattern.test(value.trim())) return 'Enter a valid email address.'
   if (name === 'password' && value && value.length < 8) return 'Password must be at least 8 characters.'
   if (name === 'confirmPassword' && value !== values.password) return 'Passwords do not match.'
@@ -74,7 +74,7 @@ function RegisterPage() {
         password: values.password,
         firstName: values.firstName.trim(),
         lastName: values.lastName.trim(),
-        ...(values.phone.trim() ? { phone: values.phone.trim() } : {}),
+        phone: values.phone.trim(),
         role: 'Hiker',
       }
       const result = await apiRequest('/auth/register', {
@@ -133,8 +133,8 @@ function RegisterPage() {
             </label>
 
             <label className="form-field form-field-wide">
-              <span>Phone <span className="optional-mark">(optional)</span></span>
-              <input name="phone" type="tel" autoComplete="tel" value={values.phone} onChange={handleChange} onBlur={handleBlur} aria-invalid={Boolean(showError('phone'))} />
+              <span>Phone <span className="required-mark" aria-hidden="true">*</span></span>
+              <input name="phone" type="tel" required autoComplete="tel" value={values.phone} onChange={handleChange} onBlur={handleBlur} aria-invalid={Boolean(showError('phone'))} />
               {showError('phone') && <small className="field-error">{showError('phone')}</small>}
             </label>
 

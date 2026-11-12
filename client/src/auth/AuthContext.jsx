@@ -6,6 +6,12 @@ const STORAGE_KEY = 'mountainhut.auth';
 const SIGNED_OUT_KEY = 'mountainhut.signedOut';
 
 
+// also used by api.js, which is not a component, when the server says the login is no longer valid
+export function forgetStoredSession() {
+  localStorage.removeItem(STORAGE_KEY);
+  localStorage.setItem(SIGNED_OUT_KEY, 'true');
+}
+
 function readStoredSession() {
   try {
     if (localStorage.getItem(SIGNED_OUT_KEY) === 'true') return null;
@@ -34,8 +40,7 @@ export function AuthProvider({ children }) {
   }
 
   function signOut() {
-    localStorage.removeItem(STORAGE_KEY);
-    localStorage.setItem(SIGNED_OUT_KEY, 'true');
+    forgetStoredSession();
     setSession(null);
   }
 

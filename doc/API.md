@@ -81,7 +81,8 @@ JSON response:
 
 name: `/api/reservations/{reference}`<br>
 parameter: `reference` (path, string)<br>
-HTTP Status: 200 ok, 404 not found, 500 ISE<br>
+header: `Authorization: Bearer <token>` (Hiker, Employee or Warden), a hiker can read only their own bookings<br>
+HTTP Status: 200 ok, 401 unauthorized, 403 forbidden, 404 not found, 500 ISE<br>
 JSON response:
 ```json
 // 200
@@ -90,6 +91,9 @@ JSON response:
   "booking_reference": "MH-20261030-ALX01",
   "user_id": 3,
   "slot_id": 1,
+  "date": "2026-10-30",
+  "start_time": "12:00",
+  "end_time": "13:00",
   "party_size": 4,
   "special_requirements": "2 vegetarian meals, 1 gluten allergy",
   "contact_name": "Alex Smith",
@@ -119,7 +123,8 @@ JSON response:
 
 name: `/api/reservations/user/{user_id}`<br>
 parameter: `user_id` (path, integer)<br>
-HTTP Status: 200 ok, 404 no bookings, 500 ISE<br>
+header: `Authorization: Bearer <token>` (Hiker), only for the id of the hiker of the token<br>
+HTTP Status: 200 ok, an empty list when there are no bookings, 401 unauthorized, 403 forbidden, 422 id not a number, 500 ISE<br>
 JSON response:
 ```json
 // 200
@@ -129,6 +134,9 @@ JSON response:
     "booking_reference": "MH-20261030-ALX01",
     "user_id": 3,
     "slot_id": 1,
+    "date": "2026-10-30",
+    "start_time": "12:00",
+    "end_time": "13:00",
     "party_size": 4,
     "special_requirements": "2 vegetarian meals, 1 gluten allergy",
     "contact_name": "Alex Smith",
@@ -162,10 +170,13 @@ body:
   "firstName": "Firstname",
   "lastName": "Lastname",
   "phone": "+39 333 1234567",
+  "notes": "registered mountain guide",
+  "emergencyContact": "Marco Rossi, +39 333 7654321",
   "role": "Hiker"
 }
 ```
-HTTP Status: 201 ok, 400 empty field, 409 email already registered, 422 invalid fields, 500 ISE<br>
+`role` can be left out and is ignored: the registration always creates a Hiker. The password needs at least 8 characters, and the email is saved in lowercase. `phone` is required, and a number without prefix is read as Italian. `notes` and `emergencyContact` are optional, at most 555 and 255 characters. Names are saved without the spaces around them, so a name of only spaces is refused.<br>
+HTTP Status: 201 ok, 409 email already registered, 422 missing or invalid fields, 500 ISE<br>
 JSON response:
 ```json
 // 201
@@ -192,7 +203,7 @@ body:
   "password": "SecurePassword123!"
 }
 ```
-HTTP Status: 200 ok, 400 empty field, 404 wrong email or password, 422 missing field, 500 ISE<br>
+HTTP Status: 200 ok, 400 empty field, 401 wrong email or password, 422 missing field, 500 ISE<br>
 JSON response:
 ```json
 // 200
@@ -208,11 +219,11 @@ JSON response:
   }
 }
 
-// 404 / 500
+// 401 / 500
 {
-  "code": 404,
+  "code": 401,
   "message": "email or password wrong",
-  "name": "NotFoundError"
+  "name": "UnauthorizedError"
 }
 ```
 
@@ -261,7 +272,8 @@ JSON response:
 
 name: `/api/reservations`<br>
 parameter: -<br>
-body:
+header: `Authorization: Bearer <token>` (Hiker)<br>
+body, where `user_id` can be left out because the hiker comes from the token:
 ```json
 {
   "slot_id": 1,
@@ -273,7 +285,7 @@ body:
   "special_requirements": "2 vegetarian meals, 1 gluten allergy"
 }
 ```
-HTTP Status: 201 created, 404 slot not found, 409 slot closed, too late, already booked or not enough seats, 422 invalid request, 500 ISE<br>
+HTTP Status: 201 created, 401 unauthorized, 403 forbidden, 404 slot not found, 409 slot closed, too late, already booked or not enough seats, 422 invalid request, 500 ISE<br>
 JSON response:
 ```json
 // 201
@@ -282,6 +294,9 @@ JSON response:
   "booking_reference": "MH-20261030-ALX01",
   "user_id": 3,
   "slot_id": 1,
+  "date": "2026-10-30",
+  "start_time": "12:00",
+  "end_time": "13:00",
   "party_size": 4,
   "special_requirements": "2 vegetarian meals, 1 gluten allergy",
   "contact_name": "Alex Smith",

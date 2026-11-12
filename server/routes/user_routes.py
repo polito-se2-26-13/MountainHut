@@ -13,24 +13,13 @@ controller=UserController()
 )
 async def create_user(user: UserCreateDTO):
     """
-    Create a new user.
+    Create a new hiker.
 
-    - Request body: UserCreateDTO (contains email, password, role, phone, firstName, lastName)
+    - Request body: UserCreateDTO (email, password of at least 8 characters, phone, firstName, lastName; role is ignored)
     - Returns: Created user as UserResponseDTO
-    - Raises:
-      - BadRequestError: when mandatory fields (password, type) are missing or invalid
+    - Missing or invalid fields are refused with 422 by the DTO
     - Status code: 201 Created
     """
-    if not user.password:
-      raise BadRequestError("empty password")
-    if not user.email :
-        raise BadRequestError("empty email")
-    if not user.firstName:
-        raise BadRequestError("empty first name")
-    if not user.lastName:
-      raise BadRequestError("empty last name")
-    if not user.role:
-        raise BadRequestError("empty role")
     return await controller.create_user(user)
 
 @router.post("/login",

@@ -11,19 +11,26 @@ controller=ReservationController()
 @router.post("", 
              response_model=ReservationResponse, 
              status_code=status.HTTP_201_CREATED,
-             #dependencies=[Depends(authenticate_user([user.value for user in UserType]))],
              )
-async def create_reservation(reservation:ReservationCreate,background_tasks:BackgroundTasks):
+async def create_reservation(reservation:ReservationCreate,background_tasks:BackgroundTasks,user=Depends(authenticate_user([UserType.Hiker]))):
+     # from the token and not from the body, otherwise anyone could book in someone else's name
+     reservation.user_id=user.id
      return await controller.create_reservation(reservation,background_tasks)
 
 @router.get("/{reference}",
             response_model=ReservationResponse,
             status_code=status.HTTP_200_OK)
-async def get_reservation_by_reference(reference:str):
-     return await controller.get_reservation_by_reference(reference)
+async def get_reservation_by_reference(reference:str,user=Depends(authenticate_user([UserType.Hiker,UserType.Employee,UserType.Warden]))):
+     reservation=await controller.get_reservation_by_reference(reference)
+     # a hiker reads only their own bookings, the hut staff reads all of them
+     if user.role==UserType.Hiker and reservation.user_id!=user.id:
+          raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient rights")
+     return reservation
 
 @router.get("/user/{user_id}",
             response_model=list[ReservationResponse],
             status_code=status.HTTP_200_OK)
-async def get_reservation_by_user_id(user_id:str):
+async def get_reservation_by_user_id(user_id:int,user=Depends(authenticate_user([UserType.Hiker]))):
+     if user.id!=user_id:
+          raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient rights")
      return await controller.get_reservation_by_user_id(user_id)

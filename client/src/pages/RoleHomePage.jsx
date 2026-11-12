@@ -33,6 +33,7 @@ const roleHomeContent = {
     title: 'Welcome to your workspace.',
     description: 'A clear starting point for your MountainHut sessions.',
     actions: [
+      { title: 'Times & tables', description: 'Configure service slots and table layouts.', to: '/employee/slots', icon: '＋' },
       { title: 'MountainHut home', description: 'Visit the public MountainHut landing page.', to: '/', icon: '↗' },
     ],
   },

@@ -89,10 +89,8 @@ class ReservationController():
         
         return reservationDTO_to_response(res,tables)
 
-    async def get_reservation_by_user_id(self,user_id:str):
+    async def get_reservation_by_user_id(self,user_id:int):
             res= await self.repo.get_reservation_by_user_id(user_id)
-            if not res :
-                raise NotFoundError(f"booking for id {user_id} not found")
             listRes=[]
             for r,a in res:
                 listRes.append(reservationDTO_to_response(r,a))
