@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Button, Form, Input } from 'antd'
 import { Link, useNavigate } from 'react-router'
 import { useAuth } from '../auth/AuthContext.jsx'
 import { useToast } from '../components/ToastProvider.jsx'
@@ -34,8 +35,7 @@ function LoginPage() {
   const showEmailError = touched.username || submitted ? emailError : ''
   const showPasswordError = touched.password || submitted ? passwordError : ''
 
-  async function handleSubmit(event) {
-    event.preventDefault()
+  async function handleSubmit() {
     setSubmitted(true)
     setTouched({ username: true, password: true })
     setFieldErrors({})
@@ -81,11 +81,12 @@ function LoginPage() {
         <h1 id="login-title">Welcome back</h1>
         <p className="form-intro">Sign in with your email and password.</p>
 
-        <form onSubmit={handleSubmit} noValidate>
+        <Form className="mh-form" onFinish={handleSubmit} noValidate>
           <div className="login-fields">
             <label className="form-field">
               <span>Email <span className="required-mark" aria-hidden="true">*</span></span>
-              <input
+              <Input
+                className="mh-control"
                 name="username"
                 type="email"
                 required
@@ -101,11 +102,12 @@ function LoginPage() {
 
             <label className="form-field">
               <span>Password <span className="required-mark" aria-hidden="true">*</span></span>
-              <input
+              <Input.Password
+                className="mh-control"
                 name="password"
-                type="password"
                 required
                 autoComplete="current-password"
+                visibilityToggle={false}
                 value={password}
                 onChange={(event) => updateField('password', event.target.value)}
                 onBlur={() => setTouched((current) => ({ ...current, password: true }))}
@@ -116,12 +118,12 @@ function LoginPage() {
             </label>
           </div>
 
-          <button className="submit-button" type="submit" disabled={loading}>
+          <Button className="submit-button" type="primary" htmlType="submit" loading={loading}>
             {loading ? 'Signing in…' : 'Sign in'}
-          </button>
+          </Button>
           <p className="login-register-link">New to MountainHut? <Link to="/register">Create an account</Link></p>
           <p className="required-note"><span className="required-mark">*</span> Required fields</p>
-        </form>
+        </Form>
       </section>
     </main>
   )

@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import { Button, DatePicker, Form, Input, InputNumber, Select } from 'antd'
+import dayjs from 'dayjs'
 import { Link, Navigate, useNavigate } from 'react-router'
 import { apiRequest } from '../api/api.js'
 import { useAuth } from '../auth/AuthContext.jsx'
@@ -149,8 +151,7 @@ function CustomerBookingPage() {
     setBookingSuccessData(null)
   }
 
-  async function handleSubmit(event) {
-    event.preventDefault()
+  async function handleSubmit() {
     setTouched({ partySize: true, contactName: true, contactEmail: true })
     setBookingSuccessData(null)
 
@@ -250,7 +251,7 @@ function CustomerBookingPage() {
         </section>
       )}
 
-      <form className="booking-layout" onSubmit={handleSubmit} noValidate>
+      <Form className="booking-layout mh-form" onFinish={handleSubmit} noValidate>
         <div className="booking-main-column">
           <section className="booking-panel" aria-labelledby="choose-time-title">
             <div className="booking-panel-heading">
@@ -260,19 +261,34 @@ function CustomerBookingPage() {
             <div className="booking-fields booking-time-fields">
               <label className="form-field">
                 <span>Date <span className="required-mark" aria-hidden="true">*</span></span>
-                <input type="date" min={localDateString()} required value={slotDate} onChange={(event) => handleDateChange(event.target.value)} />
+                <DatePicker
+                  className="mh-control"
+                  format="YYYY-MM-DD"
+                  value={slotDate ? dayjs(slotDate) : null}
+                  disabledDate={date => date.isBefore(dayjs(localDateString()), 'day')}
+                  onChange={date => handleDateChange(date ? date.format('YYYY-MM-DD') : '')}
+                  allowClear={false}
+                />
               </label>
               <label className="form-field">
                 <span>Service time <span className="required-mark" aria-hidden="true">*</span></span>
-                <select value={slotId} required onChange={(event) => { setSlotId(event.target.value); setAvailability(null); setIsCheckingAvailability(Boolean(event.target.value)); clearBookingConfirmation() }} disabled={isLoadingSlots || slotOptions.length === 0}>
-                  <option value="">{isLoadingSlots ? 'Loading service times…' : slotOptions.length ? 'Select a time' : 'No bookable times for this date'}</option>
-                  {slotOptions.map((slot) => {
+                <Select
+                  className="mh-control"
+                  value={slotId || undefined}
+                  placeholder={isLoadingSlots ? 'Loading service times…' : slotOptions.length ? 'Select a time' : 'No bookable times for this date'}
+                  loading={isLoadingSlots}
+                  onChange={(value) => { setSlotId(value); setAvailability(null); setIsCheckingAvailability(Boolean(value)); clearBookingConfirmation() }}
+                  disabled={isLoadingSlots || slotOptions.length === 0}
+                  options={slotOptions.map((slot) => {
                     const start = getSlotStart(slot)
                     const end = getSlotEnd(slot)
                     const meal = slot.meal_type ?? slot.mealType
-                    return <option key={getSlotId(slot)} value={getSlotId(slot)}>{start}{end ? ` – ${end}` : ''}{meal ? ` · ${meal}` : ''}</option>
+                    return {
+                      value: String(getSlotId(slot)),
+                      label: `${start}${end ? ` – ${end}` : ''}${meal ? ` · ${meal}` : ''}`,
+                    }
                   })}
-                </select>
+                />
               </label>
             </div>
             {isLoadingSlots && <p className="availability-hint">Finding service times for your selected date…</p>}
@@ -293,7 +309,7 @@ function CustomerBookingPage() {
             </div>
             <label className="form-field party-size-field">
               <span>Number of guests <span className="required-mark" aria-hidden="true">*</span></span>
-              <input type="number" min="1" max={availability ? remainingSeats : undefined} step="1" value={partySize} onChange={(event) => { setPartySize(event.target.value); clearBookingConfirmation() }} onBlur={() => setTouched((current) => ({ ...current, partySize: true }))} aria-invalid={Boolean(touched.partySize && partySizeError)} />
+              <InputNumber className="mh-control" min={1} max={availability ? remainingSeats : undefined} step={1} value={partySize} onChange={(value) => { setPartySize(value ?? ''); clearBookingConfirmation() }} onBlur={() => setTouched((current) => ({ ...current, partySize: true }))} aria-invalid={Boolean(touched.partySize && partySizeError)} />
               {touched.partySize && partySizeError && <small className="field-error">{partySizeError}</small>}
               {availability && !partySizeError && <small className="field-hint">Up to {remainingSeats} guests can be booked for this time.</small>}
             </label>
@@ -307,21 +323,21 @@ function CustomerBookingPage() {
             <div className="booking-fields">
               <label className="form-field">
                 <span>Contact name <span className="required-mark" aria-hidden="true">*</span></span>
-                <input value={contactName} autoComplete="name" onChange={(event) => { setContactName(event.target.value); clearBookingConfirmation() }} onBlur={() => setTouched((current) => ({ ...current, contactName: true }))} aria-invalid={Boolean(touched.contactName && contactNameError)} />
+                <Input className="mh-control" value={contactName} autoComplete="name" onChange={(event) => { setContactName(event.target.value); clearBookingConfirmation() }} onBlur={() => setTouched((current) => ({ ...current, contactName: true }))} aria-invalid={Boolean(touched.contactName && contactNameError)} />
                 {touched.contactName && contactNameError && <small className="field-error">{contactNameError}</small>}
               </label>
               <label className="form-field">
                 <span>Email <span className="required-mark" aria-hidden="true">*</span></span>
-                <input type="email" value={contactEmail} autoComplete="email" onChange={(event) => { setContactEmail(event.target.value); clearBookingConfirmation() }} onBlur={() => setTouched((current) => ({ ...current, contactEmail: true }))} aria-invalid={Boolean(touched.contactEmail && contactEmailError)} />
+                <Input className="mh-control" type="email" value={contactEmail} autoComplete="email" onChange={(event) => { setContactEmail(event.target.value); clearBookingConfirmation() }} onBlur={() => setTouched((current) => ({ ...current, contactEmail: true }))} aria-invalid={Boolean(touched.contactEmail && contactEmailError)} />
                 {touched.contactEmail && contactEmailError && <small className="field-error">{contactEmailError}</small>}
               </label>
               <label className="form-field">
                 <span>Phone <span className="optional-mark">(optional)</span></span>
-                <input type="tel" value={contactPhone} autoComplete="tel" onChange={(event) => { setContactPhone(event.target.value); clearBookingConfirmation() }} />
+                <Input className="mh-control" type="tel" value={contactPhone} autoComplete="tel" onChange={(event) => { setContactPhone(event.target.value); clearBookingConfirmation() }} />
               </label>
               <label className="form-field form-field-wide">
                 <span>Special requirements <span className="optional-mark">(optional)</span></span>
-                <textarea rows="4" value={specialReqs} placeholder="Dietary needs, allergies, or anything else we should know" onChange={(event) => { setSpecialReqs(event.target.value); clearBookingConfirmation() }} />
+                <Input.TextArea className="mh-control" rows={4} value={specialReqs} placeholder="Dietary needs, allergies, or anything else we should know" onChange={(event) => { setSpecialReqs(event.target.value); clearBookingConfirmation() }} />
               </label>
             </div>
           </section>
@@ -336,13 +352,13 @@ function CustomerBookingPage() {
           <div className="summary-line"><span>Guests</span><strong>{partySize || 0}</strong></div>
           {availability && <div className="summary-line"><span>Seats left</span><strong>{remainingSeats}</strong></div>}
           <p className="summary-note">Reservations must be made at least 2 hours before the service time.</p>
-          <button className="submit-button booking-submit" type="submit" disabled={!canSubmit || isSubmitting}>
+          <Button className="submit-button booking-submit" type="primary" htmlType="submit" disabled={!canSubmit || isSubmitting} loading={isSubmitting}>
             {isSubmitting ? 'Confirming booking…' : 'Confirm booking'}
-          </button>
+          </Button>
           {!canSubmit && !isSubmitting && <small className="submit-hint">Select an available time and enter valid guest and contact details to continue.</small>}
           <Link className="summary-back-link" to="/home/hiker">Back to home</Link>
         </aside>
-      </form>
+      </Form>
     </main>
   )
 }

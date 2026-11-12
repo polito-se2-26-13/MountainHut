@@ -1247,9 +1247,9 @@ button.back-link {
 }
 
 .account-menu-position {
-  position: absolute;
+  position: fixed;
   z-index: 1000;
-  top: 1rem;
+  top: max(1rem, env(safe-area-inset-top));
   right: max(1rem, calc((100vw - 74rem) / 2));
 }
 
@@ -1290,7 +1290,8 @@ button.back-link {
   position: absolute;
   top: calc(100% + 0.65rem);
   right: 0;
-  width: min(17rem, calc(100vw - 2rem));
+  width: min(17rem, calc(100vw - 2rem - env(safe-area-inset-left) - env(safe-area-inset-right)));
+  max-width: calc(100vw - 2rem);
   padding: 0.55rem;
   border: 1px solid #e2e8f0;
   border-radius: 0.8rem;
@@ -1482,7 +1483,22 @@ button.back-link {
   }
 }
 
-@media (min-width: 561px) and (max-width: 900px) {
+@media (min-width: 561px) and (max-width: 760px) {
+  .slot-form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .booking-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .booking-summary {
+    position: static;
+    grid-row: auto;
+  }
+}
+
+@media (min-width: 761px) and (max-width: 900px) {
   .booking-layout {
     grid-template-columns: minmax(0, 1fr) 16rem;
   }
@@ -1497,6 +1513,67 @@ button.back-link {
 }
 
 @media (max-width: 560px) {
+  /* Keep mobile browsers from auto-zooming focused native controls. This
+     preserves the viewport coordinates used to place native select menus. */
+  .booking-page .form-field input,
+  .booking-page .form-field select,
+  .booking-page .form-field textarea,
+  .slot-page .form-field input,
+  .slot-page .form-field select {
+    font-size: 16px;
+  }
+
+  .page {
+    width: min(100% - 1.25rem, 72rem);
+    padding-top: 2rem;
+  }
+
+  .reservation-history-page,
+  .slot-page,
+  .booking-page {
+    width: min(100% - 1.25rem, 74rem);
+    padding-top: 5rem;
+  }
+
+  .register-page {
+    padding: 1.25rem 0.625rem;
+  }
+
+  .register-card {
+    border-radius: 0.8rem;
+  }
+
+  .reservation-history-header,
+  .booking-header {
+    gap: 1rem;
+  }
+
+  .reservation-history-list li {
+    padding: 1rem;
+  }
+
+  .slot-panel,
+  .booking-panel {
+    padding: 1rem;
+  }
+
+  .account-menu-position {
+    top: max(0.75rem, env(safe-area-inset-top));
+    right: max(0.75rem, env(safe-area-inset-right));
+  }
+
+  .account-dropdown {
+    width: min(17rem, calc(100vw - 1.5rem - env(safe-area-inset-left) - env(safe-area-inset-right)));
+  }
+
+  .booking-confirmation {
+    padding: 1rem;
+  }
+
+  .success-modal {
+    padding: 1.5rem 1.15rem;
+  }
+
   .home-page {
     background-position: 66% center;
     padding-bottom: 2.5rem;
@@ -1515,4 +1592,227 @@ button.back-link {
   .home-hero-copy h1 {
     font-size: clamp(3rem, 14vw, 4.5rem);
   }
+}
+
+/* Ant Design controls inherit the existing MountainHut form treatment. */
+.mh-form {
+  width: 100%;
+  min-width: 0;
+}
+
+.route-loading {
+  display: grid;
+  min-height: 100vh;
+  min-height: 100svh;
+  place-items: center;
+  color: #64748b;
+  font-size: 0.9rem;
+}
+
+.form-field .mh-control,
+.form-field .ant-picker,
+.form-field .ant-select,
+.form-field .ant-input-number {
+  width: 100%;
+  min-width: 0;
+}
+
+.form-field .ant-input:not(textarea),
+.form-field .ant-input-affix-wrapper,
+.form-field .ant-picker,
+.form-field .ant-select-single .ant-select-selector,
+.form-field .ant-input-number {
+  box-sizing: border-box;
+  height: 46px;
+  min-height: 46px;
+  border-color: #cbd5e1;
+  border-radius: 0.5rem;
+  background: #fff;
+  color: #18212f;
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 400;
+  box-shadow: none;
+}
+
+.form-field .ant-input:not(textarea),
+.form-field .ant-input-affix-wrapper,
+.form-field .ant-picker {
+  padding: 0 0.75rem;
+}
+
+.form-field .ant-input-affix-wrapper .ant-input {
+  height: auto;
+  min-height: auto;
+  padding: 0;
+  border: 0;
+  line-height: 1.5;
+}
+
+.form-field .ant-input-affix-wrapper .ant-input:focus {
+  border: 0;
+  outline: 0;
+  box-shadow: none;
+}
+
+.form-field .ant-select-single {
+  height: 46px;
+}
+
+.form-field .ant-select-single .ant-select-selector {
+  align-items: center;
+  padding: 0 0.75rem;
+}
+
+.form-field .ant-select-single .ant-select-selection-item,
+.form-field .ant-select-single .ant-select-selection-placeholder {
+  line-height: 1.5;
+}
+
+.form-field .ant-picker-input > input {
+  height: auto;
+  min-height: 0;
+  padding: 0;
+  line-height: 1.5;
+}
+
+.form-field .ant-input-number-input-wrap input {
+  height: 44px;
+  min-height: 0;
+  padding: 0 0.75rem;
+  color: #18212f;
+  font: inherit;
+  line-height: 1.5;
+}
+
+.form-field textarea.ant-input {
+  height: auto;
+  min-height: 6rem;
+  padding: 0.7rem 0.75rem;
+  resize: vertical;
+}
+
+.table-row .ant-input {
+  width: 100%;
+  min-width: 0;
+  height: 46px;
+  min-height: 46px;
+  padding: 0 0.7rem;
+  border-color: #cbd5e1;
+  border-radius: 0.45rem;
+  color: #18212f;
+  font: inherit;
+}
+
+.table-row .ant-input-number {
+  width: 100%;
+  min-width: 0;
+  height: 46px;
+  min-height: 46px;
+  border-color: #cbd5e1;
+  border-radius: 0.45rem;
+}
+
+.table-row .ant-input-number input {
+  height: 44px;
+  min-height: 0;
+  padding: 0 0.7rem;
+  border: 0;
+  line-height: 1.5;
+}
+
+.form-field .ant-input:hover,
+.form-field .ant-input-affix-wrapper:hover,
+.form-field .ant-picker:hover,
+.form-field .ant-select:hover .ant-select-selector,
+.form-field .ant-input-number:hover {
+  border-color: #1769aa;
+}
+
+.form-field .ant-input:focus,
+.form-field .ant-input-affix-wrapper-focused,
+.form-field .ant-picker-focused,
+.form-field .ant-select-focused .ant-select-selector,
+.form-field .ant-input-number-focused {
+  border-color: #1769aa;
+  box-shadow: 0 0 0 3px rgb(23 105 170 / 16%);
+}
+
+.form-field [aria-invalid="true"],
+.form-field .ant-input[aria-invalid="true"] {
+  border-color: #c62828;
+}
+
+.ant-btn.submit-button {
+  display: inline-flex;
+  min-height: 3rem;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 0.5rem;
+  background: #1769aa;
+  box-shadow: none;
+  color: #fff;
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 650;
+}
+
+.ant-btn.submit-button:hover:not(:disabled) {
+  background: #125486;
+  color: #fff;
+}
+
+.ant-btn.secondary-button,
+.ant-btn.add-table-button,
+.ant-btn.remove-table-button {
+  height: auto;
+  font-family: inherit;
+}
+
+.ant-btn.secondary-button {
+  border-color: #cbd5e1;
+  border-radius: 0.5rem;
+  color: #334155;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.ant-btn.add-table-button {
+  border-color: #bfdbfe;
+  border-radius: 0.5rem;
+  color: #1769aa;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.ant-btn.remove-table-button {
+  border-color: transparent;
+  color: #b42318;
+  font-size: 0.75rem;
+}
+
+@media (max-width: 560px) {
+  .form-field .ant-input:not(textarea),
+  .form-field .ant-input-affix-wrapper,
+  .form-field .ant-picker,
+  .form-field .ant-select,
+  .form-field .ant-input-number,
+  .form-field .ant-select-single .ant-select-selector {
+    font-size: 16px;
+  }
+
+  .table-row .ant-input,
+  .table-row .ant-input-number {
+    font-size: 16px;
+  }
+
+  .ant-picker-dropdown,
+  .ant-select-dropdown {
+    max-width: calc(100vw - 1rem);
+  }
+}
+
+:where(.css-dev-only-do-not-override-oc1rc0).ant-select-single:not(.ant-select-customize) .ant-select-content {
+  overflow: visible;
 }
