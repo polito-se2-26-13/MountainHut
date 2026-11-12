@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Button, DatePicker, Form, Input, InputNumber, Select } from 'antd'
+import { Button, Checkbox, DatePicker, Form, Input, InputNumber, Select } from 'antd'
 import dayjs from 'dayjs'
 import { Link, Navigate, useNavigate } from 'react-router'
 import { apiRequest } from '../api/api.js'
@@ -55,7 +55,10 @@ function CustomerBookingPage() {
   const [availability, setAvailability] = useState(null)
   const [partySize, setPartySize] = useState(2)
   const [contactName, setContactName] = useState(session?.userProfile?.fullName || '')
-  const [contactEmail, setContactEmail] = useState(session?.userProfile?.email || '')
+  const accountEmail = session?.userProfile?.email || ''
+  const [useAlternativeEmail, setUseAlternativeEmail] = useState(false)
+  const [alternativeEmail, setAlternativeEmail] = useState('')
+  const contactEmail = useAlternativeEmail ? alternativeEmail : accountEmail
   const [contactPhone, setContactPhone] = useState('')
   const [specialReqs, setSpecialReqs] = useState('')
   const [isLoadingSlots, setIsLoadingSlots] = useState(true)
@@ -326,11 +329,24 @@ function CustomerBookingPage() {
                 <Input className="mh-control" value={contactName} autoComplete="name" onChange={(event) => { setContactName(event.target.value); clearBookingConfirmation() }} onBlur={() => setTouched((current) => ({ ...current, contactName: true }))} aria-invalid={Boolean(touched.contactName && contactNameError)} />
                 {touched.contactName && contactNameError && <small className="field-error">{contactNameError}</small>}
               </label>
-              <label className="form-field">
-                <span>Email <span className="required-mark" aria-hidden="true">*</span></span>
-                <Input className="mh-control" type="email" value={contactEmail} autoComplete="email" onChange={(event) => { setContactEmail(event.target.value); clearBookingConfirmation() }} onBlur={() => setTouched((current) => ({ ...current, contactEmail: true }))} aria-invalid={Boolean(touched.contactEmail && contactEmailError)} />
-                {touched.contactEmail && contactEmailError && <small className="field-error">{contactEmailError}</small>}
-              </label>
+              <div className="form-field form-field-wide">
+                <span>Confirmation email</span>
+                <p className="field-hint">By default, we’ll send the confirmation to your account email: <strong>{accountEmail || 'No account email available'}</strong></p>
+                <Checkbox checked={useAlternativeEmail} onChange={(event) => {
+                  setUseAlternativeEmail(event.target.checked)
+                  setTouched((current) => ({ ...current, contactEmail: false }))
+                  clearBookingConfirmation()
+                }}>
+                  I want to send the confirmation to a different email address.
+                </Checkbox>
+                {useAlternativeEmail && (
+                  <label className="form-field alternative-email-field">
+                    <span>Alternative email <span className="required-mark" aria-hidden="true">*</span></span>
+                    <Input className="mh-control" type="email" value={alternativeEmail} autoComplete="email" onChange={(event) => { setAlternativeEmail(event.target.value); clearBookingConfirmation() }} onBlur={() => setTouched((current) => ({ ...current, contactEmail: true }))} aria-invalid={Boolean(touched.contactEmail && contactEmailError)} />
+                    {touched.contactEmail && contactEmailError && <small className="field-error">{contactEmailError}</small>}
+                  </label>
+                )}
+              </div>
               <label className="form-field">
                 <span>Phone <span className="optional-mark">(optional)</span></span>
                 <Input className="mh-control" type="tel" value={contactPhone} autoComplete="tel" onChange={(event) => { setContactPhone(event.target.value); clearBookingConfirmation() }} />
