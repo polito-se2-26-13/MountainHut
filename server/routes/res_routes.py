@@ -12,7 +12,7 @@ controller=ReservationController()
              response_model=ReservationResponse, 
              status_code=status.HTTP_201_CREATED,
              )
-async def create_reservation(reservation:ReservationCreate,background_tasks:BackgroundTasks,user=Depends(authenticate_user([UserType.HIKER]))):
+async def create_reservation(reservation:ReservationCreate,background_tasks:BackgroundTasks,user=Depends(authenticate_user([UserType.HIKER,UserType.WARDEN,UserType.EMPLOYEE]))):
      # from the token and not from the body, otherwise anyone could book in someone else's name
      reservation.user_id=user.id
      return await controller.create_reservation(reservation,background_tasks)

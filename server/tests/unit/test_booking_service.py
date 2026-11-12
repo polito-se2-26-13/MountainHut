@@ -11,7 +11,9 @@ from sqlalchemy.pool import StaticPool
 from server.controllers.reservation_controller import ReservationController, send_confirmation_with_retry
 from server.database import AsyncSessionLocal, Base, engine as real_engine, set_sqlite_pragma
 from server.main import app
-from server.const import SlotStatus, ReservationStatus, UserRole
+from server.models.enum.slot_status import SlotStatus
+from server.models.enum.reservation_status import ReservationStatus
+from server.models.enum.user_type import UserType
 from server.models.DAO import UserDAO, TableDAO, TimeSlotDAO, SlotTableDAO, ReservationDAO
 from server.models.DTO.reservation_dto import ReservationCreate, ReservationMailDTO
 from server.models.error.conflict_error import ConflictError
@@ -37,7 +39,7 @@ async def test_db():
         first_name="Alice",
         last_name="Walker",
         phone="+39 340 1112233",
-        role=UserRole.HIKER.value,
+        role=UserType.HIKER.value,
     )
     # Create tables
     t1 = TableDAO(id=1, table_number="T1", capacity=6, location="Indoor")
@@ -174,7 +176,7 @@ async def test_api_booking_endpoint_flow(client):
             "contact_phone": "+39 340 1112233",
             "special_requirements": "Gluten-free bread",
         },
-        headers={"Authorization": f"Bearer {generate_token(UserDAO(email='hiker@test.com', role=UserRole.HIKER.value))}"},
+        headers={"Authorization": f"Bearer {generate_token(UserDAO(email='hiker@test.com', role=UserType.HIKER.value))}"},
     )
     assert response.status_code == 201
     data = response.json()
@@ -191,7 +193,7 @@ async def test_api_booking_endpoint_flow(client):
     # 3. Retrieve reservation by reference
     get_res = await client.get(
         f"/api/reservations/{ref}",
-        headers={"Authorization": f"Bearer {generate_token(UserDAO(email='hiker@test.com', role=UserRole.HIKER.value))}"},
+        headers={"Authorization": f"Bearer {generate_token(UserDAO(email='hiker@test.com', role=UserType.HIKER.value))}"},
     )
     assert get_res.status_code == 200
     assert get_res.json()["booking_reference"] == ref
@@ -245,7 +247,7 @@ def test_confirmation_email_without_requirements_says_so():
 
 
 async def test_two_bookings_at_the_same_moment_cannot_take_more_seats_than_the_slot_has(test_db):
-    test_db.add(UserDAO(id=2, email="bob@test.com", password_hash="dummy", first_name="Bob", last_name="Brown", role=UserRole.HIKER.value))
+    test_db.add(UserDAO(id=2, email="bob@test.com", password_hash="dummy", first_name="Bob", last_name="Brown", role=UserType.HIKER.value))
     await test_db.commit()
     # two groups of 6 on a slot with 10 seats, sent together
     payloads = [ReservationCreate(slot_id=1, party_size=6, user_id=user, contact_name="Group", contact_email=f"g{user}@test.com") for user in (1, 2)]

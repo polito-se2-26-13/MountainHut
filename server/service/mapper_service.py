@@ -38,17 +38,7 @@ def userdao_to_userdto_detail(user:UserDAO)->UserDetailDTO:
         lastName=user.last_name,
         phone=user.phone
     )
-def reservationDTO_to_response(reservation:ReservationDAO, assigments: List[dict]):
-    assigmentList:List[AssignedTableInfo]=[]
-    for a in assigments:
-        assigmentList.append(
-            AssignedTableInfo(
-                table_id=a["slotTableId"],
-                table_number=a["tableNumber"],
-                assigned_seats=a["assignedSeats"],
-                location=None
-            )
-        )
+def reservationDTO_to_response(reservation:ReservationDAO, assigments: List[AssignedTableInfo]):
     return ReservationResponse(
         id=reservation.id,
         booking_reference=reservation.booking_reference,
@@ -63,7 +53,7 @@ def reservationDTO_to_response(reservation:ReservationDAO, assigments: List[dict
         contact_name=reservation.contact_name,
         contact_phone=reservation.contact_phone,
         status=reservation.status,
-        assigned_tables=assigmentList
+        assigned_tables=assigments
         )
 def slotTableDto_to_response(slotTime:TimeSlotDAO,table_list:list)->SlotResponse:
     tables:list[Table]=[]
@@ -126,3 +116,11 @@ def reservationEmailDto_to_email(
         special_reqs=spReq,
         hiker_name=hikerName
     )
+
+def reservationTableAssignmentDAO_to_AssignedTableInfo(assigned:ReservationTableAssignmentDAO,number:str)->AssignedTableInfo:
+    return AssignedTableInfo(
+                    table_id=assigned.slot_table_id,
+                    table_number=number,
+                    assigned_seats=assigned.assigned_seats,
+                    location=None
+                )

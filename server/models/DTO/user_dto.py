@@ -21,7 +21,7 @@ class UserDTO(BaseModel):
     phone: Optional[Phone]= None
 
 class UserLoginDTO(BaseModel):
-    username: str
+    username: EmailStr=Field(max_length=100)
     password: str
 
 class UserResponseDTO(BaseModel):

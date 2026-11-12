@@ -2,13 +2,17 @@ from server.database import AsyncSessionLocal
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional, Tuple
 from sqlalchemy import select,func
+from server.models.DAO.user import UserDAO
 from server.models.DAO.table import TableDAO
 from server.models.DAO.time_slot import SlotTableDAO, TimeSlotDAO
 from server.models.DAO.reservation import ReservationDAO, ReservationTableAssignmentDAO
-from server.models.DTO.reservation_dto import ReservationCreate
+from server.models.DTO.reservation_dto import AssignedTableInfo, ReservationCreate
 from server.models.enum.reservation_status import ReservationStatus
+from server.models.enum.user_type import UserType
 from server.models.error.notfound_error import NotFoundError
 from datetime import datetime
+
+from server.service.mapper_service import reservationTableAssignmentDAO_to_AssignedTableInfo
 
 class ReservationRepository:
 
@@ -27,10 +31,13 @@ class ReservationRepository:
     async def get_reservation_confirmed(self,user_id:int,slot_id:int)->ReservationDAO|None:
         async with await self._get_session() as session:
             res=await session.execute(
-            select(ReservationDAO).where(
+            select(ReservationDAO)
+            .join(UserDAO, ReservationDAO.user_id == UserDAO.id)
+            .where(
                 ReservationDAO.user_id == user_id,
                 ReservationDAO.slot_id == slot_id,
                 ReservationDAO.status == ReservationStatus.CONFIRMED.value,
+                UserDAO.role == UserType.HIKER.value
             ))
             return res.scalar_one_or_none()
     
@@ -74,7 +81,7 @@ class ReservationRepository:
 
 
     async def transaction_add_reservation(self, 
-        reservation:ReservationCreate,table_allocations:List[Tuple[SlotTableDAO, int]])->Tuple[ReservationDAO,List[ReservationTableAssignmentDAO]]:
+        reservation:ReservationCreate,table_allocations:List[Tuple[SlotTableDAO, int]])->Tuple[ReservationDAO,List[AssignedTableInfo]]:
         async with await self._get_session() as session:
             res = ReservationDAO(
                     user_id=reservation.user_id,
@@ -88,7 +95,7 @@ class ReservationRepository:
                 )
             session.add(res)
             await session.flush()
-            assignments:List[dict]=[]
+            assignments:List[AssignedTableInfo]=[]
             for slot_table, seats in table_allocations:
                     table_numer=await session.execute(select(TableDAO.table_number).where(TableDAO.id==slot_table.table_id))
                     number=str(table_numer.scalar_one())
@@ -98,12 +105,7 @@ class ReservationRepository:
                         assigned_seats=seats,
                     )
                     session.add(assignment)
-                    assignments.append({
-                        "slotTableId":slot_table.id,
-                        "tableNumber":number,
-                        "assignedSeats":seats,
-                        "tableLocation":""
-                    })
+                    assignments.append(reservationTableAssignmentDAO_to_AssignedTableInfo(assignment,number))
             
             try:
                 await session.commit()

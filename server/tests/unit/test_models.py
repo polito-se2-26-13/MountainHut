@@ -6,7 +6,9 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import IntegrityError
 
 from server.database import Base, set_sqlite_pragma
-from server.const import UserRole, SlotStatus, ReservationStatus
+from server.models.enum.user_type import UserType
+from server.models.enum.slot_status import SlotStatus
+from server.models.enum.reservation_status import ReservationStatus
 from server.models.DAO import (
     UserDAO,
     HutInfoDAO,
@@ -41,7 +43,7 @@ def test_user_creation_and_password_hashing(db_session):
         first_name="Marco",
         last_name="Rossi",
         phone="+39 333 1234567",
-        role=UserRole.HIKER.value,
+        role=UserType.HIKER.value,
         notes="UIAGM Mountain Guide",
         emergency_contact="Anna Rossi (+39 333 7654321)",
     )

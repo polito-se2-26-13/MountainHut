@@ -7,7 +7,9 @@ from sqlalchemy.pool import StaticPool
 
 from server.controllers.reservation_controller import ReservationController
 from server.database import AsyncSessionLocal, Base, engine as real_engine, set_sqlite_pragma
-from server.const import SlotStatus, ReservationStatus, UserRole
+from server.models.enum.slot_status import SlotStatus
+from server.models.enum.reservation_status import ReservationStatus
+from server.models.enum.user_type import UserType
 from server.models.DAO import UserDAO, TableDAO, TimeSlotDAO, SlotTableDAO, ReservationDAO
 from server.models.DTO.reservation_dto import ReservationCreate
 from server.models.error.conflict_error import ConflictError

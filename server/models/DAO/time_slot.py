@@ -62,7 +62,7 @@ class TimeSlotDAO(Base):
     @property
     def reserved_seats(self) -> int:
         """Total seats currently reserved in confirmed reservations for this slot."""
-        from server.const import ReservationStatus
+        from server.models.enum.reservation_status import ReservationStatus
         return sum(
             res.party_size
             for res in self.reservations
@@ -125,7 +125,7 @@ class SlotTableDAO(Base):
     @property
     def occupied_seats(self) -> int:
         """Sum of seats occupied by confirmed reservations at this table for this slot."""
-        from server.const import ReservationStatus
+        from server.models.enum.reservation_status import ReservationStatus
         return sum(
             assignment.assigned_seats
             for assignment in self.assignments
