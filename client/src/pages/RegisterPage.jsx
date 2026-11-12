@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { Button, Form, Input } from 'antd'
 import { Link, useNavigate } from 'react-router'
 import { apiRequest } from '../api/api.js'
 import { useToast } from '../components/ToastProvider.jsx'
@@ -60,8 +61,7 @@ function RegisterPage() {
     setTouched((current) => ({ ...current, [event.target.name]: true }))
   }
 
-  async function handleSubmit(event) {
-    event.preventDefault()
+  async function handleSubmit() {
     setSubmitted(true)
     setTouched(Object.fromEntries(Object.keys(initialValues).map((name) => [name, true])))
 
@@ -100,51 +100,51 @@ function RegisterPage() {
         <h1 id="register-title">Create your account</h1>
         <p className="form-intro">Join the MountainHut community.</p>
 
-        <form onSubmit={handleSubmit} noValidate>
+        <Form className="mh-form" onFinish={handleSubmit} noValidate>
           <div className="form-grid">
             <label className="form-field">
               <span>First name <span className="required-mark" aria-hidden="true">*</span></span>
-              <input name="firstName" required autoComplete="given-name" value={values.firstName} onChange={handleChange} onBlur={handleBlur} aria-invalid={Boolean(showError('firstName'))} />
+              <Input className="mh-control" name="firstName" required autoComplete="given-name" value={values.firstName} onChange={handleChange} onBlur={handleBlur} aria-invalid={Boolean(showError('firstName'))} />
               {showError('firstName') && <small className="field-error">{showError('firstName')}</small>}
             </label>
 
             <label className="form-field">
               <span>Last name <span className="required-mark" aria-hidden="true">*</span></span>
-              <input name="lastName" required autoComplete="family-name" value={values.lastName} onChange={handleChange} onBlur={handleBlur} aria-invalid={Boolean(showError('lastName'))} />
+              <Input className="mh-control" name="lastName" required autoComplete="family-name" value={values.lastName} onChange={handleChange} onBlur={handleBlur} aria-invalid={Boolean(showError('lastName'))} />
               {showError('lastName') && <small className="field-error">{showError('lastName')}</small>}
             </label>
 
             <label className="form-field form-field-wide">
               <span>Email <span className="required-mark" aria-hidden="true">*</span></span>
-              <input name="email" type="email" required autoComplete="email" value={values.email} onChange={handleChange} onBlur={handleBlur} aria-invalid={Boolean(showError('email'))} />
+              <Input className="mh-control" name="email" type="email" required autoComplete="email" value={values.email} onChange={handleChange} onBlur={handleBlur} aria-invalid={Boolean(showError('email'))} />
               {showError('email') && <small className="field-error">{showError('email')}</small>}
             </label>
 
             <label className="form-field">
               <span>Password <span className="required-mark" aria-hidden="true">*</span></span>
-              <input name="password" type="password" required autoComplete="new-password" value={values.password} onChange={handleChange} onBlur={handleBlur} aria-invalid={Boolean(showError('password'))} />
+              <Input.Password className="mh-control" name="password" required autoComplete="new-password" visibilityToggle={false} value={values.password} onChange={handleChange} onBlur={handleBlur} aria-invalid={Boolean(showError('password'))} />
               <small className={showError('password') ? 'field-error' : 'field-hint'}>{showError('password') || 'Use at least 8 characters.'}</small>
             </label>
 
             <label className="form-field">
               <span>Confirm password <span className="required-mark" aria-hidden="true">*</span></span>
-              <input name="confirmPassword" type="password" required autoComplete="new-password" value={values.confirmPassword} onChange={handleChange} onBlur={handleBlur} aria-invalid={Boolean(showError('confirmPassword'))} />
+              <Input.Password className="mh-control" name="confirmPassword" required autoComplete="new-password" visibilityToggle={false} value={values.confirmPassword} onChange={handleChange} onBlur={handleBlur} aria-invalid={Boolean(showError('confirmPassword'))} />
               {showError('confirmPassword') && <small className="field-error">{showError('confirmPassword')}</small>}
             </label>
 
             <label className="form-field form-field-wide">
               <span>Phone <span className="required-mark" aria-hidden="true">*</span></span>
-              <input name="phone" type="tel" required autoComplete="tel" value={values.phone} onChange={handleChange} onBlur={handleBlur} aria-invalid={Boolean(showError('phone'))} />
+              <Input className="mh-control" name="phone" type="tel" autoComplete="tel" value={values.phone} onChange={handleChange} onBlur={handleBlur} aria-invalid={Boolean(showError('phone'))} />
               {showError('phone') && <small className="field-error">{showError('phone')}</small>}
             </label>
 
           </div>
 
-          <button className="submit-button" type="submit" disabled={loading}>
+          <Button className="submit-button" type="primary" htmlType="submit" loading={loading}>
             {loading ? 'Creating account…' : 'Create account'}
-          </button>
+          </Button>
           <p className="required-note"><span className="required-mark">*</span> Required fields</p>
-        </form>
+        </Form>
       </section>
       {success && (
         <div className="success-modal-backdrop">
@@ -159,14 +159,14 @@ function RegisterPage() {
             <p className="eyebrow">ACCOUNT READY</p>
             <h2 id="registration-success-title">Registration successful</h2>
             <p id="registration-success-message">{success} You can now sign in to your account.</p>
-            <button
+            <Button
               className="submit-button"
-              type="button"
+              type="primary"
               ref={loginButtonRef}
               onClick={() => navigate('/login', { replace: true })}
             >
               Return to sign in
-            </button>
+            </Button>
           </section>
         </div>
       )}
