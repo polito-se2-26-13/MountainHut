@@ -309,7 +309,7 @@ function CustomerBookingPage() {
             </div>
             <label className="form-field party-size-field">
               <span>Number of guests <span className="required-mark" aria-hidden="true">*</span></span>
-              <InputNumber className="mh-control" min={1} max={availability ? remainingSeats : undefined} step={1} value={partySize} onChange={(value) => { setPartySize(value ?? ''); clearBookingConfirmation() }} onBlur={() => setTouched((current) => ({ ...current, partySize: true }))} aria-invalid={Boolean(touched.partySize && partySizeError)} />
+              <InputNumber className="mh-control" min={1} step={1} value={partySize} onChange={(value) => { setPartySize(value ?? ''); clearBookingConfirmation() }} onBlur={() => setTouched((current) => ({ ...current, partySize: true }))} aria-invalid={Boolean(touched.partySize && partySizeError)} />
               {touched.partySize && partySizeError && <small className="field-error">{partySizeError}</small>}
               {availability && !partySizeError && <small className="field-hint">Up to {remainingSeats} guests can be booked for this time.</small>}
             </label>
