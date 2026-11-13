@@ -11,7 +11,12 @@ const initialValues = {
   firstName: '',
   lastName: '',
   phone: '',
+  notes: '',
+  emergencyContact: '',
 }
+
+// optional for the PO (issue #22 of the course repository), every other field is required
+const optionalFields = ['notes', 'emergencyContact']
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const phonePattern = /^\+?[0-9][0-9\s().-]{6,19}$/
@@ -19,6 +24,7 @@ const phonePattern = /^\+?[0-9][0-9\s().-]{6,19}$/
 function validateField(name, values) {
   const value = values[name]
 
+  if (optionalFields.includes(name)) return ''
   if (!value.trim()) return 'This field is required.'
   if (name === 'email' && value && !emailPattern.test(value.trim())) return 'Enter a valid email address.'
   if (name === 'password' && value && value.length < 8) return 'Password must be at least 8 characters.'
@@ -75,6 +81,8 @@ function RegisterPage() {
         firstName: values.firstName.trim(),
         lastName: values.lastName.trim(),
         phone: values.phone.trim(),
+        ...(values.notes.trim() ? { notes: values.notes.trim() } : {}),
+        ...(values.emergencyContact.trim() ? { emergencyContact: values.emergencyContact.trim() } : {}),
         role: 'Hiker',
       }
       const result = await apiRequest('/auth/register', {
@@ -134,8 +142,18 @@ function RegisterPage() {
 
             <label className="form-field form-field-wide">
               <span>Phone <span className="required-mark" aria-hidden="true">*</span></span>
-              <Input className="mh-control" name="phone" type="tel" autoComplete="tel" value={values.phone} onChange={handleChange} onBlur={handleBlur} aria-invalid={Boolean(showError('phone'))} />
+              <Input className="mh-control" name="phone" type="tel" required autoComplete="tel" value={values.phone} onChange={handleChange} onBlur={handleBlur} aria-invalid={Boolean(showError('phone'))} />
               {showError('phone') && <small className="field-error">{showError('phone')}</small>}
+            </label>
+
+            <label className="form-field form-field-wide">
+              <span>Notes <span className="optional-mark">(optional)</span></span>
+              <Input.TextArea className="mh-control" name="notes" rows={2} maxLength={555} placeholder="e.g. registered mountain guide" value={values.notes} onChange={handleChange} />
+            </label>
+
+            <label className="form-field form-field-wide">
+              <span>Emergency contact <span className="optional-mark">(optional)</span></span>
+              <Input className="mh-control" name="emergencyContact" maxLength={255} placeholder="Name and phone of someone to call" value={values.emergencyContact} onChange={handleChange} />
             </label>
 
           </div>

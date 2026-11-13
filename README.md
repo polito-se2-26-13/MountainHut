@@ -79,6 +79,16 @@ cd server
 pytest
 ```
 
+The end-to-end tests are in `client/e2e` and use Playwright. They start the backend and the frontend by themselves, on the ports 8100 and 5199, and every run puts the sample data back in `server/mountainHut.sqlite`. They need `server/.venv`, created as written above.
+
+```
+cd client
+npx playwright install chromium
+npm run e2e
+```
+
+`npx playwright install chromium` is needed only the first time.
+
 ## Branches
 
 - `main` holds what we show at the sprint review. It only receives the merge of `dev` at the end of each sprint.
