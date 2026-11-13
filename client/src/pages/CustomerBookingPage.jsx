@@ -197,7 +197,10 @@ function CustomerBookingPage() {
           contact_email: contactEmail.trim(),
           ...(contactPhone.trim() ? { contact_phone: contactPhone.trim() } : {}),
           ...(hasSpecialRequirements && specialRequirements.some((item) => item.description.trim())
-            ? { special_requirements: specialRequirements.filter((item) => item.description.trim()).map((item) => `${item.hasAllergy ? '[Allergy] ' : ''}${item.description.trim()}`).join('\n') }
+            ? { special_requirements: specialRequirements.filter((item) => item.description.trim()).map((item) => ({
+              has_allergy: item.hasAllergy,
+              description: item.description.trim(),
+            })) }
             : {}),
         }),
       })
