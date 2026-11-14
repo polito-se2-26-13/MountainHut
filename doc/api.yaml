@@ -687,7 +687,122 @@ paths:
                 name: InternalServerError
                 message: Internal Server Error
                 status: 500
-                
+  /reservations/reference/{reference}/change:
+    put:
+      tags:
+        - Reservations
+      summary: Change an existing reservation
+      description: |
+        Updates an existing reservation.
+        Hikers can modify only their own reservations.
+        Employees and wardens can modify reservations.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: reference
+          in: path
+          required: true
+          description: Booking reference of the reservation to update
+          schema:
+            type: string
+          example: MH-2026-0001
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReservationUpdate'
+      responses:
+        '200':
+          description: Reservation successfully updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReservationResponse'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppErrorResponse'
+              example:
+                name: BadRequestError
+                message: Bad Request
+                status: 400
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppErrorResponse'
+              example:
+                name: UnauthorizedError
+                message: Authentication required
+                status: 401
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppErrorResponse'
+              example:
+                name: ForbiddenError
+                message: You cannot modify this reservation
+                status: 403
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppErrorResponse'
+              examples:
+                ReservationNotFound:
+                  value:
+                    name: NotFoundError
+                    message: The reservation with the given reference doesn't exist
+                    status: 404
+                SlotNotFound:
+                  value:
+                    name: NotFoundError
+                    message: Time slot not found
+                    status: 404
+        '409':
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppErrorResponse'
+              examples:
+                InsufficientCapacity:
+                  value:
+                    name: ConflictError
+                    message: The hut cannot accommodate the requested party size
+                    status: 409
+                SlotNotOpen:
+                  value:
+                    name: ConflictError
+                    message: Time slot is not open
+                    status: 409
+        '422':
+          description: Unprocessable Entity
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppErrorResponse'
+              example:
+                name: ValidationError
+                message: Invalid reservation data
+                status: 422
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppErrorResponse'
+              example:
+                name: InternalServerError
+                message: Internal Server Error
+                status: 500                
 components:
   schemas:
     UserCreateDTO:
@@ -1108,3 +1223,40 @@ components:
         hasAllergy:
           type: boolean
           example: false
+    ReservationUpdate:
+      type: object
+      required:
+        - slot_id
+        - party_size
+        - contact_name
+        - contact_email
+      properties:
+        slot_id:
+          type: integer
+          description: ID of the selected time slot
+          example: 2
+        party_size:
+          type: integer
+          minimum: 1
+          description: Number of people in the party
+          example: 3
+        contact_name:
+          type: string
+          description: Full name of contact hiker
+          example: Mario Rossi
+        contact_email:
+          type: string
+          format: email
+          minLength: 5
+          maxLength: 100
+          description: Email for booking confirmation
+          example: mario@example.com
+        contact_phone:
+          type: string
+          nullable: true
+          description: Mobile number
+          example: "+393331234567"
+        requirements:
+          type: string
+          nullable: true
+          example: Vegetarian meal
