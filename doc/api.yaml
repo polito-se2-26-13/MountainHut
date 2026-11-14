@@ -513,7 +513,181 @@ paths:
                 name: InternalServerError
                 message: Internal Server Error
                 status: 500
+  /reservations/reference/{reference}:
+    get:
+      tags:
+        - Reservations
+      summary: Get reservation by booking reference
+      description: |
+        Retrieves a reservation using its booking reference.
+        HIKER users can only access their own reservations.
+        EMPLOYEE and WARDEN users can access all reservations.
+      operationId: getReservationByReference
 
+      security:
+        - BearerAuth: []
+
+      parameters:
+        - name: reference
+          in: path
+          required: true
+          description: Unique booking reference
+          schema:
+            type: string
+          example: MH-2026-0001
+
+      responses:
+        '200':
+          description: Reservation successfully retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReservationResponse'
+
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppErrorResponse'
+              example:
+                name: BadRequestError
+                message: Bad Request
+                status: 400
+
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppErrorResponse'
+              example:
+                name: UnauthorizedError
+                message: Authentication required
+                status: 401
+
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppErrorResponse'
+              example:
+                name: ForbiddenError
+                message: You cannot see other reservation
+                status: 403
+
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppErrorResponse'
+              example:
+                name: NotFoundError
+                message: Booking reference not found
+                status: 404
+
+        '422':
+          description: Unprocessable Entity
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppErrorResponse'
+              example:
+                name: ValidationError
+                message: Invalid booking reference
+                status: 422
+
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppErrorResponse'
+              example:
+                name: InternalServerError
+                message: Internal Server Error
+                status: 500
+  /reservations/user:
+    get:
+      tags:
+        - Reservations
+      summary: Get reservations by authenticated user
+      description: |
+        Retrieves all reservations belonging to the authenticated hiker.
+        The user ID is extracted from the authentication token.
+        Only HIKER users can access this endpoint.
+      operationId: getReservationsByUserId
+
+      security:
+        - BearerAuth: []
+
+      responses:
+        '200':
+          description: User reservations successfully retrieved
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ReservationResponse'
+
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppErrorResponse'
+              example:
+                name: BadRequestError
+                message: Bad Request
+                status: 400
+
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppErrorResponse'
+              example:
+                name: UnauthorizedError
+                message: Authentication required
+                status: 401
+
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppErrorResponse'
+              example:
+                name: ForbiddenError
+                message: Insufficient permissions
+                status: 403
+
+        '422':
+          description: Unprocessable Entity
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppErrorResponse'
+              example:
+                name: ValidationError
+                message: Invalid request
+                status: 422
+
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppErrorResponse'
+              example:
+                name: InternalServerError
+                message: Internal Server Error
+                status: 500
+                
 components:
   schemas:
     UserCreateDTO:
