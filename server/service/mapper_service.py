@@ -2,7 +2,7 @@ from server.models.DAO.time_slot import TimeSlotDAO
 from server.models.DTO.error_dto import ErrorDTO
 from server.models.DTO.user_dto import UserResponseDTO,UserLoginResponse,UserDTO, UserDetailDTO
 from server.models.DAO.user import UserDAO
-from server.models.DTO.reservation_dto import ReservationResponse, AssignedTableInfo,ReservationMailDTO
+from server.models.DTO.reservation_dto import ReservationResponse, AssignedTableInfo,ReservationMailDTO,Note
 from server.models.DAO.reservation import ReservationDAO,ReservationTableAssignmentDAO
 from server.models.DTO.slot_dto import SlotResponse,Table,SlotDetail
 from typing import List
@@ -38,7 +38,7 @@ def userdao_to_userdto_detail(user:UserDAO)->UserDetailDTO:
         lastName=user.last_name,
         phone=user.phone
     )
-def reservationDTO_to_response(reservation:ReservationDAO, assigments: List[dict]):
+def reservationDTO_to_response(reservation:ReservationDAO, assigments: List[dict],requirment: list[Note]):
     assigmentList:List[AssignedTableInfo]=[]
     for a in assigments:
         assigmentList.append(
@@ -58,7 +58,7 @@ def reservationDTO_to_response(reservation:ReservationDAO, assigments: List[dict
         start_time=reservation.slot.start_time.strftime("%H:%M"),
         end_time=reservation.slot.end_time.strftime("%H:%M"),
         party_size=reservation.party_size,
-        special_requirements=reservation.special_requirements,
+        requirements=requirment,
         contact_email=reservation.contact_email,
         contact_name=reservation.contact_name,
         contact_phone=reservation.contact_phone,
@@ -114,7 +114,7 @@ def reservationEmailDto_to_email(
         date:str,
         timeSlot:str,
         partySize:int,
-        spReq:str,
+        spReq:list[Note],
         hikerName:str):
     
     return ReservationMailDTO(

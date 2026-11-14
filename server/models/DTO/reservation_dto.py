@@ -13,7 +13,7 @@ class ReservationCreate(BaseModel):
     contact_name: Name = Field(..., description="Full name of contact hiker")
     contact_email: EmailStr = Field(..., min_length=5, max_length=100, description="Email for booking confirmation")
     contact_phone: Optional[Phone] = Field(None, description="Mobile number")
-    special_requirements: Optional[str] = Field(None, description="Dietary requirements, allergies, notes")
+    requirements: Optional[list[Note]]=None
 
 
 class AssignedTableInfo(BaseModel):
@@ -34,7 +34,7 @@ class ReservationResponse(BaseModel):
     start_time: Optional[str] = None
     end_time: Optional[str] = None
     party_size: int
-    special_requirements: Optional[str] = None
+    special_requirements: Optional[list[Note]] = None
     contact_name: str
     contact_email: str
     contact_phone: Optional[str] = None
@@ -69,7 +69,3 @@ class ReservationMailDTO(BaseModel):
 class Note(BaseModel):
     description: str
     hasAllergy: bool
-
-class SpecialNoteDTO(BaseModel):
-    id_res:int
-    requirements: list[Note]

@@ -76,11 +76,11 @@ class ReservationRepository:
     async def transaction_add_reservation(self, 
         reservation:ReservationCreate,table_allocations:List[Tuple[SlotTableDAO, int]])->Tuple[ReservationDAO,List[ReservationTableAssignmentDAO]]:
         async with await self._get_session() as session:
+            #add reservation in db
             res = ReservationDAO(
                     user_id=reservation.user_id,
                     slot_id=reservation.slot_id,
                     party_size=reservation.party_size,
-                    special_requirements=reservation.special_requirements,
                     contact_name=reservation.contact_name,
                     contact_email=reservation.contact_email,
                     contact_phone=reservation.contact_phone,
@@ -88,6 +88,8 @@ class ReservationRepository:
                 )
             session.add(res)
             await session.flush()
+
+            #add table reservation in db
             assignments:List[dict]=[]
             for slot_table, seats in table_allocations:
                     table_numer=await session.execute(select(TableDAO.table_number).where(TableDAO.id==slot_table.table_id))
@@ -104,7 +106,18 @@ class ReservationRepository:
                         "assignedSeats":seats,
                         "tableLocation":""
                     })
-            
+            await session.flush()
+
+            #add special requirment
+            for sn in reservation.requirements:
+                newSN=SpecailnoteDAO(
+                    res_id=res.id,
+                    description=sn.description,
+                    has_allergy=sn.hasAllergy                    
+                )
+                session.add(newSN)
+            await session.flush()
+
             try:
                 await session.commit()
                 await session.refresh(res)
@@ -174,21 +187,3 @@ class ReservationRepository:
                 select(ReservationDAO)
                 .where(ReservationDAO.id==res_id))
             return result.scalar_one_or_none()
-
-    async def transaction_add_special_note(self,specialNote:SpecialNoteDTO):
-        async with await self._get_session() as session:
-            for sn in specialNote.requirements:
-                newSN=SpecailnoteDAO(
-                    res_id=specialNote.id_res,
-                    description=sn.description,
-                    has_allergy=sn.hasAllergy                    
-                )
-                session.add(newSN)
-                await session.flush()
-
-            try:
-                await session.commit()
-                return
-            except:
-                await session.rollback()
-                raise ValueError(f"Failed to create reservation due to database constraint")

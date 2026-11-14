@@ -72,7 +72,7 @@ class ReservationController():
                 timeSlot.date.strftime("%d/%m/%Y"),
                 f"{timeSlot.start_time:%H:%M}-{timeSlot.end_time:%H:%M}",
                 res.party_size,
-                res.special_requirements,
+                reservation.requirements,
                 res.hiker.full_name
             )
         # the answer does not wait for the mail server, which kept the whole backend busy for up to 20 seconds
@@ -80,7 +80,7 @@ class ReservationController():
             background_tasks.add_task(send_confirmation_with_retry,mail)
         else:
             send_confirmation_with_retry(mail)
-        return reservationDTO_to_response(res,tables)
+        return reservationDTO_to_response(res,tables,reservation.requirements)
 
     async def get_reservation_by_reference(self,reference:str):
         res,tables= await self.repo.get_reservation_by_reference(reference)
@@ -95,14 +95,3 @@ class ReservationController():
             for r,a in res:
                 listRes.append(reservationDTO_to_response(r,a))
             return listRes
-
-    async def set_special_note(self,user_id:int,specialNotes:SpecialNoteDTO):
-        #find reservation
-        res=await self.repo.get_reservation_by_id(specialNotes.id_res)
-        if res is None:
-            raise NotFoundError(f"Not found the reservation with id {specialNotes.id_res}")
-        #controll that user id is same for the reservation and login
-        if res.user_id!=user_id:
-            raise ConflictError("You can add special note only for your reservation")
-        await self.repo.transaction_add_special_note(specialNotes)
-        return
