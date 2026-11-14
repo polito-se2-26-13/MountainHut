@@ -65,3 +65,11 @@ class ReservationMailDTO(BaseModel):
     time_slot: str
     party_size: int
     special_reqs: Optional[str]= "None specified"
+
+class Note(BaseModel):
+    description: str
+    hasAllergy: bool
+
+class SpecialNoteDTO(BaseModel):
+    id_res:int
+    requirements: list[Note]

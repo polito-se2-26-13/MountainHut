@@ -5,7 +5,7 @@ from sqlalchemy import select,func
 from server.models.DAO.table import TableDAO
 from server.models.DAO.time_slot import SlotTableDAO, TimeSlotDAO
 from server.models.DAO.reservation import ReservationDAO, ReservationTableAssignmentDAO
-from server.models.DTO.reservation_dto import ReservationCreate
+from server.models.DTO.reservation_dto import ReservationCreate,SpecialNoteDTO
 from server.const import ReservationStatus
 from server.models.error.notfound_error import NotFoundError
 from datetime import datetime
@@ -168,4 +168,27 @@ class ReservationRepository:
                 for res, assignments in reservations.values()
             ]
 
-            
+    async def get_reservation_by_id(self,res_id:int):
+        async with await self._get_session() as session:
+            result=await session.execute(
+                select(ReservationDAO)
+                .where(ReservationDAO.id==res_id))
+            return result.scalar_one_or_none()
+
+    async def transaction_add_special_note(self,specialNote:SpecialNoteDTO):
+        async with await self._get_session() as session:
+            for sn in specialNote.requirements:
+                newSN=SpecailnoteDAO(
+                    res_id=specialNote.id_res,
+                    description=sn.description,
+                    has_allergy=sn.hasAllergy                    
+                )
+                session.add(newSN)
+                await session.flush()
+
+            try:
+                await session.commit()
+                return
+            except:
+                await session.rollback()
+                raise ValueError(f"Failed to create reservation due to database constraint")

@@ -1,5 +1,5 @@
 from server.repositories.reservation_repository import ReservationRepository
-from server.models.DTO.reservation_dto import ReservationCreate,ReservationResponse
+from server.models.DTO.reservation_dto import ReservationCreate,ReservationResponse,SpecialNoteDTO
 from server.models.DAO.time_slot import TimeSlotDAO
 from server.models.error.notfound_error import NotFoundError
 from server.models.error.conflict_error import ConflictError
@@ -95,3 +95,14 @@ class ReservationController():
             for r,a in res:
                 listRes.append(reservationDTO_to_response(r,a))
             return listRes
+
+    async def set_special_note(self,user_id:int,specialNotes:SpecialNoteDTO):
+        #find reservation
+        res=await self.repo.get_reservation_by_id(specialNotes.id_res)
+        if res is None:
+            raise NotFoundError(f"Not found the reservation with id {specialNotes.id_res}")
+        #controll that user id is same for the reservation and login
+        if res.user_id!=user_id:
+            raise ConflictError("You can add special note only for your reservation")
+        await self.repo.transaction_add_special_note(specialNotes)
+        return
