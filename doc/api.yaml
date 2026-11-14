@@ -407,6 +407,112 @@ paths:
                 name: InternalServerError
                 message: Internal Server Error
                 status: 500
+  /reservations:
+    post:
+      tags:
+        - Reservations
+      summary: Create a reservation
+      description: |
+        Creates a reservation for an authenticated hiker.
+        The user_id is retrieved from the authentication token.
+        Any user_id provided in the request body is ignored.
+        The selected time slot must exist and be open for reservations.
+      operationId: createReservation
+
+      security:
+        - BearerAuth: []
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReservationCreate'
+
+      responses:
+        '201':
+          description: Reservation successfully created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReservationResponse'
+
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppErrorResponse'
+              example:
+                name: BadRequestError
+                message: Bad Request
+                status: 400
+
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppErrorResponse'
+              example:
+                name: UnauthorizedError
+                message: Authentication required
+                status: 401
+
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppErrorResponse'
+              example:
+                name: ForbiddenError
+                message: Insufficient permissions
+                status: 403
+
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppErrorResponse'
+              example:
+                name: NotFoundError
+                message: Time slot not found
+                status: 404
+
+        '409':
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppErrorResponse'
+              example:
+                name: ConflictError
+                message: Time slot is not open
+                status: 409
+
+        '422':
+          description: Unprocessable Entity
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppErrorResponse'
+              example:
+                name: ValidationError
+                message: Invalid reservation data
+                status: 422
+
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppErrorResponse'
+              example:
+                name: InternalServerError
+                message: Internal Server Error
+                status: 500
 
 components:
   schemas:
@@ -693,3 +799,138 @@ components:
         remaining_seats:
           type: integer
           example: 15
+    ReservationCreate:
+      type: object
+      required:
+        - slot_id
+        - party_size
+        - contact_name
+        - contact_email
+      properties:
+        slot_id:
+          type: integer
+          description: ID of the selected time slot
+          example: 1
+        party_size:
+          type: integer
+          minimum: 1
+          description: Number of people in the party
+          example: 4
+        user_id:
+          type: integer
+          nullable: true
+          description: Ignored by the API. The hiker is identified through the authentication token.
+        contact_name:
+          type: string
+          description: Full name of contact hiker
+          example: Mario Rossi
+        contact_email:
+          type: string
+          format: email
+          minLength: 5
+          maxLength: 100
+          description: Email for booking confirmation
+          example: mario@example.com
+        contact_phone:
+          type: string
+          nullable: true
+          example: "+393331234567"
+        requirements:
+          type: array
+          nullable: true
+          items:
+            $ref: '#/components/schemas/Note'
+    ReservationResponse:
+      type: object
+      required:
+        - id
+        - booking_reference
+        - user_id
+        - slot_id
+        - party_size
+        - contact_name
+        - contact_email
+        - status
+      properties:
+        id:
+          type: integer
+          example: 1
+        booking_reference:
+          type: string
+          example: MH-2026-0001
+        user_id:
+          type: integer
+          example: 10
+        slot_id:
+          type: integer
+          example: 5
+        date:
+          type: string
+          nullable: true
+          example: "2026-12-20"
+        start_time:
+          type: string
+          nullable: true
+          example: "12:00"
+        end_time:
+          type: string
+          nullable: true
+          example: "14:00"
+        party_size:
+          type: integer
+          example: 4
+        special_requirements:
+          type: array
+          nullable: true
+          items:
+            $ref: '#/components/schemas/Note'
+        contact_name:
+          type: string
+          example: Mario Rossi
+        contact_email:
+          type: string
+          format: email
+          example: mario@example.com
+        contact_phone:
+          type: string
+          nullable: true
+          example: "+393331234567"
+        status:
+          type: string
+          example: Confirmed
+        assigned_tables:
+          type: array
+          items:
+            $ref: '#/components/schemas/AssignedTableInfo'
+    AssignedTableInfo:
+      type: object
+      required:
+        - table_id
+        - table_number
+        - assigned_seats
+      properties:
+        table_id:
+          type: integer
+          example: 1
+        table_number:
+          type: string
+          example: T01
+        location:
+          type: string
+          nullable: true
+          example: Ground floor
+        assigned_seats:
+          type: integer
+          example: 4
+    Note:
+      type: object
+      required:
+        - description
+        - hasAllergy
+      properties:
+        description:
+          type: string
+          example: Vegetarian meal
+        hasAllergy:
+          type: boolean
+          example: false
