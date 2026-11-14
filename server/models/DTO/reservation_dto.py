@@ -40,7 +40,7 @@ class ReservationResponse(BaseModel):
     contact_phone: Optional[str] = None
     status: str
     assigned_tables: List[AssignedTableInfo] = []
-    created_at: Optional[str] = None
+    #created_at: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 

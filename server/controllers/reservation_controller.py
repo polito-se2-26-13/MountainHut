@@ -3,6 +3,7 @@ from server.models.DTO.reservation_dto import ReservationCreate,ReservationRespo
 from server.models.DAO.time_slot import TimeSlotDAO
 from server.models.error.notfound_error import NotFoundError
 from server.models.error.conflict_error import ConflictError
+from server.models.error.forbidden_error import ForbiddenError
 from server.models.enum.slot_status import SlotStatus
 from server.service.booking_service import validate_two_hour_rule,assign_tables_for_party
 from server.service.mapper_service import reservationDTO_to_response,reservationEmailDto_to_email
@@ -82,11 +83,12 @@ class ReservationController():
             send_confirmation_with_retry(mail)
         return reservationDTO_to_response(res,tables)
 
-    async def get_reservation_by_reference(self,reference:str):
+    async def get_reservation_by_reference(self,reference:str,user_id:int):
         res,tables= await self.repo.get_reservation_by_reference(reference)
         if not res :
             raise NotFoundError("booking reference not found")
-        
+        if res.user_id!=user_id:
+            raise ForbiddenError("you cannot see other reservation")
         return reservationDTO_to_response(res,tables)
 
     async def get_reservation_by_user_id(self,user_id:int):

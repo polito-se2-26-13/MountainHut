@@ -38,7 +38,7 @@ function CustomerReservationHistoryPage() {
   useEffect(() => {
     if (!session?.isAuthenticated || session.userProfile.role !== 'Hiker') return undefined
     let active = true
-    apiRequest(`/reservations/user/${encodeURIComponent(session.userProfile.id)}`, {
+    apiRequest(`/reservations/user`, {
       headers: { Authorization: `Bearer ${session.token}` },
     }).then((response) => {
       if (active) setReservations(newestFirst(reservationsFrom(response)))

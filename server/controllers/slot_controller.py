@@ -3,6 +3,7 @@ from server.models.DTO.slot_dto import SlotCreation
 from server.repositories.slot_repopsitory import SlotRepository
 from server.repositories.reservation_repository import ReservationRepository
 from server.models.error.conflict_error import ConflictError
+from server.models.error.notfound_error import NotFoundError
 from server.service.mapper_service import slotTableDto_to_response
 from server.models.error.unprocessable_content import UnprocessableContent
 from server.models.DTO.slot_dto import SlotDetail
@@ -35,22 +36,27 @@ class SlotController():
             raise ConflictError("the slot overlaps another slot of the same day")
 
         #search time slot, or create it: the employee chooses date and times freely (MH-02)
-        slotTime=await self.repo.find_slot_time(slot.date,slot.startTime,slot.endTime)
+        slotTime=await self.repo.find_slot_time(slot.date,slot.startTime,slot.endTime,slot.mealType)
         if slotTime is None:
-            slotTime=await self.repo.add_slot_time(slot)
+            raise NotFoundError("Time Slot doesn't exist")
+            #slotTime=await self.repo.add_slot_time(slot)
         else:
             # saving the slot again cannot leave a table with fewer seats than the ones already booked on it
-            booked={st.table.table_number: st.occupied_seats for st in slotTime.slot_tables}
-            for t in slot.tables:
-                if t.seats<booked.get(t.tableNumber,0):
-                    raise ConflictError(f"table {t.tableNumber} already has {booked[t.tableNumber]} seats booked")
+                booked={st.table.table_number: st.occupied_seats for st in slotTime.slot_tables}
+                for t in slot.tables:
+                    if t.seats<booked.get(t.tableNumber,0):
+                        raise ConflictError(f"table {t.tableNumber} already has {booked[t.tableNumber]} seats booked")
 
         #search table, or create it: there is no fixed set of tables and seats differ per slot (PO issue 17)
         tables: list[tuple[TableDAO,int]]=[]
         for t in slot.tables:
             table=await self.repo.find_table(t.tableNumber)
             if table is None:
-                table=await self.repo.add_table(t.tableNumber,t.seats)
+                raise NotFoundError(f"table {t.tableNumber} not foud")
+                #table=await self.repo.add_table(t.tableNumber,t.seats)
+            if table.capacity<t.seats:
+                # conflict error when trying to arrange more tables than the table's capacity allows
+                raise ConflictError(f"You cannot add {t.seats} seats to table {t.tableNumber} because it exceeds the capacity: {table.capacity}.")
             tables.append((table,t.seats))
         #add table
         result=await self.repo.transaction_add_table(slotTime,tables)

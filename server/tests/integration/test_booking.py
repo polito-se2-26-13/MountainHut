@@ -265,8 +265,7 @@ def test_booking_can_be_read_by_its_reference(client, db):
     db.commit()
     slot = add_slot(db, [6])
     booking = book(client, hiker, slot, 2).json()
-
-    response = client.get(f"/api/reservations/{booking['booking_reference']}", headers=TOKENS[hiker])
+    response = client.get(f"/api/reservations/reference/{booking['booking_reference']}", headers=TOKENS[hiker])
 
     assert response.status_code == 200
     assert response.json()["id"] == booking["id"]
@@ -277,9 +276,10 @@ def test_booking_can_be_read_by_its_reference(client, db):
 def test_bookings_are_read_only_with_the_login(client, db):
     anna = add_hiker(db)
     booking = book(client, anna, add_slot(db, [6]), 2).json()
-
-    assert client.get(f"/api/reservations/user/{anna}").status_code == 401
-    assert client.get(f"/api/reservations/{booking['booking_reference']}").status_code == 401
+    
+    print(client.get(f"/api/reservations/user").request.headers)
+    assert client.get(f"/api/reservations/user").status_code == 401
+    assert client.get(f"/api/reservations/reference/{booking['booking_reference']}").status_code == 401
 
 
 def test_a_hiker_reads_only_their_own_bookings(client, db):
@@ -290,9 +290,9 @@ def test_a_hiker_reads_only_their_own_bookings(client, db):
     db.add(employee)
     db.commit()
 
-    assert client.get(f"/api/reservations/user/{anna}", headers=TOKENS[other]).status_code == 403
-    assert client.get(f"/api/reservations/{booking['booking_reference']}", headers=TOKENS[other]).status_code == 403
-    mine = client.get(f"/api/reservations/user/{anna}", headers=TOKENS[anna])
+    assert client.get(f"/api/reservations/user/", headers=TOKENS[other]).status_code == 403
+    assert client.get(f"/api/reservations/reference/{booking['booking_reference']}", headers=TOKENS[other]).status_code == 403
+    mine = client.get(f"/api/reservations/user/", headers=TOKENS[anna])
     assert mine.status_code == 200
     assert [b["id"] for b in mine.json()] == [booking["id"]]
     # the hut staff can look up any booking by its reference
@@ -303,7 +303,7 @@ def test_a_hiker_reads_only_their_own_bookings(client, db):
 def test_a_hiker_without_bookings_gets_an_empty_list(client, db):
     anna = add_hiker(db)
 
-    response = client.get(f"/api/reservations/user/{anna}", headers=TOKENS[anna])
+    response = client.get(f"/api/reservations/user/", headers=TOKENS[anna])
 
     assert response.status_code == 200
     assert response.json() == []
@@ -315,7 +315,7 @@ def test_a_booking_shows_date_and_time_of_its_slot(client, db):
     slot = db.get(TimeSlotDAO, slot_id)
     created = book(client, anna, slot_id, 2).json()
 
-    read = client.get(f"/api/reservations/user/{anna}", headers=TOKENS[anna]).json()[0]
+    read = client.get(f"/api/reservations/user/", headers=TOKENS[anna]).json()[0]
 
     for booking in (created, read):
         assert booking["date"] == slot.date.isoformat()

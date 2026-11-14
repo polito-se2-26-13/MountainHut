@@ -4,8 +4,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select,func
 from server.models.DAO.table import TableDAO
 from server.models.DAO.time_slot import TimeSlotDAO, SlotTableDAO
-from server.models.DTO.slot_dto import SlotCreation
+from server.models.DTO.slot_dto import SlotCreation, Table
 from datetime import date, time, datetime
+from server.models.enum.meal_type import MealType
 
 class SlotRepository:
 
@@ -15,7 +16,7 @@ class SlotRepository:
     async def _get_session(self) -> AsyncSession:
         return self._session or AsyncSessionLocal()
 
-    async def find_slot_time(self, date:date,startTime:time,endTime:time)->TimeSlotDAO|None:
+    async def find_slot_time(self, date:date,startTime:time,endTime:time,mealType:MealType)->TimeSlotDAO|None:
         # the meal is not part of the search: a second slot at the same time could be booked twice by a hiker
         async with await self._get_session() as session:
             result = await session.execute(
@@ -23,6 +24,7 @@ class SlotRepository:
                     TimeSlotDAO.date == date,
                     func.time(TimeSlotDAO.start_time) == startTime.strftime("%H:%M:%S"),
                     func.time(TimeSlotDAO.end_time) == endTime.strftime("%H:%M:%S"),
+                    TimeSlotDAO.meal_type == mealType,
                 )
             )
 
@@ -72,7 +74,7 @@ class SlotRepository:
             await session.refresh(table)
             return table
 
-    async def transaction_add_table(self,slotTime:TimeSlotDAO,tables:list[tuple[TableDAO,int]])->list:
+    async def transaction_add_table(self,slotTime:TimeSlotDAO,tables:list[tuple[TableDAO,int]])->list[Table]:
         table_list = []
         async with await self._get_session() as session:
             try:
@@ -92,10 +94,10 @@ class SlotRepository:
                     else:
                         result.available_seats = seat
                         result.is_available = True
-                    table_list.append({
-                        "tableNumber": t.table_number,
-                        "seats": seat
-                    })
+                    table_list.append(Table(
+                        tableNumber=t.table_number,
+                        seats=seat
+                    ))
                     await session.flush()
 
             except :
@@ -125,10 +127,10 @@ class SlotRepository:
                     slots[slot.id] = [slot, []]
                 if table_number is None:
                     continue
-                slots[slot.id][1].append({
-                    "table_number": table_number,
-                    "available_seats": available_seats
-                })
+                slots[slot.id][1].append(Table(
+                        tableNumber=table_number,
+                        seats=available_seats
+                    ))
             return [
                 (slot, tables)
                 for slot, tables in slots.values()

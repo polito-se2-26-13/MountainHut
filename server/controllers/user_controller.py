@@ -14,7 +14,7 @@ class UserController():
     async def create_user(self,user:UserCreateDTO) -> UserResponseDTO:
      """Create a hiker - throws ConflictError if the email exists"""
      # only hikers register themselves, the staff accounts are the sample ones for now
-     user.role=UserType.Hiker
+     user.role=UserType.HIKER
      # one account per email, whatever capitals it is written with
      user.email=user.email.lower()
      users= await self.repo.get_user_by_email(user.email)

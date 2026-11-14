@@ -25,14 +25,6 @@ def format_booking_email_text(reservation: ReservationMailDTO) -> str:
     - name of the hiker who made the reservation
     """
     """
-    conf = reservation.to_confirmation_dict()
-    hiker_name = conf.get("hikerName") or "Valued Guest"
-    ref = conf.get("bookingReference") or "N/A"
-    date_str = conf.get("date") or "N/A"
-    time_slot = conf.get("timeSlot") or "N/A"
-    party_size = conf.get("partySize") or 1
-    special_reqs = conf.get("specialRequirements") or "None specified"
-    tables = conf.get("assignedTables") or []
 """
     hiker_name=reservation.hiker_name
     ref= reservation.booking_reference
@@ -71,14 +63,6 @@ def format_booking_email_html(reservation: ReservationMailDTO) -> str:
     """
     Generate a clean, responsive HTML email template for booking confirmation (MH-03).
     """
-    '''conf = reservation.to_confirmation_dict()
-    hiker_name = conf.get("hikerName") or "Valued Guest"
-    ref = conf.get("bookingReference") or "N/A"
-    date_str = conf.get("date") or "N/A"
-    time_slot = conf.get("timeSlot") or "N/A"
-    party_size = conf.get("partySize") or 1
-    special_reqs = conf.get("specialRequirements") or "None specified"
-    tables = conf.get("assignedTables") or []'''
     # name and requests are typed by the user: escaped, so they reach the mail as text and not as HTML or links
     hiker_name=escape(reservation.hiker_name)
     ref= reservation.booking_reference

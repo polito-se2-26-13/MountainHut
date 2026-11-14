@@ -115,7 +115,7 @@ class ReservationRepository:
                 raise ValueError(f"Failed to create reservation due to database constraint")
         return [res,assignments]
 
-    async def get_reservation_by_reference(self,reference:str)->tuple[ReservationDAO,list[dict]]:
+    async def get_reservation_by_reference(self,reference:str)->tuple[ReservationDAO,list[AssignedTableInfo]]:
         async with await self._get_session() as session:
             result =await session.execute(select(
                 ReservationDAO,
@@ -131,16 +131,17 @@ class ReservationRepository:
             return None,[]
         
         res = rows[0][0]
-        assignments:List[dict]=[]
+        assignments:List[AssignedTableInfo]=[]
         for reservation, slot_table_id, assigned_seats , table_number in rows:
-            assignments.append({
-                "slotTableId": slot_table_id,
-                "tableNumber": table_number,
-                "assignedSeats": assigned_seats
-            })
+            info=AssignedTableInfo(
+                table_id=slot_table_id,
+                table_number=table_number,
+                assigned_seats=assigned_seats
+            )
+            assignments.append(info)
         return res, assignments
 
-    async def get_reservation_by_user_id(self,user_id:str)->tuple[ReservationDAO,list[dict]]:
+    async def get_reservation_by_user_id(self,user_id:int)->list[tuple[ReservationDAO,list[AssignedTableInfo]]]:
             async with await self._get_session() as session:
                 result =await session.execute(select(
                     ReservationDAO,
@@ -156,18 +157,19 @@ class ReservationRepository:
                 return []
             
             reservations = {}
+
             for res, slot_table_id, assigned_seats, table_number in rows:
                 if res.id not in reservations:
-                    reservations[res.id] = [res, []]
+                    reservations[res.id] = (res, [])
 
-                reservations[res.id][1].append(({
-                    "slotTableId": slot_table_id,
-                    "assignedSeats": assigned_seats,
-                    "tableNumber": table_number
-                }))
-            return [
-                (res, assignments)
-                for res, assignments in reservations.values()
-            ]
+                reservations[res.id][1].append(
+                    AssignedTableInfo(
+                        table_id=slot_table_id,
+                        table_number=table_number,
+                        assigned_seats=assigned_seats
+                    )
+                )
+
+            return list(reservations.values())
 
             
