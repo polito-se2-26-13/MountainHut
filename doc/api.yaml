@@ -1,3 +1,4 @@
+
 openapi: 3.0.3
 
 info:
@@ -18,453 +19,642 @@ tags:
   - name: Reservations
 
 paths:
-
-  /slots:
-    get:
-      tags:
-        - Slots
-      summary: Get slots for copy
-      description: |
-        Returns existing service slots.
-        If no date is provided, all slots are returned.
-        If there are no slots for the requested date, an empty array is returned.
-      security:
-        - BearerAuth: []
-      parameters:
-        - name: date
-          in: query
-          required: false
-          description: Date whose existing service slots should be returned.
-          schema:
-            type: string
-            format: date
-            example: "2026-10-28"
-      responses:
-        "200":
-          description: Slots successfully retrieved.
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Slot"
-        "401":
-          description: Unauthorized.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/DetailError"
-        "403":
-          description: Forbidden.
-        "422":
-          description: Invalid date.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/DetailError"
-        "500":
-          description: Internal server error.
-
-    post:
-      tags:
-        - Slots
-      summary: Create service slot
-      description: |
-        Creates a new service slot or updates the tables of an existing slot
-        with the same date and times.
-
-        Only the listed tables are added or updated.
-        Existing tables and meal information remain unchanged unless updated.
-
-        A table cannot have fewer seats than those already booked.
-        Slots on the same day cannot overlap, but consecutive slots are allowed.
-      security:
-        - BearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/CreateSlotRequest"
-      responses:
-        "201":
-          description: Slot created successfully.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/CreateSlotResponse"
-        "401":
-          description: Unauthorized.
-        "403":
-          description: Forbidden.
-        "409":
-          description: Slot overlaps another slot or table capacity is insufficient.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "422":
-          description: Invalid request, invalid table name, slot in the past or invalid time range.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/DetailError"
-        "500":
-          description: Internal server error.
-
-  /slots/{slot_id}/availability:
-    get:
-      tags:
-        - Slots
-      summary: Get slot availability
-      parameters:
-        - name: slot_id
-          in: path
-          required: true
-          schema:
-            type: integer
-      responses:
-        "200":
-          description: Slot availability successfully retrieved.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/SlotAvailability"
-        "404":
-          description: Time slot not found.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Internal server error.
-
   /auth/register:
     post:
       tags:
         - Authentication
       summary: Register a new hiker
       description: |
-        Registers a new user with the Hiker role.
-        The role field is ignored if provided.
+        Creates a new hiker account.
+        The role field is ignored and the user is always created with the Hiker role.
+        Email addresses must be unique.
+      operationId: createUser
 
-        Password must contain at least 8 characters.
-        Email is saved in lowercase.
-        Phone is required. Numbers without a prefix are interpreted as Italian.
-        Notes and emergency contact are optional.
-        Names are saved without surrounding spaces.
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/RegisterRequest"
+              $ref: '#/components/schemas/UserCreateDTO'
+
       responses:
-        "201":
-          description: User successfully registered.
+        '201':
+          description: Created
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  id:
-                    type: integer
-                    example: 101
-                required:
-                  - id
-        "409":
-          description: Email already registered.
+                $ref: '#/components/schemas/UserResponseDTO'
+
+        '400':
+          description: Bad Request
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "422":
-          description: Missing or invalid fields.
+                $ref: '#/components/schemas/AppErrorResponse'
+              example:
+                name: BadRequestError
+                message: Bad Request
+                status: 400
+
+        '409':
+          description: Conflict
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/DetailError"
-        "500":
-          description: Internal server error.
+                $ref: '#/components/schemas/AppErrorResponse'
+              example:
+                name: ConflictError
+                message: A user with this email already exists
+                status: 409
+
+        '422':
+          description: Unprocessable Entity
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppErrorResponse'
+              example:
+                name: ValidationError
+                message: Invalid email format
+                status: 422
+
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppErrorResponse'
+              example:
+                name: InternalServerError
+                message: Internal Server Error
+                status: 500
 
   /auth/login:
     post:
       tags:
         - Authentication
-      summary: Login
+      summary: User login
+      description: |
+        Authenticates a user using username and password.
+        Returns an authentication token and the user's details.
+      operationId: loginUser
+
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/LoginRequest"
-      responses:
-        "200":
-          description: Login successful.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/LoginResponse"
-        "400":
-          description: Empty field.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/DetailError"
-        "401":
-          description: Wrong email or password.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "422":
-          description: Missing field.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/DetailError"
-        "500":
-          description: Internal server error.
+              $ref: '#/components/schemas/UserLoginDTO'
 
-  /reservations/reference/{reference}:
-    get:
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserLoginResponse'
+
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppErrorResponse'
+              example:
+                name: BadRequestError
+                message: Empty password or username
+                status: 400
+
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppErrorResponse'
+              example:
+                name: UnauthorizedError
+                message: Email or password wrong
+                status: 401
+
+        '422':
+          description: Unprocessable Entity
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppErrorResponse'
+              example:
+                name: ValidationError
+                message: Missing or invalid login fields
+                status: 422
+
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppErrorResponse'
+              example:
+                name: InternalServerError
+                message: Internal Server Error
+                status: 500
+
+  /slots:
+    post:
       tags:
-        - Reservations
-      summary: Get reservation by reference
-      description: A hiker can read only their own bookings.
+        - Slots
+      summary: Create a new time slot
+      description: |
+        Creates a new time slot.
+        Only authenticated EMPLOYEE and WARDEN users can perform this operation.
+        The start time must be earlier than the end time.
+        The slot date and time must not be in the past.
+      operationId: createSlot
+
       security:
         - BearerAuth: []
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SlotCreation'
+
+      responses:
+        '201':
+          description: Time slot successfully created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SlotResponse'
+
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppErrorResponse'
+              example:
+                name: UnauthorizedError
+                message: Authentication required
+                status: 401
+
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppErrorResponse'
+              example:
+                name: ForbiddenError
+                message: Insufficient permissions
+                status: 403
+
+        '409':
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppErrorResponse'
+              example:
+                name: ConflictError
+                message: Slot conflicts with an existing slot
+                status: 409
+
+        '422':
+          description: Unprocessable Content
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppErrorResponse'
+              examples:
+                invalidTime:
+                  summary: Invalid time interval
+                  value:
+                    name: UnprocessableContent
+                    message: Start time must be less than end time
+                    status: 422
+                pastSlot:
+                  summary: Slot in the past
+                  value:
+                    name: UnprocessableContent
+                    message: The slot is in the past
+                    status: 422
+
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppErrorResponse'
+              example:
+                name: InternalServerError
+                message: Internal Server Error
+                status: 500
+    get:
+      tags:
+        - Slots
+      summary: Get time slots
+      description: |
+        Retrieves the list of time slots.
+        An optional date parameter can be provided to filter slots by date.
+        Accessible to authenticated HIKER, EMPLOYEE and WARDEN users.
+      operationId: getSlotTime
+
+      security:
+        - BearerAuth: []
+
       parameters:
-        - name: reference
-          in: path
-          required: true
+        - name: date
+          in: query
+          required: false
+          description: Filter time slots by date
           schema:
             type: string
-          example: MH-20261030-ALX01
-      responses:
-        "200":
-          description: Reservation successfully retrieved.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Reservation"
-        "401":
-          description: Unauthorized.
-        "403":
-          description: Forbidden.
-        "404":
-          description: Booking reference not found.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Internal server error.
+            format: date
+          example: "2026-12-20"
 
-  /reservations/user/:
-    get:
-      tags:
-        - Reservations
-      summary: Get hiker reservations
-      description: Only the hiker identified by the token can access their reservations.
-      security:
-        - BearerAuth: []
-      parameters:
-        - name: user_id
-          in: path
-          required: true
-          schema:
-            type: integer
       responses:
-        "200":
-          description: Reservations successfully retrieved. Returns an empty array if there are no bookings.
+        '200':
+          description: Time slots successfully retrieved
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/Reservation"
-        "401":
-          description: Unauthorized.
-        "403":
-          description: Forbidden.
-        "422":
-          description: Invalid user ID.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/DetailError"
-        "500":
-          description: Internal server error.
+                  $ref: '#/components/schemas/SlotDetail'
 
-  /reservations:
-    post:
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppErrorResponse'
+              example:
+                name: BadRequestError
+                message: Bad Request
+                status: 400
+
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppErrorResponse'
+              example:
+                name: UnauthorizedError
+                message: Authentication required
+                status: 401
+
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppErrorResponse'
+              example:
+                name: ForbiddenError
+                message: Insufficient permissions
+                status: 403
+
+        '422':
+          description: Unprocessable Entity
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppErrorResponse'
+              example:
+                name: ValidationError
+                message: Invalid date format
+                status: 422
+
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppErrorResponse'
+              example:
+                name: InternalServerError
+                message: Internal Server Error
+                status: 500
+  /slots/{slot_id}/availability:
+    get:
       tags:
-        - Reservations
-      summary: Create reservation
+        - Slots
+      summary: Get slot availability
       description: |
-        Creates a reservation for the authenticated hiker.
-        The user_id field can be omitted because the hiker is identified by the token.
-      security:
-        - BearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/CreateReservationRequest"
+        Retrieves capacity and availability details for a specific time slot.
+      operationId: getSlotAvailability
+
+      parameters:
+        - name: slot_id
+          in: path
+          required: true
+          description: ID of the time slot
+          schema:
+            type: integer
+          example: 1
+
       responses:
-        "201":
-          description: Reservation successfully created.
+        '200':
+          description: Slot availability successfully retrieved
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Reservation"
-        "401":
-          description: Unauthorized.
-        "403":
-          description: Forbidden.
-        "404":
-          description: Slot not found.
+                $ref: '#/components/schemas/SlotAvailabilityResponse'
+
+        '404':
+          description: Not Found
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "409":
-          description: Slot closed, too late, already booked or insufficient seats.
+                $ref: '#/components/schemas/AppErrorResponse'
+              example:
+                name: NotFoundError
+                message: Time slot with id 1 not found.
+                status: 404
+
+        '400':
+          description: Bad Request
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "422":
-          description: Invalid request.
+                $ref: '#/components/schemas/AppErrorResponse'
+              example:
+                name: BadRequestError
+                message: Bad Request
+                status: 400
+
+        '422':
+          description: Unprocessable Entity
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/DetailError"
-        "500":
-          description: Internal server error.
+                $ref: '#/components/schemas/AppErrorResponse'
+              example:
+                name: ValidationError
+                message: Invalid slot ID
+                status: 422
+
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppErrorResponse'
+              example:
+                name: InternalServerError
+                message: Internal Server Error
+                status: 500
 
 components:
-
-  securitySchemes:
-    BearerAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: JWT
-
   schemas:
-
-    Slot:
+    UserCreateDTO:
       type: object
+      required:
+        - email
+        - password
+        - firstName
+        - lastName
+        - phone
       properties:
-        slotId:
+        email:
+          type: string
+          format: email
+          minLength: 5
+          maxLength: 100
+          example: hiker@example.com
+
+        password:
+          type: string
+          minLength: 8
+          example: securePassword123
+
+        role:
+          type: string
+          description: Ignored during registration. The user is always created as Hiker.
+          default: Hiker
+
+        firstName:
+          type: string
+          description: User's first name
+
+        lastName:
+          type: string
+          description: User's last name
+
+        phone:
+          type: string
+          description: User's phone number
+
+        notes:
+          type: string
+          nullable: true
+          maxLength: 555
+
+        emergencyContact:
+          type: string
+          nullable: true
+          maxLength: 255
+
+    UserResponseDTO:
+      type: object
+      required:
+        - id
+      properties:
+        id:
           type: integer
-          example: 101
+          example: 1
+
+    AppErrorResponse:
+      type: object
+      required:
+        - name
+        - message
+        - status
+      properties:
+        name:
+          type: string
+          example: ConflictError
+
+        message:
+          type: string
+          example: A user with this email already exists
+
+        status:
+          type: integer
+          example: 409
+    UserLoginDTO:
+      type: object
+      required:
+        - username
+        - password
+      properties:
+        username:
+          type: string
+          example: hiker@example.com
+        password:
+          type: string
+          example: securePassword123
+
+    UserLoginResponse:
+      type: object
+      required:
+        - token
+        - user
+      properties:
+        token:
+          type: string
+          description: Authentication token
+        user:
+          $ref: '#/components/schemas/UserDetailDTO'
+    UserDetailDTO:
+      type: object
+      required:
+        - email
+        - role
+        - firstName
+        - lastName
+      properties:
+        id:
+          type: integer
+          nullable: true
+          example: 1
+        email:
+          type: string
+          format: email
+          minLength: 5
+          maxLength: 100
+          example: hiker@example.com
+        role:
+          type: string
+          example: Hiker
+        firstName:
+          type: string
+          minLength: 1
+          maxLength: 100
+          example: Mario
+        lastName:
+          type: string
+          minLength: 1
+          maxLength: 100
+          example: Rossi
+        phone:
+          type: string
+          nullable: true
+          example: "+393331234567"
+    SlotCreation:
+      type: object
+      required:
+        - date
+        - startTime
+        - endTime
+        - mealType
+        - tables
+      properties:
         date:
           type: string
           format: date
-          example: "2026-10-28"
+          example: "2026-12-20"
         startTime:
           type: string
           example: "12:00"
         endTime:
           type: string
-          example: "13:00"
+          example: "14:00"
         mealType:
           type: string
           example: Lunch
         tables:
           type: array
           items:
-            $ref: "#/components/schemas/Table"
+            $ref: '#/components/schemas/Table'
+
+    SlotResponse:
+      type: object
       required:
         - slotId
         - date
         - startTime
         - endTime
+        - mealType
         - tables
-
-    Table:
-      type: object
+        - message
       properties:
-        tableNumber:
-          type: string
-          example: T1
-        seats:
-          type: integer
-          example: 4
-      required:
-        - tableNumber
-        - seats
-
-    CreateSlotRequest:
-      type: object
-      properties:
-        date:
-          type: string
-          format: date
-          example: "2026-11-01"
-        startTime:
-          type: string
-          example: "12:00"
-        endTime:
-          type: string
-          example: "13:00"
-        mealType:
-          type: string
-          nullable: true
-          example: Lunch
-        tables:
-          type: array
-          items:
-            $ref: "#/components/schemas/Table"
-      required:
-        - date
-        - startTime
-        - endTime
-        - tables
-
-    CreateSlotResponse:
-      allOf:
-        - $ref: "#/components/schemas/Slot"
-        - type: object
-          properties:
-            message:
-              type: string
-              example: Slot created successfully
-
-    SlotAvailability:
-      type: object
-      properties:
-        slot_id:
+        slotId:
           type: integer
           example: 1
         date:
           type: string
           format: date
-          example: "2026-10-30"
-        start_time:
+        startTime:
           type: string
           example: "12:00"
-        end_time:
+        endTime:
           type: string
-          example: "13:00"
-        meal_type:
+          example: "14:00"
+        mealType:
           type: string
           example: Lunch
-        status:
+        tables:
+          type: array
+          items:
+            $ref: '#/components/schemas/Table'
+        message:
           type: string
-          example: OPEN
-        total_capacity:
+          example: Slot successfully created
+    Table:
+      type: object
+      required:
+        - tableNumber
+        - seats
+      properties:
+        tableNumber:
+          type: string
+          example: "T01"
+        seats:
           type: integer
-          example: 34
-        reserved_seats:
+          example: 4
+
+    MealType:
+      type: string
+      enum:
+        - Lunch
+        - Dinner
+        - Snack
+        - Breakfast
+    SlotDetail:
+      type: object
+      required:
+        - slotId
+        - date
+        - startTime
+        - endTime
+        - mealType
+        - tables
+      properties:
+        slotId:
           type: integer
-          example: 6
-        remaining_seats:
-          type: integer
-          example: 28
+          example: 1
+        date:
+          type: string
+          format: date
+          example: "2026-12-20"
+        startTime:
+          type: string
+          example: "12:00"
+        endTime:
+          type: string
+          example: "14:00"
+        mealType:
+          $ref: '#/components/schemas/MealType'
+        tables:
+          type: array
+          items:
+            $ref: '#/components/schemas/Table'
+    SlotAvailabilityResponse:
+      type: object
       required:
         - slot_id
         - date
@@ -474,247 +664,32 @@ components:
         - total_capacity
         - reserved_seats
         - remaining_seats
-
-    RegisterRequest:
-      type: object
       properties:
-        email:
-          type: string
-          format: email
-          example: hiker@example.com
-        password:
-          type: string
-          minLength: 8
-          example: SecurePassword123!
-        firstName:
-          type: string
-          example: Firstname
-        lastName:
-          type: string
-          example: Lastname
-        phone:
-          type: string
-          example: "+39 333 1234567"
-        role:
-          type: string
-          description: Ignored. Registration always creates a Hiker.
-          example: Hiker
-      required:
-        - email
-        - password
-        - firstName
-        - lastName
-        - phone
-
-    LoginRequest:
-      type: object
-      properties:
-        username:
-          type: string
-          format: email
-          example: manager@mountainhut.com
-        password:
-          type: string
-          example: SecurePassword123!
-      required:
-        - username
-        - password
-
-    LoginResponse:
-      type: object
-      properties:
-        token:
-          type: string
-          description: JWT authentication token.
-        user:
-          $ref: "#/components/schemas/User"
-      required:
-        - token
-        - user
-
-    User:
-      type: object
-      properties:
-        id:
-          type: integer
-          example: 1
-        email:
-          type: string
-          format: email
-          example: manager@mountainhut.com
-        firstName:
-          type: string
-          example: Firstname
-        lastName:
-          type: string
-          example: Lastname
-        role:
-          type: string
-          enum:
-            - Hiker
-            - Employee
-            - Manager
-            - Warden
-        phone:
-          type: string
-          example: "+393331234567"
-      required:
-        - id
-        - email
-        - firstName
-        - lastName
-        - role
-        - phone
-
-    CreateReservationRequest:
-      type: object
-      properties:
-        slot_id:
-          type: integer
-          example: 1
-        party_size:
-          type: integer
-          minimum: 1
-          example: 4
-        user_id:
-          type: integer
-          nullable: true
-          description: Optional. The authenticated hiker is used if omitted.
-          example: 3
-        contact_name:
-          type: string
-          example: Alex Smith
-        contact_email:
-          type: string
-          format: email
-          example: hiker1@example.com
-        contact_phone:
-          type: string
-          example: "+39 340 1234567"
-        special_requirements:
-          type: string
-          nullable: true
-          example: "2 vegetarian meals, 1 gluten allergy"
-      required:
-        - slot_id
-        - party_size
-        - contact_name
-        - contact_email
-        - contact_phone
-
-    Reservation:
-      type: object
-      properties:
-        id:
-          type: integer
-          example: 1
-        booking_reference:
-          type: string
-          example: MH-20261030-ALX01
-        user_id:
-          type: integer
-          example: 3
         slot_id:
           type: integer
           example: 1
         date:
           type: string
-          format: date
-          example: "2026-10-30"
+          example: "2026-12-20"
         start_time:
           type: string
           example: "12:00"
         end_time:
           type: string
-          example: "13:00"
-        party_size:
-          type: integer
-          example: 4
-        special_requirements:
+          example: "14:00"
+        meal_type:
           type: string
           nullable: true
-          example: "2 vegetarian meals, 1 gluten allergy"
-        contact_name:
-          type: string
-          example: Alex Smith
-        contact_email:
-          type: string
-          format: email
-          example: hiker1@example.com
-        contact_phone:
-          type: string
-          example: "+39 340 1234567"
+          example: Lunch
         status:
           type: string
-          example: CONFIRMED
-        assigned_tables:
-          type: array
-          items:
-            $ref: "#/components/schemas/AssignedTable"
-        created_at:
-          type: string
-          format: date-time
-          example: "2026-10-30T12:00:00"
-      required:
-        - id
-        - booking_reference
-        - user_id
-        - slot_id
-        - date
-        - start_time
-        - end_time
-        - party_size
-        - contact_name
-        - contact_email
-        - contact_phone
-        - status
-        - assigned_tables
-        - created_at
-
-    AssignedTable:
-      type: object
-      properties:
-        table_id:
+          example: Available
+        total_capacity:
           type: integer
-          example: 1
-        table_number:
-          type: string
-          example: T1
-        location:
-          type: string
-          example: Indoor Main Hall
-        assigned_seats:
+          example: 40
+        reserved_seats:
           type: integer
-          example: 4
-      required:
-        - table_id
-        - table_number
-        - location
-        - assigned_seats
-
-    ErrorResponse:
-      type: object
-      properties:
-        code:
+          example: 25
+        remaining_seats:
           type: integer
-          example: 409
-        message:
-          type: string
-          example: message
-        name:
-          type: string
-          example: ConflictError
-      required:
-        - code
-        - message
-        - name
-
-    DetailError:
-      type: object
-      properties:
-        detail:
-          description: Validation, request or authentication error details.
-          nullable: true
-          example: message
-      required:
-        - detail
+          example: 15
