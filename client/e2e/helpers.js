@@ -28,11 +28,10 @@ export async function choose(page, label, option) {
   await page.getByTitle(option).click()
 }
 
-export async function bookTable(page, { date, time, guests, requests }) {
+export async function bookTable(page, { date, time, guests }) {
   await page.goto('/customer/book-table')
   await typeInPicker(page, 'Date', date)
   await choose(page, 'Service time', time)
   await page.getByRole('spinbutton', { name: 'Number of guests' }).fill(String(guests))
-  if (requests) await page.getByLabel(/Special requirements/).fill(requests)
   await page.getByRole('button', { name: 'Confirm booking' }).click()
 }
