@@ -1,6 +1,7 @@
 """Integration tests of the Book a table story (MH-01): POST /api/reservations,
 GET /api/reservations/{reference} and GET /api/slots/{slot_id}/availability."""
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from server.models.DAO.reservation import ReservationDAO
 from server.models.DAO.table import TableDAO
@@ -22,7 +23,8 @@ def add_hiker(db, email="anna@example.com"):
 
 def add_slot(db, seats, hours_ahead=24, status="OPEN"):
     """A slot starting hours_ahead from now, with one table for each number in seats."""
-    start = datetime.now().replace(microsecond=0) + timedelta(hours=hours_ahead)
+    # Italian time, as the two-hour rule reads the slots: the GitHub machine runs on UTC
+    start = datetime.now(ZoneInfo("Europe/Rome")).replace(microsecond=0, tzinfo=None) + timedelta(hours=hours_ahead)
     slot = TimeSlotDAO(
         date=start.date(),
         start_time=start.time(),
