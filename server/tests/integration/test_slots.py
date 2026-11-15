@@ -86,14 +86,15 @@ def test_hiker_and_warden_can_list_the_slots(client, db):
 
 def test_same_table_on_another_date_has_its_own_seats(client, db):
     employee = login_as(db, "Employee")
-    client.post("/api/slots", json=slot([("T1", 8)]), headers=employee)
+    client.post("/api/slots", json=slot([("T1", 6)]), headers=employee)
 
-    response = client.post("/api/slots", json=slot([("T1", 6)], day=OTHER_DAY), headers=employee)
+    # more seats than the first time too: the PO in #17 lets the seats change from slot to slot
+    response = client.post("/api/slots", json=slot([("T1", 8)], day=OTHER_DAY), headers=employee)
 
     assert response.status_code == 201
     assert db.query(TableDAO).count() == 1
-    assert client.get(f"/api/slots?date={DAY}", headers=employee).json()[0]["tables"][0]["seats"] == 8
-    assert client.get(f"/api/slots?date={OTHER_DAY}", headers=employee).json()[0]["tables"][0]["seats"] == 6
+    assert client.get(f"/api/slots?date={DAY}", headers=employee).json()[0]["tables"][0]["seats"] == 6
+    assert client.get(f"/api/slots?date={OTHER_DAY}", headers=employee).json()[0]["tables"][0]["seats"] == 8
 
 
 def test_saving_the_same_times_again_does_not_create_a_second_slot(client, db):

@@ -56,9 +56,6 @@ class SlotController():
             if table is None:
                 print("table creato")
                 table=await self.repo.add_table(t.tableNumber,t.seats)
-            if table.capacity<t.seats:
-                # conflict error when trying to arrange more tables than the table's capacity allows
-                raise ConflictError(f"You cannot add {t.seats} seats to table {t.tableNumber} because it exceeds the capacity: {table.capacity}.")
             tables.append((table,t.seats))
         #add table
         result=await self.repo.transaction_add_table(slotTime,tables)
