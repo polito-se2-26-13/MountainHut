@@ -13,6 +13,7 @@ const LoginPage = lazy(() => import('./pages/LoginPage.jsx'))
 const RoleHomePage = lazy(() => import('./pages/RoleHomePage.jsx'))
 const EmployeeSlotConfigPage = lazy(() => import('./pages/EmployeeSlotConfigPage.jsx'))
 const CustomerBookingPage = lazy(() => import('./pages/CustomerBookingPage.jsx'))
+const AvailabilityPage = lazy(() => import('./pages/AvailabilityPage.jsx'))
 const CustomerReservationHistoryPage = lazy(() => import('./pages/CustomerReservationHistoryPage.jsx'))
 
 function App() {
@@ -43,6 +44,7 @@ function App() {
                 <Route path="/home/:role" element={<RoleHomePage />} />
                 <Route path="/employee/slots" element={<EmployeeSlotConfigPage />} />
                 <Route path="/customer/book-table" element={<CustomerBookingPage />} />
+                <Route path="/availability" element={<AvailabilityPage />} />
                 <Route path="/customer/reservations" element={<CustomerReservationHistoryPage />} />
                 <Route path="/404" element={<NotFoundPage />} />
                 <Route path="*" element={<Navigate to="/404" replace />} />

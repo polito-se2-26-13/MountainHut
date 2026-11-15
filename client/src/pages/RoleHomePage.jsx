@@ -14,6 +14,7 @@ const roleHomeContent = {
     title: 'Make room for a slower moment.',
     description: 'Plan a table at the hut or revisit the details of a past booking.',
     actions: [
+      { title: 'Check availability', description: 'Preview open service times and seating for your group.', to: '/availability', icon: '◷' },
       { title: 'Book a table', description: 'Choose a date and service time for your group.', to: '/customer/book-table', icon: '↗' },
       { title: 'Booking history', description: 'Review your previous reservations.', to: '/customer/reservations', icon: '⌁' },
     ],

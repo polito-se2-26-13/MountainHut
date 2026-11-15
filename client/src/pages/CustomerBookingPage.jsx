@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Button, Checkbox, DatePicker, Form, Input, InputNumber, Select } from 'antd'
 import dayjs from 'dayjs'
-import { Link, Navigate, useNavigate } from 'react-router'
+import { Link, Navigate, useLocation, useNavigate } from 'react-router'
 import { apiRequest } from '../api/api.js'
 import { useAuth } from '../auth/AuthContext.jsx'
 import { useToast } from '../components/ToastProvider.jsx'
@@ -48,12 +48,14 @@ function formatAssignedTables(tables = []) {
 
 function CustomerBookingPage() {
   const { session } = useAuth()
-  const [slotDate, setSlotDate] = useState(localDateString())
+  const location = useLocation()
+  const availabilitySearch = location.state?.availabilitySearch
+  const [slotDate, setSlotDate] = useState(availabilitySearch?.date || localDateString())
   const [slotOptions, setSlotOptions] = useState([])
   const [slotOptionsDate, setSlotOptionsDate] = useState('')
-  const [slotId, setSlotId] = useState('')
+  const [slotId, setSlotId] = useState(availabilitySearch?.slotId != null ? String(availabilitySearch.slotId) : '')
   const [availability, setAvailability] = useState(null)
-  const [partySize, setPartySize] = useState(2)
+  const [partySize, setPartySize] = useState(availabilitySearch?.partySize ?? 2)
   const [contactName, setContactName] = useState(session?.userProfile?.fullName || '')
   const accountEmail = session?.userProfile?.email || ''
   const [useAlternativeEmail, setUseAlternativeEmail] = useState(false)
@@ -72,6 +74,12 @@ function CustomerBookingPage() {
   const selectedSlot = slotOptionsDate === slotDate
     ? slotOptions.find((slot) => String(getSlotId(slot)) === String(slotId))
     : undefined
+
+  useEffect(() => {
+    if (!availabilitySearch?.time || availabilitySearch.date !== slotDate || slotOptionsDate !== slotDate) return
+    const matchingSlot = slotOptions.find((slot) => getSlotStart(slot)?.slice(0, 5) === availabilitySearch.time.slice(0, 5))
+    if (matchingSlot) setSlotId(String(getSlotId(matchingSlot)))
+  }, [availabilitySearch, slotDate, slotOptionsDate, slotOptions])
 
   useEffect(() => {
     if (!session?.isAuthenticated || session.userProfile.role !== 'Hiker') return undefined
