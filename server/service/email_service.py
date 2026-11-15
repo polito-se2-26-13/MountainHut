@@ -25,14 +25,6 @@ def format_booking_email_text(reservation: ReservationMailDTO) -> str:
     - name of the hiker who made the reservation
     """
     """
-    conf = reservation.to_confirmation_dict()
-    hiker_name = conf.get("hikerName") or "Valued Guest"
-    ref = conf.get("bookingReference") or "N/A"
-    date_str = conf.get("date") or "N/A"
-    time_slot = conf.get("timeSlot") or "N/A"
-    party_size = conf.get("partySize") or 1
-    special_reqs = conf.get("specialRequirements") or "None specified"
-    tables = conf.get("assignedTables") or []
 """
     hiker_name=reservation.hiker_name
     ref= reservation.booking_reference
@@ -80,14 +72,6 @@ def format_booking_email_html(reservation: ReservationMailDTO) -> str:
     """
     Generate a clean, responsive HTML email template for booking confirmation (MH-03).
     """
-    '''conf = reservation.to_confirmation_dict()
-    hiker_name = conf.get("hikerName") or "Valued Guest"
-    ref = conf.get("bookingReference") or "N/A"
-    date_str = conf.get("date") or "N/A"
-    time_slot = conf.get("timeSlot") or "N/A"
-    party_size = conf.get("partySize") or 1
-    special_reqs = conf.get("specialRequirements") or "None specified"
-    tables = conf.get("assignedTables") or []'''
     # name and requests are typed by the user: escaped, so they reach the mail as text and not as HTML or links
     hiker_name=escape(reservation.hiker_name)
     ref= reservation.booking_reference
@@ -178,17 +162,18 @@ def format_booking_email_html(reservation: ReservationMailDTO) -> str:
 </html>"""
     return html
 
-
 def send_booking_confirmation_email(reservation: ReservationMailDTO) -> Dict[str, Any]:
-  """
-  Format and dispatch the booking confirmation email to the hiker (MH-03).
-  Returns delivery metadata including recipient, subject, text, and html body.
-  """
   subject = f"Mountain Hut Booking Confirmation [{reservation.booking_reference}]"
   to_email = reservation.contact_email
   text_content = format_booking_email_text(reservation)
   html_content = format_booking_email_html(reservation)
+  return sender_email(subject,to_email,text_content,html_content,reservation.booking_reference)
 
+def sender_email(subject:str,to_email:str,text_content:str,html_content:str,booking_ref:str) -> Dict[str, Any]:
+  """
+  Format and dispatch the booking confirmation email to the hiker (MH-03).
+  Returns delivery metadata including recipient, subject, text, and html body.
+  """
   message=EmailMessage()
   message["Subject"]=subject
   message["From"]=os.getenv("SMTP_EMAIL")
@@ -217,7 +202,7 @@ def send_booking_confirmation_email(reservation: ReservationMailDTO) -> Dict[str
         "status": "SENT",
         "to": to_email,
         "subject": subject,
-        "booking_reference": reservation.booking_reference,
+        "booking_reference": booking_ref,
         "text_content": text_content,
         "html_content": html_content,
     }
@@ -226,7 +211,7 @@ def send_booking_confirmation_email(reservation: ReservationMailDTO) -> Dict[str
             "status": "FAILED",
             "to": to_email,
             "subject": subject,
-            "booking_reference": reservation.booking_reference,
+            "booking_reference": booking_ref,
             "error": str(e)
         }  
 

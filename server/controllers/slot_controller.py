@@ -3,9 +3,12 @@ from server.models.DTO.slot_dto import SlotCreation
 from server.repositories.slot_repopsitory import SlotRepository
 from server.repositories.reservation_repository import ReservationRepository
 from server.models.error.conflict_error import ConflictError
-from server.service.mapper_service import slotTableDto_to_response
+from server.models.error.notfound_error import NotFoundError
+from server.service.mapper_service import slotTableDto_to_response, timeSlotDAO_to_response,tableDAO_to_response
 from server.models.error.unprocessable_content import UnprocessableContent
 from server.models.DTO.slot_dto import SlotDetail
+from server.models.DTO.time_dto import TimeResponse
+from server.models.DTO.table_dto import TableResponse
 from server.service.mapper_service import slots_deatils_to_response
 from datetime import date, datetime, time
 from typing import Optional
@@ -36,21 +39,22 @@ class SlotController():
             raise ConflictError("the slot overlaps another slot of the same day")
 
         #search time slot, or create it: the employee chooses date and times freely (MH-02)
-        slotTime=await self.repo.find_slot_time(slot.date,slot.startTime,slot.endTime)
+        slotTime=await self.repo.find_slot_time(slot.date,slot.startTime,slot.endTime,slot.mealType)
         if slotTime is None:
             slotTime=await self.repo.add_slot_time(slot)
         else:
             # saving the slot again cannot leave a table with fewer seats than the ones already booked on it
-            booked={st.table.table_number: st.occupied_seats for st in slotTime.slot_tables}
-            for t in slot.tables:
-                if t.seats<booked.get(t.tableNumber,0):
-                    raise ConflictError(f"table {t.tableNumber} already has {booked[t.tableNumber]} seats booked")
+                booked={st.table.table_number: st.occupied_seats for st in slotTime.slot_tables}
+                for t in slot.tables:
+                    if t.seats<booked.get(t.tableNumber,0):
+                        raise ConflictError(f"table {t.tableNumber} already has {booked[t.tableNumber]} seats booked")
 
         #search table, or create it: there is no fixed set of tables and seats differ per slot (PO issue 17)
         tables: list[tuple[TableDAO,int]]=[]
         for t in slot.tables:
             table=await self.repo.find_table(t.tableNumber)
             if table is None:
+                print("table creato")
                 table=await self.repo.add_table(t.tableNumber,t.seats)
             tables.append((table,t.seats))
         #add table
@@ -68,3 +72,17 @@ class SlotController():
         self, slot_date: date, slot_time: time, party_size: Optional[int] = None
     ) -> dict:
         return await ReservationRepository().get_slot_availability_by_date_time(slot_date, slot_time, party_size)
+
+    async def get_list_time(self)->list[TimeResponse]:
+        result=await self.repo.get_time()
+        response:list[TimeResponse]=[]
+        for r in result:
+            response.append(timeSlotDAO_to_response(r))
+        return response
+
+    async def get_list_table(self)->list[TableResponse]:
+            result=await self.repo.get_table()
+            response:list[TableResponse]=[]
+            for r in result:
+                response.append(tableDAO_to_response(r))
+            return response
