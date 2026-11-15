@@ -4,9 +4,11 @@ from server.repositories.slot_repopsitory import SlotRepository
 from server.repositories.reservation_repository import ReservationRepository
 from server.models.error.conflict_error import ConflictError
 from server.models.error.notfound_error import NotFoundError
-from server.service.mapper_service import slotTableDto_to_response
+from server.service.mapper_service import slotTableDto_to_response, timeSlotDAO_to_response,tableDAO_to_response
 from server.models.error.unprocessable_content import UnprocessableContent
 from server.models.DTO.slot_dto import SlotDetail
+from server.models.DTO.time_dto import TimeResponse
+from server.models.DTO.table_dto import TableResponse
 from server.service.mapper_service import slots_deatils_to_response
 from datetime import date, datetime
 
@@ -38,8 +40,7 @@ class SlotController():
         #search time slot, or create it: the employee chooses date and times freely (MH-02)
         slotTime=await self.repo.find_slot_time(slot.date,slot.startTime,slot.endTime,slot.mealType)
         if slotTime is None:
-            raise NotFoundError("Time Slot doesn't exist")
-            #slotTime=await self.repo.add_slot_time(slot)
+            slotTime=await self.repo.add_slot_time(slot)
         else:
             # saving the slot again cannot leave a table with fewer seats than the ones already booked on it
                 booked={st.table.table_number: st.occupied_seats for st in slotTime.slot_tables}
@@ -52,8 +53,7 @@ class SlotController():
         for t in slot.tables:
             table=await self.repo.find_table(t.tableNumber)
             if table is None:
-                raise NotFoundError(f"table {t.tableNumber} not foud")
-                #table=await self.repo.add_table(t.tableNumber,t.seats)
+                table=await self.repo.add_table(t.tableNumber,t.seats)
             if table.capacity<t.seats:
                 # conflict error when trying to arrange more tables than the table's capacity allows
                 raise ConflictError(f"You cannot add {t.seats} seats to table {t.tableNumber} because it exceeds the capacity: {table.capacity}.")
@@ -68,3 +68,17 @@ class SlotController():
 
     async def getSlotAvailability(self,slot_id:int)->dict:
         return await ReservationRepository().get_slot_availability(slot_id)
+
+    async def get_list_time(self)->list[TimeResponse]:
+        result=await self.repo.get_time()
+        response:list[TimeResponse]=[]
+        for r in result:
+            response.append(timeSlotDAO_to_response(r))
+        return response
+
+    async def get_list_table(self)->list[TableResponse]:
+            result=await self.repo.get_table()
+            response:list[TableResponse]=[]
+            for r in result:
+                response.append(tableDAO_to_response(r))
+            return response

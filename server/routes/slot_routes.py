@@ -6,6 +6,8 @@ from server.config.config import ROUTES
 from server.controllers.slot_controller import SlotController
 from server.models.DTO.slot_dto import SlotDetail
 from server.models.DTO.reservation_dto import SlotAvailabilityResponse
+from server.models.DTO.table_dto import TableResponse
+from server.models.DTO.time_dto import TimeResponse
 from datetime import date
 from typing import Optional
 
@@ -31,3 +33,17 @@ async def getSlotTime(date:Optional[date]=None):
             status_code=status.HTTP_200_OK)
 async def getSlotAvailability(slot_id:int):
     return await controller.getSlotAvailability(slot_id)
+
+@router.get("/times",
+            response_model=list[TimeResponse],
+            status_code=status.HTTP_200_OK,
+            dependencies=[Depends(authenticate_user([UserType.EMPLOYEE,UserType.WARDEN]))])
+async def get_list_time():
+    return await controller.get_list_time()
+
+@router.get("/tables",
+            response_model=list[TableResponse],
+            status_code=status.HTTP_200_OK,
+            dependencies=[Depends(authenticate_user([UserType.EMPLOYEE,UserType.WARDEN]))])
+async def get_list_time():
+    return await controller.get_list_table()

@@ -135,3 +135,14 @@ class SlotRepository:
                 (slot, tables)
                 for slot, tables in slots.values()
             ]
+
+    async def get_time(self)->list[TimeSlotDAO]:
+        async with await self._get_session() as session:
+            result=await session.execute(select(TimeSlotDAO))
+            return result.scalars().all()
+
+    async def get_table(self)->list[TableDAO]:
+            async with await self._get_session() as session:
+                result=await session.execute(select(TableDAO))
+                return result.scalars().all()
+    

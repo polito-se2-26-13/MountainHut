@@ -1,3 +1,4 @@
+from server.models.DAO.table import TableDAO
 from server.models.DAO.time_slot import TimeSlotDAO
 from server.models.DTO.error_dto import ErrorDTO
 from server.models.DTO.user_dto import UserResponseDTO,UserLoginResponse,UserDTO, UserDetailDTO
@@ -5,6 +6,8 @@ from server.models.DAO.user import UserDAO
 from server.models.DTO.reservation_dto import ReservationResponse, AssignedTableInfo,ReservationMailDTO
 from server.models.DAO.reservation import ReservationDAO,ReservationTableAssignmentDAO
 from server.models.DTO.slot_dto import SlotResponse,Table,SlotDetail
+from server.models.DTO.table_dto import TableResponse
+from server.models.DTO.time_dto import TimeResponse
 from typing import List
 
 def create_error_dto(code: int, message: str, name: str) -> ErrorDTO:
@@ -118,3 +121,18 @@ def reservationTableAssignmentDAO_to_AssignedTableInfo(assigned:ReservationTable
                     assigned_seats=assigned.assigned_seats,
                     location=None
                 )
+def timeSlotDAO_to_response(timeDao:TimeSlotDAO)->TimeResponse:
+    return TimeResponse(
+        id=timeDao.id,
+        date=timeDao.date,
+        startTime=timeDao.start_time.strftime("%H:%M"),
+        endTime=timeDao.end_time.strftime("%H:%M"),
+        mealType=timeDao.meal_type,
+    )
+def tableDAO_to_response(tableDao:TableDAO)->TableResponse:
+    return TableResponse(
+        id=tableDao.id,
+        tableNumber=tableDao.table_number,
+        capacity=tableDao.capacity,
+        location=tableDao.location,
+    )

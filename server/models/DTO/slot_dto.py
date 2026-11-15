@@ -16,8 +16,8 @@ class SlotResponse(BaseModel):
 
 class SlotCreation(BaseModel):
     date: date
-    startTime: str
-    endTime: str
+    startTime: time
+    endTime: time
     mealType: MealType
     tables: list[Table]
 
