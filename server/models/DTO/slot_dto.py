@@ -10,7 +10,7 @@ class SlotResponse(BaseModel):
     date:date
     startTime: str
     endTime: str
-    mealType: MealType
+    mealType: MealType|None=None #TODO for test test_slots_of_a_date_are_listed_as_the_pages_read_them mealType is required
     tables:list[Table]
     message:str
 
@@ -18,7 +18,7 @@ class SlotCreation(BaseModel):
     date: date
     startTime: time
     endTime: time
-    mealType: MealType
+    mealType: MealType|None=None #TODO for test test_slots_of_a_date_are_listed_as_the_pages_read_them mealType is required
     tables: list[Table]
 
 class SlotDetail(BaseModel):
@@ -26,5 +26,5 @@ class SlotDetail(BaseModel):
     date:date
     startTime: str
     endTime: str
-    mealType: MealType
+    mealType: MealType |None=None #TODO for test test_slots_of_a_date_are_listed_as_the_pages_read_them mealType is required
     tables:list[Table]

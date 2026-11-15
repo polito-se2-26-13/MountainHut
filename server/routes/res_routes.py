@@ -21,7 +21,7 @@ async def create_reservation(reservation:ReservationCreate,background_tasks:Back
             response_model=ReservationResponse,
             status_code=status.HTTP_200_OK)
 async def get_reservation_by_reference(reference:str,user=Depends(authenticate_user([UserType.HIKER,UserType.EMPLOYEE,UserType.WARDEN]))):
-     reservation=await controller.get_reservation_by_reference(reference,user.id)
+     reservation=await controller.get_reservation_by_reference(reference,user.id,user.role)
      # a hiker reads only their own bookings, the hut staff reads all of them
      return reservation
 

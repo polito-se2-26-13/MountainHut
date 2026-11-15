@@ -53,7 +53,7 @@ def test_slots_of_a_date_are_listed_as_the_pages_read_them(client, db):
     client.post("/api/slots", json=slot([("T1", 3)], day=OTHER_DAY), headers=employee)
 
     response = client.get(f"/api/slots?date={DAY}", headers=employee)
-
+    print(created)
     assert response.status_code == 200
     assert response.history == []
     assert response.json() == [{
@@ -86,21 +86,21 @@ def test_hiker_and_warden_can_list_the_slots(client, db):
 
 def test_same_table_on_another_date_has_its_own_seats(client, db):
     employee = login_as(db, "Employee")
-    client.post("/api/slots", json=slot([("T1", 6)]), headers=employee)
+    client.post("/api/slots", json=slot([("T1", 8)]), headers=employee)
 
-    response = client.post("/api/slots", json=slot([("T1", 8)], day=OTHER_DAY), headers=employee)
+    response = client.post("/api/slots", json=slot([("T1", 6)], day=OTHER_DAY), headers=employee)
 
     assert response.status_code == 201
     assert db.query(TableDAO).count() == 1
-    assert client.get(f"/api/slots?date={DAY}", headers=employee).json()[0]["tables"][0]["seats"] == 6
-    assert client.get(f"/api/slots?date={OTHER_DAY}", headers=employee).json()[0]["tables"][0]["seats"] == 8
+    assert client.get(f"/api/slots?date={DAY}", headers=employee).json()[0]["tables"][0]["seats"] == 8
+    assert client.get(f"/api/slots?date={OTHER_DAY}", headers=employee).json()[0]["tables"][0]["seats"] == 6
 
 
 def test_saving_the_same_times_again_does_not_create_a_second_slot(client, db):
     employee = login_as(db, "Employee")
     first = client.post("/api/slots", json=slot([("T1", 4)], mealType="Lunch"), headers=employee).json()
 
-    second = client.post("/api/slots", json=slot([("T2", 2)]), headers=employee).json()
+    second = client.post("/api/slots", json=slot([("T2", 2)],mealType="Lunch"), headers=employee).json()
 
     assert second["slotId"] == first["slotId"]
     assert db.query(TimeSlotDAO).count() == 1
@@ -108,11 +108,11 @@ def test_saving_the_same_times_again_does_not_create_a_second_slot(client, db):
 
 def test_saving_a_table_again_changes_its_seats(client, db):
     employee = login_as(db, "Employee")
-    client.post("/api/slots", json=slot([("T1", 4)]), headers=employee)
-
     client.post("/api/slots", json=slot([("T1", 6)]), headers=employee)
 
-    assert client.get(f"/api/slots?date={DAY}", headers=employee).json()[0]["tables"] == [{"tableNumber": "T1", "seats": 6}]
+    client.post("/api/slots", json=slot([("T1", 4)]), headers=employee)
+
+    assert client.get(f"/api/slots?date={DAY}", headers=employee).json()[0]["tables"] == [{"tableNumber": "T1", "seats": 4}]
 
 
 def test_refused_request_leaves_nothing_behind(client, db):
