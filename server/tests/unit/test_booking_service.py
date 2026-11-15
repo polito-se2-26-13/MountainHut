@@ -192,7 +192,7 @@ async def test_api_booking_endpoint_flow(client):
 
     # 3. Retrieve reservation by reference
     get_res = await client.get(
-        f"/api/reservations/{ref}",
+        f"/api/reservations/reference/{ref}",
         headers={"Authorization": f"Bearer {generate_token(UserDAO(email='hiker@test.com', role=UserType.HIKER.value))}"},
     )
     assert get_res.status_code == 200
