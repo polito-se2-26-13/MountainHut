@@ -321,3 +321,36 @@ def test_a_booking_shows_date_and_time_of_its_slot(client, db):
         assert booking["date"] == slot.date.isoformat()
         assert booking["start_time"] == slot.start_time.strftime("%H:%M")
         assert booking["end_time"] == slot.end_time.strftime("%H:%M")
+
+
+def test_availability_shows_the_tables_the_booking_will_use(client, db):
+    # MH-04: the split shown before booking is the one the booking then gets
+    anna = add_hiker(db)
+    slot = add_slot(db, [3, 1, 2, 2])
+
+    preview = client.get(f"/api/slots/{slot}/availability", params={"party_size": 4}).json()
+    booked = book(client, anna, slot, 4)
+
+    assert preview["is_available"]
+    assert {t["table_number"]: t["assigned_seats"] for t in preview["layout"]} == seats_by_table(booked)
+
+
+def test_availability_splits_the_party_as_in_the_po_example(client, db):
+    # MH-04 clarification: with 6 free seats split over 3 tables of 2, a party of 6 is available
+    slot = add_slot(db, [2, 2, 2])
+
+    six = client.get(f"/api/slots/{slot}/availability", params={"party_size": 6}).json()
+    seven = client.get(f"/api/slots/{slot}/availability", params={"party_size": 7}).json()
+
+    assert six["is_available"] and six["layout_summary"] == "2 + 2 + 2 seats"
+    assert not seven["is_available"] and seven["layout"] == []
+
+
+def test_a_booking_that_is_no_longer_confirmed_gives_its_seats_back(client, db):
+    anna = add_hiker(db)
+    slot = add_slot(db, [6])
+    reference = book(client, anna, slot, 4).json()["booking_reference"]
+    db.query(ReservationDAO).filter_by(booking_reference=reference).update({"status": "CANCELLED"})
+    db.commit()
+
+    assert client.get(f"/api/slots/{slot}/availability").json()["remaining_seats"] == 6
