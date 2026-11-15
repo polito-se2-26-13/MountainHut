@@ -10,7 +10,8 @@ from server.models.DTO.slot_dto import SlotDetail
 from server.models.DTO.time_dto import TimeResponse
 from server.models.DTO.table_dto import TableResponse
 from server.service.mapper_service import slots_deatils_to_response
-from datetime import date, datetime
+from datetime import date, datetime, time
+from typing import Optional
 
 class SlotController():
     def __init__(self):
@@ -67,8 +68,13 @@ class SlotController():
         result=await self.repo.get_slot_time(date)
         return slots_deatils_to_response(result)
 
-    async def getSlotAvailability(self,slot_id:int)->dict:
-        return await ReservationRepository().get_slot_availability(slot_id)
+    async def getSlotAvailability(self, slot_id: int, party_size: Optional[int] = None) -> dict:
+        return await ReservationRepository().get_slot_availability(slot_id, party_size)
+
+    async def getSlotAvailabilityByDateTime(
+        self, slot_date: date, slot_time: time, party_size: Optional[int] = None
+    ) -> dict:
+        return await ReservationRepository().get_slot_availability_by_date_time(slot_date, slot_time, party_size)
 
     async def get_list_time(self)->list[TimeResponse]:
         result=await self.repo.get_time()

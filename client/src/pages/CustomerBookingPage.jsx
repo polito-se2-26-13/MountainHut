@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Button, DatePicker, Form, Input, InputNumber, Select } from 'antd'
+import { Button, Checkbox, DatePicker, Form, Input, InputNumber, Select } from 'antd'
 import dayjs from 'dayjs'
 import { Link, Navigate, useNavigate } from 'react-router'
 import { apiRequest } from '../api/api.js'
@@ -55,9 +55,13 @@ function CustomerBookingPage() {
   const [availability, setAvailability] = useState(null)
   const [partySize, setPartySize] = useState(2)
   const [contactName, setContactName] = useState(session?.userProfile?.fullName || '')
-  const [contactEmail, setContactEmail] = useState(session?.userProfile?.email || '')
+  const accountEmail = session?.userProfile?.email || ''
+  const [useAlternativeEmail, setUseAlternativeEmail] = useState(false)
+  const [alternativeEmail, setAlternativeEmail] = useState('')
+  const contactEmail = useAlternativeEmail ? alternativeEmail : accountEmail
   const [contactPhone, setContactPhone] = useState('')
-  const [specialReqs, setSpecialReqs] = useState('')
+  const [hasSpecialRequirements, setHasSpecialRequirements] = useState(true)
+  const [specialRequirements, setSpecialRequirements] = useState([{id: 0, description: '', hasAllergy: false}])
   const [isLoadingSlots, setIsLoadingSlots] = useState(true)
   const [isCheckingAvailability, setIsCheckingAvailability] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -192,7 +196,12 @@ function CustomerBookingPage() {
           contact_name: contactName.trim(),
           contact_email: contactEmail.trim(),
           ...(contactPhone.trim() ? { contact_phone: contactPhone.trim() } : {}),
-          ...(specialReqs.trim() ? { special_requirements: specialReqs.trim() } : {}),
+          ...(hasSpecialRequirements && specialRequirements.some((item) => item.description.trim())
+            ? { special_requirements: specialRequirements.filter((item) => item.description.trim()).map((item) => ({
+              has_allergy: item.hasAllergy,
+              description: item.description.trim(),
+            })) }
+            : {}),
         }),
       })
       setBookingSuccessData({
@@ -205,7 +214,8 @@ function CustomerBookingPage() {
       setSlotId('')
       setAvailability(null)
       setPartySize(2)
-      setSpecialReqs('')
+      setHasSpecialRequirements(false)
+      setSpecialRequirements([])
     } catch (error) {
       notify(error.message || 'Your booking could not be completed. Please try again.')
     } finally {
@@ -309,7 +319,7 @@ function CustomerBookingPage() {
             </div>
             <label className="form-field party-size-field">
               <span>Number of guests <span className="required-mark" aria-hidden="true">*</span></span>
-              <InputNumber className="mh-control" min={1} max={availability ? remainingSeats : undefined} step={1} value={partySize} onChange={(value) => { setPartySize(value ?? ''); clearBookingConfirmation() }} onBlur={() => setTouched((current) => ({ ...current, partySize: true }))} aria-invalid={Boolean(touched.partySize && partySizeError)} />
+              <InputNumber className="mh-control" min={1} step={1} value={partySize} onChange={(value) => { setPartySize(value ?? ''); clearBookingConfirmation() }} onBlur={() => setTouched((current) => ({ ...current, partySize: true }))} aria-invalid={Boolean(touched.partySize && partySizeError)} />
               {touched.partySize && partySizeError && <small className="field-error">{partySizeError}</small>}
               {availability && !partySizeError && <small className="field-hint">Up to {remainingSeats} guests can be booked for this time.</small>}
             </label>
@@ -326,19 +336,73 @@ function CustomerBookingPage() {
                 <Input className="mh-control" value={contactName} autoComplete="name" onChange={(event) => { setContactName(event.target.value); clearBookingConfirmation() }} onBlur={() => setTouched((current) => ({ ...current, contactName: true }))} aria-invalid={Boolean(touched.contactName && contactNameError)} />
                 {touched.contactName && contactNameError && <small className="field-error">{contactNameError}</small>}
               </label>
-              <label className="form-field">
-                <span>Email <span className="required-mark" aria-hidden="true">*</span></span>
-                <Input className="mh-control" type="email" value={contactEmail} autoComplete="email" onChange={(event) => { setContactEmail(event.target.value); clearBookingConfirmation() }} onBlur={() => setTouched((current) => ({ ...current, contactEmail: true }))} aria-invalid={Boolean(touched.contactEmail && contactEmailError)} />
-                {touched.contactEmail && contactEmailError && <small className="field-error">{contactEmailError}</small>}
-              </label>
+              <div className="form-field form-field-wide">
+                <span>Confirmation email</span>
+                <p className="field-hint">By default, we’ll send the confirmation to your account email: <strong>{accountEmail || 'No account email available'}</strong></p>
+                <Checkbox checked={useAlternativeEmail} onChange={(event) => {
+                  setUseAlternativeEmail(event.target.checked)
+                  setTouched((current) => ({ ...current, contactEmail: false }))
+                  clearBookingConfirmation()
+                }}>
+                  I want to send the confirmation to a different email address.
+                </Checkbox>
+                {useAlternativeEmail && (
+                  <label className="form-field alternative-email-field">
+                    <span>Alternative email <span className="required-mark" aria-hidden="true">*</span></span>
+                    <Input className="mh-control" type="email" value={alternativeEmail} autoComplete="email" onChange={(event) => { setAlternativeEmail(event.target.value); clearBookingConfirmation() }} onBlur={() => setTouched((current) => ({ ...current, contactEmail: true }))} aria-invalid={Boolean(touched.contactEmail && contactEmailError)} />
+                    {touched.contactEmail && contactEmailError && <small className="field-error">{contactEmailError}</small>}
+                  </label>
+                )}
+              </div>
               <label className="form-field">
                 <span>Phone <span className="optional-mark">(optional)</span></span>
                 <Input className="mh-control" type="tel" value={contactPhone} autoComplete="tel" onChange={(event) => { setContactPhone(event.target.value); clearBookingConfirmation() }} />
               </label>
-              <label className="form-field form-field-wide">
-                <span>Special requirements <span className="optional-mark">(optional)</span></span>
-                <Input.TextArea className="mh-control" rows={4} value={specialReqs} placeholder="Dietary needs, allergies, or anything else we should know" onChange={(event) => { setSpecialReqs(event.target.value); clearBookingConfirmation() }} />
-              </label>
+              <div className="form-field form-field-wide requirements-field">
+                <div className="requirements-intro">
+                  <span>Special requirements <span className="optional-mark">(optional)</span></span>
+                  <p>Let us know about dietary needs or allergies so we can prepare for your group.</p>
+                </div>
+                {hasSpecialRequirements && (
+                  <div className="requirement-list">
+                    {specialRequirements.map((requirement, index) => (
+                      <article className="requirement-card" key={requirement.id}>
+                        <strong className="requirement-index">{index + 1}</strong>
+                        <label className="form-field">
+                          <span className="sr-only">Requirement {index + 1} description</span>
+                          <Input className="mh-control" value={requirement.description} placeholder={index === 0 ? 'e.g. 1 vegan, peanut allergy' : 'e.g. 2 vegetarians'} onChange={(event) => {
+                            const description = event.target.value
+                            setSpecialRequirements((items) => items.map((item) => item.id === requirement.id ? { ...item, description } : item))
+                            clearBookingConfirmation()
+                          }} />
+                        </label>
+                        <Checkbox className="allergy-checkbox" checked={requirement.hasAllergy} onChange={(event) => {
+                          setSpecialRequirements((items) => items.map((item) => item.id === requirement.id ? { ...item, hasAllergy: event.target.checked } : item))
+                          clearBookingConfirmation()
+                        }}>
+                          <span aria-hidden="true">⚠️ </span>This requirement involves an allergy
+                        </Checkbox>
+                        {specialRequirements.length > 1 && <Button className="requirement-remove" type="text" htmlType="button" aria-label={`Remove requirement ${index + 1}`} onClick={() => {
+                          setSpecialRequirements((items) => items.filter((item) => item.id !== requirement.id))
+                          clearBookingConfirmation()
+                        }}>Remove</Button>}
+                      </article>
+                    ))}
+                    <Button className="requirement-add" type="dashed" htmlType="button" onClick={() => {
+                      setSpecialRequirements((items) => [...items, { id: items.length + 1, description: '', hasAllergy: false }])
+                      clearBookingConfirmation()
+                    }}>＋ Add requirement</Button>
+                  </div>
+                )}
+                <Checkbox checked={!hasSpecialRequirements} onChange={(event) => {
+                  const noRequirements = event.target.checked
+                  setHasSpecialRequirements(!noRequirements)
+                  setSpecialRequirements(noRequirements ? [] : [{ id: `${Date.now()}`, description: '', hasAllergy: false }])
+                  clearBookingConfirmation()
+                }}>
+                  No dietary restrictions or allergies
+                </Checkbox>
+              </div>
             </div>
           </section>
         </div>

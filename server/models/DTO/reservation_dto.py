@@ -45,8 +45,24 @@ class ReservationResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class TableLayoutAssignment(BaseModel):
+    """Assigned seats breakdown at a specific table for a party (MH-04)."""
+    table_number: str
+    assigned_seats: int
+    location: Optional[str] = None
+
+
+class TableCapacityInfo(BaseModel):
+    """Real-time capacity and occupancy information for a physical table in a slot."""
+    table_number: str
+    capacity: int
+    occupied_seats: int
+    free_seats: int
+    location: Optional[str] = None
+
+
 class SlotAvailabilityResponse(BaseModel):
-    """Capacity and availability details for a time slot."""
+    """Capacity, availability, and table layout details for a time slot (MH-04)."""
     slot_id: int
     date: str
     start_time: str
@@ -56,6 +72,11 @@ class SlotAvailabilityResponse(BaseModel):
     total_capacity: int
     reserved_seats: int
     remaining_seats: int
+    is_available: bool = True
+    party_size: Optional[int] = None
+    layout_summary: Optional[str] = None
+    layout: Optional[List[TableLayoutAssignment]] = None
+    tables: Optional[List[TableCapacityInfo]] = None
 
 class ReservationMailDTO(BaseModel):
     hiker_name:str

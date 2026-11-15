@@ -49,14 +49,17 @@ Error response:
 }
 ```
 
-**get slot availability**
+**get slot availability (MH-04)**
 
 name: `/api/slots/{slot_id}/availability`<br>
-parameter: `slot_id` (path, integer)<br>
+parameters:
+- `slot_id` (path, integer, required)
+- `party_size` or `partySize` (query, integer >= 1, optional) — evaluates real-time table layout allocation for the party<br>
+authentication: public (no login required)<br>
 HTTP Status: 200 ok, 404 not found, 500 ISE<br>
 JSON response:
 ```json
-// 200
+// 200 without party_size
 {
   "slot_id": 1,
   "date": "2026-10-30",
@@ -66,7 +69,53 @@ JSON response:
   "status": "OPEN",
   "total_capacity": 34,
   "reserved_seats": 6,
-  "remaining_seats": 28
+  "remaining_seats": 28,
+  "is_available": true,
+  "party_size": null,
+  "layout_summary": null,
+  "layout": null,
+  "tables": [
+    {
+      "table_number": "T1",
+      "capacity": 6,
+      "occupied_seats": 6,
+      "free_seats": 0,
+      "location": "Indoor Main Hall"
+    },
+    {
+      "table_number": "T2",
+      "capacity": 4,
+      "occupied_seats": 0,
+      "free_seats": 4,
+      "location": "Indoor Main Hall"
+    }
+  ]
+}
+
+// 200 with party_size=6 (e.g. split party layout: 3 + 2 + 1 seats)
+{
+  "slot_id": 6,
+  "date": "2026-11-24",
+  "start_time": "13:00",
+  "end_time": "14:00",
+  "meal_type": "Lunch",
+  "status": "OPEN",
+  "total_capacity": 12,
+  "reserved_seats": 6,
+  "remaining_seats": 6,
+  "is_available": true,
+  "party_size": 6,
+  "layout_summary": "3 + 2 + 1 seats",
+  "layout": [
+    { "table_number": "T11", "assigned_seats": 3, "location": "Main Dining Hall" },
+    { "table_number": "T10", "assigned_seats": 2, "location": "Main Dining Hall" },
+    { "table_number": "T12", "assigned_seats": 1, "location": "Stube Cozy Corner" }
+  ],
+  "tables": [
+    { "table_number": "T10", "capacity": 6, "occupied_seats": 4, "free_seats": 2, "location": "Main Dining Hall" },
+    { "table_number": "T11", "capacity": 4, "occupied_seats": 1, "free_seats": 3, "location": "Main Dining Hall" },
+    { "table_number": "T12", "capacity": 2, "occupied_seats": 1, "free_seats": 1, "location": "Stube Cozy Corner" }
+  ]
 }
 
 // 404
@@ -75,6 +124,18 @@ JSON response:
   "message": "Time slot with id 1 not found.",
   "name": "NotFoundError"
 }
+```
+
+**check availability by date and time (MH-04)**
+
+name: `/api/slots/availability`<br>
+parameters:
+- `date` (query, date string `YYYY-MM-DD`, required)
+- `time` (query, time string `HH:MM`, required)
+- `party_size` or `partySize` (query, integer >= 1, optional)<br>
+authentication: public (no login required)<br>
+HTTP Status: 200 ok, 404 not found, 500 ISE<br>
+JSON response: identical to `/api/slots/{slot_id}/availability`
 ```
 
 **get reservation by reference**

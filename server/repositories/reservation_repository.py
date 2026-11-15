@@ -8,9 +8,12 @@ from server.models.DAO.time_slot import SlotTableDAO, TimeSlotDAO
 from server.models.DAO.reservation import ReservationDAO, ReservationTableAssignmentDAO
 from server.models.DTO.reservation_dto import AssignedTableInfo, ReservationCreate
 from server.models.enum.reservation_status import ReservationStatus
+from server.models.enum.slot_status import SlotStatus
 from server.models.enum.user_type import UserType
 from server.models.error.notfound_error import NotFoundError
-from datetime import datetime
+from server.models.error.conflict_error import ConflictError
+from server.service.booking_service import assign_tables_for_party
+from datetime import datetime, date, time
 
 from server.service.mapper_service import reservationTableAssignmentDAO_to_AssignedTableInfo
 
@@ -41,43 +44,95 @@ class ReservationRepository:
             ))
             return res.scalar_one_or_none()
     
-    async def get_slot_availability(self, slot_id: int) -> dict:
-        """Retrieve slot details and real-time seat availability asynchronously."""
+    async def get_slot_availability(self, slot_id: int, party_size: Optional[int] = None) -> dict:
+        """Free seats of a slot and, for a party size, the tables a booking would get (MH-04)."""
+        slot = await self.get_time_slot(slot_id)
+        if not slot:
+            raise NotFoundError(f"Time slot with id {slot_id} not found.")
+
+        # occupied_seats and free_seats of the model count only confirmed bookings, as the booking does
+        tables = sorted((st for st in slot.slot_tables if st.is_available), key=lambda st: st.table.table_number)
+        total_capacity = sum(st.available_seats for st in tables)
+        reserved_seats = sum(st.occupied_seats for st in tables)
+        remaining_seats = max(0, total_capacity - reserved_seats)
+        is_open = slot.status == SlotStatus.OPEN.value
+
+        layout = None
+        if party_size is not None:
+            layout = []
+            if is_open:
+                try:
+                    # the same choice the booking makes, so the preview is what the hiker will get
+                    layout = [
+                        {"table_number": st.table.table_number, "assigned_seats": seats, "location": st.table.location}
+                        for st, seats in assign_tables_for_party(slot, party_size)
+                    ]
+                except ConflictError:
+                    pass
+        is_available = is_open and (len(layout) > 0 if party_size is not None else remaining_seats > 0)
+
+        layout_summary = None
+        if len(layout or []) == 1:
+            layout_summary = f"{party_size} seat(s) at Table {layout[0]['table_number']}"
+        elif layout:
+            # e.g. "2 + 3 + 1 seats", as in the MH-04 clarification
+            layout_summary = f"{' + '.join(str(t['assigned_seats']) for t in layout)} seats"
+
+        return {
+            "slot_id": slot.id,
+            "date": slot.date.isoformat(),
+            "start_time": slot.start_time.strftime("%H:%M"),
+            "end_time": slot.end_time.strftime("%H:%M"),
+            "meal_type": slot.meal_type,
+            "status": slot.status,
+            "total_capacity": total_capacity,
+            "reserved_seats": reserved_seats,
+            "remaining_seats": remaining_seats,
+            "is_available": is_available,
+            "party_size": party_size,
+            "layout_summary": layout_summary,
+            "layout": layout,
+            "tables": [
+                {
+                    "table_number": st.table.table_number,
+                    "capacity": st.available_seats,
+                    "occupied_seats": st.occupied_seats,
+                    "free_seats": st.free_seats,
+                    "location": st.table.location,
+                }
+                for st in tables
+            ],
+        }
+
+    async def get_slot_availability_by_date_time(
+        self, slot_date: date, slot_time: time, party_size: Optional[int] = None
+    ) -> dict:
+        """Find slot by date and time, then compute real-time availability (MH-04)."""
         async with await self._get_session() as session:
-            result = await session.execute(select(TimeSlotDAO).where(TimeSlotDAO.id == slot_id))
+            result = await session.execute(
+                select(TimeSlotDAO).where(
+                    TimeSlotDAO.date == slot_date,
+                    TimeSlotDAO.start_time <= slot_time,
+                    TimeSlotDAO.end_time > slot_time,
+                )
+            )
             slot = result.scalar_one_or_none()
             if not slot:
-                raise NotFoundError(f"Time slot with id {slot_id} not found.")
-
-            # Calculate capacity and reservations via direct SQL for accuracy
-            cap_res = await session.execute(
-                select(func.coalesce(func.sum(SlotTableDAO.available_seats), 0)).where(
-                    SlotTableDAO.slot_id == slot_id,
-                    SlotTableDAO.is_available == True,
+                # If exact time range doesn't match, check by start_time
+                res_start = await session.execute(
+                    select(TimeSlotDAO).where(
+                        TimeSlotDAO.date == slot_date,
+                        TimeSlotDAO.start_time == slot_time,
+                    )
                 )
-            )
-            total_capacity = int(cap_res.scalar_one())
+                slot = res_start.scalar_one_or_none()
 
-            res_count = await session.execute(
-                select(func.coalesce(func.sum(ReservationDAO.party_size), 0)).where(
-                    ReservationDAO.slot_id == slot_id,
-                    ReservationDAO.status == ReservationStatus.CONFIRMED.value,
+            if not slot:
+                raise NotFoundError(
+                    f"Time slot not found for date '{slot_date.isoformat()}' and time '{slot_time.strftime('%H:%M')}'."
                 )
-            )
-            reserved_seats = int(res_count.scalar_one())
-            remaining_seats = max(0, total_capacity - reserved_seats)
 
-            return {
-                "slot_id": slot.id,
-                "date": slot.date.isoformat(),
-                "start_time": slot.start_time.strftime("%H:%M"),
-                "end_time": slot.end_time.strftime("%H:%M"),
-                "meal_type": slot.meal_type,
-                "status": slot.status,
-                "total_capacity": total_capacity,
-                "reserved_seats": reserved_seats,
-                "remaining_seats": remaining_seats,
-            }
+        return await self.get_slot_availability(slot.id, party_size)
 
 
     async def transaction_add_reservation(self, 
