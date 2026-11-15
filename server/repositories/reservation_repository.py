@@ -1,16 +1,21 @@
 from server.database import AsyncSessionLocal
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional, Tuple
-from sqlalchemy import select
+from sqlalchemy import select,func
+from server.models.DAO.user import UserDAO
 from server.models.DAO.table import TableDAO
 from server.models.DAO.time_slot import SlotTableDAO, TimeSlotDAO
 from server.models.DAO.reservation import ReservationDAO, ReservationTableAssignmentDAO
-from server.models.DTO.reservation_dto import ReservationCreate
-from server.const import ReservationStatus, SlotStatus
+from server.models.DTO.reservation_dto import AssignedTableInfo, ReservationCreate
+from server.models.enum.reservation_status import ReservationStatus
+from server.models.enum.slot_status import SlotStatus
+from server.models.enum.user_type import UserType
 from server.models.error.notfound_error import NotFoundError
 from server.models.error.conflict_error import ConflictError
 from server.service.booking_service import assign_tables_for_party
 from datetime import datetime, date, time
+
+from server.service.mapper_service import reservationTableAssignmentDAO_to_AssignedTableInfo
 
 class ReservationRepository:
 
@@ -29,10 +34,13 @@ class ReservationRepository:
     async def get_reservation_confirmed(self,user_id:int,slot_id:int)->ReservationDAO|None:
         async with await self._get_session() as session:
             res=await session.execute(
-            select(ReservationDAO).where(
+            select(ReservationDAO)
+            .join(UserDAO, ReservationDAO.user_id == UserDAO.id)
+            .where(
                 ReservationDAO.user_id == user_id,
                 ReservationDAO.slot_id == slot_id,
                 ReservationDAO.status == ReservationStatus.CONFIRMED.value,
+                UserDAO.role == UserType.HIKER.value
             ))
             return res.scalar_one_or_none()
     
@@ -128,7 +136,7 @@ class ReservationRepository:
 
 
     async def transaction_add_reservation(self, 
-        reservation:ReservationCreate,table_allocations:List[Tuple[SlotTableDAO, int]])->Tuple[ReservationDAO,List[ReservationTableAssignmentDAO]]:
+        reservation:ReservationCreate,table_allocations:List[Tuple[SlotTableDAO, int]])->Tuple[ReservationDAO,List[AssignedTableInfo]]:
         async with await self._get_session() as session:
             res = ReservationDAO(
                     user_id=reservation.user_id,
@@ -142,7 +150,7 @@ class ReservationRepository:
                 )
             session.add(res)
             await session.flush()
-            assignments:List[dict]=[]
+            assignments:List[AssignedTableInfo]=[]
             for slot_table, seats in table_allocations:
                     table_numer=await session.execute(select(TableDAO.table_number).where(TableDAO.id==slot_table.table_id))
                     number=str(table_numer.scalar_one())
@@ -152,12 +160,7 @@ class ReservationRepository:
                         assigned_seats=seats,
                     )
                     session.add(assignment)
-                    assignments.append({
-                        "slotTableId":slot_table.id,
-                        "tableNumber":number,
-                        "assignedSeats":seats,
-                        "tableLocation":""
-                    })
+                    assignments.append(reservationTableAssignmentDAO_to_AssignedTableInfo(assignment,number))
             
             try:
                 await session.commit()
@@ -167,7 +170,7 @@ class ReservationRepository:
                 raise ValueError(f"Failed to create reservation due to database constraint")
         return [res,assignments]
 
-    async def get_reservation_by_reference(self,reference:str)->tuple[ReservationDAO,list[dict]]:
+    async def get_reservation_by_reference(self,reference:str)->tuple[ReservationDAO,list[AssignedTableInfo]]:
         async with await self._get_session() as session:
             result =await session.execute(select(
                 ReservationDAO,
@@ -183,16 +186,17 @@ class ReservationRepository:
             return None,[]
         
         res = rows[0][0]
-        assignments:List[dict]=[]
+        assignments:List[AssignedTableInfo]=[]
         for reservation, slot_table_id, assigned_seats , table_number in rows:
-            assignments.append({
-                "slotTableId": slot_table_id,
-                "tableNumber": table_number,
-                "assignedSeats": assigned_seats
-            })
+            info=AssignedTableInfo(
+                table_id=slot_table_id,
+                table_number=table_number,
+                assigned_seats=assigned_seats
+            )
+            assignments.append(info)
         return res, assignments
 
-    async def get_reservation_by_user_id(self,user_id:str)->tuple[ReservationDAO,list[dict]]:
+    async def get_reservation_by_user_id(self,user_id:int)->list[tuple[ReservationDAO,list[AssignedTableInfo]]]:
             async with await self._get_session() as session:
                 result =await session.execute(select(
                     ReservationDAO,
@@ -208,18 +212,19 @@ class ReservationRepository:
                 return []
             
             reservations = {}
+
             for res, slot_table_id, assigned_seats, table_number in rows:
                 if res.id not in reservations:
-                    reservations[res.id] = [res, []]
+                    reservations[res.id] = (res, [])
 
-                reservations[res.id][1].append(({
-                    "slotTableId": slot_table_id,
-                    "assignedSeats": assigned_seats,
-                    "tableNumber": table_number
-                }))
-            return [
-                (res, assignments)
-                for res, assignments in reservations.values()
-            ]
+                reservations[res.id][1].append(
+                    AssignedTableInfo(
+                        table_id=slot_table_id,
+                        table_number=table_number,
+                        assigned_seats=assigned_seats
+                    )
+                )
+
+            return list(reservations.values())
 
             

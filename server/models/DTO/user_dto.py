@@ -21,7 +21,7 @@ class UserDTO(BaseModel):
     phone: Optional[Phone]= None
 
 class UserLoginDTO(BaseModel):
-    username: str
+    username: EmailStr=Field(max_length=100)
     password: str
 
 class UserResponseDTO(BaseModel):
@@ -30,7 +30,7 @@ class UserResponseDTO(BaseModel):
 class UserCreateDTO(BaseModel):
     email: EmailStr=Field(min_length=5, max_length=100)
     password: str=Field(min_length=8)
-    role: UserType=UserType.Hiker
+    role: UserType
     firstName: Name
     lastName: Name
     # for the PO the phone of a hiker is required, notes and emergency contact are optional (issue #22 of the course repository)

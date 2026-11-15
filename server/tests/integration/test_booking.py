@@ -1,6 +1,7 @@
 """Integration tests of the Book a table story (MH-01): POST /api/reservations,
 GET /api/reservations/{reference} and GET /api/slots/{slot_id}/availability."""
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from server.models.DAO.reservation import ReservationDAO
 from server.models.DAO.table import TableDAO
@@ -22,7 +23,8 @@ def add_hiker(db, email="anna@example.com"):
 
 def add_slot(db, seats, hours_ahead=24, status="OPEN"):
     """A slot starting hours_ahead from now, with one table for each number in seats."""
-    start = datetime.now().replace(microsecond=0) + timedelta(hours=hours_ahead)
+    # Italian time, as the two-hour rule reads the slots: the GitHub machine runs on UTC
+    start = datetime.now(ZoneInfo("Europe/Rome")).replace(microsecond=0, tzinfo=None) + timedelta(hours=hours_ahead)
     slot = TimeSlotDAO(
         date=start.date(),
         start_time=start.time(),
@@ -265,8 +267,7 @@ def test_booking_can_be_read_by_its_reference(client, db):
     db.commit()
     slot = add_slot(db, [6])
     booking = book(client, hiker, slot, 2).json()
-
-    response = client.get(f"/api/reservations/{booking['booking_reference']}", headers=TOKENS[hiker])
+    response = client.get(f"/api/reservations/reference/{booking['booking_reference']}", headers=TOKENS[hiker])
 
     assert response.status_code == 200
     assert response.json()["id"] == booking["id"]
@@ -277,9 +278,10 @@ def test_booking_can_be_read_by_its_reference(client, db):
 def test_bookings_are_read_only_with_the_login(client, db):
     anna = add_hiker(db)
     booking = book(client, anna, add_slot(db, [6]), 2).json()
-
-    assert client.get(f"/api/reservations/user/{anna}").status_code == 401
-    assert client.get(f"/api/reservations/{booking['booking_reference']}").status_code == 401
+    
+    print(client.get(f"/api/reservations/user").request.headers)
+    assert client.get(f"/api/reservations/user").status_code == 401
+    assert client.get(f"/api/reservations/reference/{booking['booking_reference']}").status_code == 401
 
 
 def test_a_hiker_reads_only_their_own_bookings(client, db):
@@ -290,20 +292,20 @@ def test_a_hiker_reads_only_their_own_bookings(client, db):
     db.add(employee)
     db.commit()
 
-    assert client.get(f"/api/reservations/user/{anna}", headers=TOKENS[other]).status_code == 403
-    assert client.get(f"/api/reservations/{booking['booking_reference']}", headers=TOKENS[other]).status_code == 403
-    mine = client.get(f"/api/reservations/user/{anna}", headers=TOKENS[anna])
+    #assert client.get(f"/api/reservations/user/", headers=TOKENS[other]).status_code == 403
+    assert client.get(f"/api/reservations/reference/{booking['booking_reference']}", headers=TOKENS[other]).status_code == 403
+    mine = client.get(f"/api/reservations/user/", headers=TOKENS[anna])
     assert mine.status_code == 200
     assert [b["id"] for b in mine.json()] == [booking["id"]]
     # the hut staff can look up any booking by its reference
-    staff = client.get(f"/api/reservations/{booking['booking_reference']}", headers={"Authorization": f"Bearer {generate_token(employee)}"})
+    staff = client.get(f"/api/reservations/reference/{booking['booking_reference']}", headers={"Authorization": f"Bearer {generate_token(employee)}"})
     assert staff.status_code == 200
 
 
 def test_a_hiker_without_bookings_gets_an_empty_list(client, db):
     anna = add_hiker(db)
 
-    response = client.get(f"/api/reservations/user/{anna}", headers=TOKENS[anna])
+    response = client.get(f"/api/reservations/user/", headers=TOKENS[anna])
 
     assert response.status_code == 200
     assert response.json() == []
@@ -315,7 +317,7 @@ def test_a_booking_shows_date_and_time_of_its_slot(client, db):
     slot = db.get(TimeSlotDAO, slot_id)
     created = book(client, anna, slot_id, 2).json()
 
-    read = client.get(f"/api/reservations/user/{anna}", headers=TOKENS[anna]).json()[0]
+    read = client.get(f"/api/reservations/user/", headers=TOKENS[anna]).json()[0]
 
     for booking in (created, read):
         assert booking["date"] == slot.date.isoformat()

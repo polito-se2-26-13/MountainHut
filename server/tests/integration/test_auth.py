@@ -131,9 +131,9 @@ def test_token_opens_only_the_routes_of_its_role(client):
     client.post("/api/auth/register", json=ANNA)
     token = client.post("/api/auth/login", json={"username": ANNA["email"], "password": ANNA["password"]}).json()["token"]
 
-    assert asyncio.run(process_token(f"Bearer {token}", [UserType.Hiker])).email == ANNA["email"]
+    assert asyncio.run(process_token(f"Bearer {token}", [UserType.HIKER])).email == ANNA["email"]
     with pytest.raises(HTTPException) as refused:
-        asyncio.run(process_token(f"Bearer {token}", [UserType.Employee]))
+        asyncio.run(process_token(f"Bearer {token}", [UserType.EMPLOYEE]))
     assert refused.value.status_code == 403
 
 
@@ -144,6 +144,6 @@ def test_a_token_signed_with_another_key_is_refused(client):
                         "a key that is not ours but long enough for HS256", algorithm="HS256")
 
     with pytest.raises(HTTPException) as refused:
-        asyncio.run(process_token(f"Bearer {forged}", [UserType.Hiker]))
+        asyncio.run(process_token(f"Bearer {forged}", [UserType.HIKER]))
     assert refused.value.status_code == 401
     assert refused.value.detail == "Invalid token"

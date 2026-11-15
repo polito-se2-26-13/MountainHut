@@ -6,6 +6,8 @@ from server.config.config import ROUTES
 from server.controllers.slot_controller import SlotController
 from server.models.DTO.slot_dto import SlotDetail
 from server.models.DTO.reservation_dto import SlotAvailabilityResponse
+from server.models.DTO.table_dto import TableResponse
+from server.models.DTO.time_dto import TimeResponse
 from datetime import date, time
 from typing import Optional
 
@@ -14,7 +16,7 @@ controller=SlotController()
 @router.post("",
              response_model=SlotResponse,
              status_code=status.HTTP_201_CREATED,
-             dependencies=[Depends(authenticate_user([UserType.Employee,UserType.Warden]))]
+             dependencies=[Depends(authenticate_user([UserType.EMPLOYEE,UserType.WARDEN]))]
              )
 async def setUpSlot(slot: SlotCreation):
     return await controller.setUpSlot(slot)
@@ -22,7 +24,7 @@ async def setUpSlot(slot: SlotCreation):
 @router.get("",
             response_model=list[SlotDetail],
             status_code=status.HTTP_200_OK,
-            dependencies=[Depends(authenticate_user([UserType.Hiker,UserType.Employee,UserType.Warden]))])
+            dependencies=[Depends(authenticate_user([UserType.HIKER,UserType.EMPLOYEE,UserType.WARDEN]))])
 async def getSlotTime(date:Optional[date]=None):
     return await controller.getSlotTime(date)
 
@@ -50,3 +52,17 @@ async def getSlotAvailability(
     """Retrieve slot capacity, real-time availability, and table layout breakdown (MH-04)."""
     p_size = party_size if party_size is not None else partySize
     return await controller.getSlotAvailability(slot_id, p_size)
+
+@router.get("/times",
+            response_model=list[TimeResponse],
+            status_code=status.HTTP_200_OK,
+            dependencies=[Depends(authenticate_user([UserType.EMPLOYEE,UserType.WARDEN]))])
+async def get_list_time():
+    return await controller.get_list_time()
+
+@router.get("/tables",
+            response_model=list[TableResponse],
+            status_code=status.HTTP_200_OK,
+            dependencies=[Depends(authenticate_user([UserType.EMPLOYEE,UserType.WARDEN]))])
+async def get_list_time():
+    return await controller.get_list_table()

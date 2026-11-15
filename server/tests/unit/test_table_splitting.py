@@ -1,4 +1,6 @@
 """Unit tests for MH-42: Table Splitting and 2-Hour Cutoff Rule."""
+from zoneinfo import ZoneInfo
+
 import pytest
 from datetime import date, time, datetime, timedelta
 from sqlalchemy import event, select
@@ -7,7 +9,9 @@ from sqlalchemy.pool import StaticPool
 
 from server.controllers.reservation_controller import ReservationController
 from server.database import AsyncSessionLocal, Base, engine as real_engine, set_sqlite_pragma
-from server.const import SlotStatus, ReservationStatus, UserRole
+from server.models.enum.slot_status import SlotStatus
+from server.models.enum.reservation_status import ReservationStatus
+from server.models.enum.user_type import UserType
 from server.models.DAO import UserDAO, TableDAO, TimeSlotDAO, SlotTableDAO, ReservationDAO
 from server.models.DTO.reservation_dto import ReservationCreate
 from server.models.error.conflict_error import ConflictError
@@ -66,22 +70,22 @@ async def split_test_db():
 async def test_two_hour_cutoff_rule(split_test_db):
     """Test MH-01 / MH-42: Hiker can reserve a seat up to 2 hours before the due time."""
     slot = (await split_test_db.execute(select(TimeSlotDAO).filter_by(id=1))).scalar_one()
-
+    italy_tz = ZoneInfo("Europe/Rome")
     # The slot starts at 12:00, so the cutoff is at 10:00 of the same day
 
     # 1. Booking at 09:30 (2.5h before) -> OK
-    validate_two_hour_rule(slot, current_time=datetime.combine(slot.date, time(9, 30)))
+    validate_two_hour_rule(slot, current_time=datetime.combine(slot.date, time(9, 30),tzinfo=italy_tz))
 
     # 2. Booking at 10:00 (exactly 2h before) -> OK
-    validate_two_hour_rule(slot, current_time=datetime.combine(slot.date, time(10, 0)))
+    validate_two_hour_rule(slot, current_time=datetime.combine(slot.date, time(10, 0),tzinfo=italy_tz))
 
     # 3. Booking at 10:01 (1h 59m before) -> Rejected
     with pytest.raises(ConflictError, match="at least 2 hours before"):
-        validate_two_hour_rule(slot, current_time=datetime.combine(slot.date, time(10, 1)))
+        validate_two_hour_rule(slot, current_time=datetime.combine(slot.date, time(10, 1),tzinfo=italy_tz))
 
     # 4. Booking after slot start -> Rejected
     with pytest.raises(ConflictError, match="at least 2 hours before"):
-        validate_two_hour_rule(slot, current_time=datetime.combine(slot.date, time(12, 15)))
+        validate_two_hour_rule(slot, current_time=datetime.combine(slot.date, time(12, 15),tzinfo=italy_tz))
 
 
 async def test_best_fit_single_table_allocation(split_test_db):
