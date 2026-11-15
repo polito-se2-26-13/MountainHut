@@ -6,6 +6,7 @@ from server.models.DTO.reservation_dto import (
     SlotAvailabilityResponse,
     TableLayoutAssignment,
     TableCapacityInfo,
+    SpecialRequirementDTO,
 )
 
 __all__ = [
@@ -15,5 +16,6 @@ __all__ = [
     "SlotAvailabilityResponse",
     "TableLayoutAssignment",
     "TableCapacityInfo",
+    "SpecialRequirementDTO",
 ]
 

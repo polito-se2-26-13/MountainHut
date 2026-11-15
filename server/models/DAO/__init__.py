@@ -3,7 +3,11 @@ from server.models.DAO.user import UserDAO
 from server.models.DAO.hut_info import HutInfoDAO
 from server.models.DAO.table import TableDAO
 from server.models.DAO.time_slot import TimeSlotDAO, SlotTableDAO
-from server.models.DAO.reservation import ReservationDAO, ReservationTableAssignmentDAO
+from server.models.DAO.reservation import (
+    ReservationDAO,
+    ReservationTableAssignmentDAO,
+    SpecialRequirementDAO,
+)
 
 __all__ = [
     "UserDAO",
@@ -13,5 +17,6 @@ __all__ = [
     "SlotTableDAO",
     "ReservationDAO",
     "ReservationTableAssignmentDAO",
+    "SpecialRequirementDAO",
 ]
 

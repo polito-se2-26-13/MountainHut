@@ -72,7 +72,7 @@ class ReservationController():
                 timeSlot.date.strftime("%d/%m/%Y"),
                 f"{timeSlot.start_time:%H:%M}-{timeSlot.end_time:%H:%M}",
                 res.party_size,
-                res.special_requirements,
+                res.special_requirements_list or res.special_requirements,
                 res.hiker.full_name
             )
         # the answer does not wait for the mail server, which kept the whole backend busy for up to 20 seconds

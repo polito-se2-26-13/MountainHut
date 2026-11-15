@@ -39,7 +39,15 @@ def format_booking_email_text(reservation: ReservationMailDTO) -> str:
     date_str = reservation.date_str
     time_slot = reservation.time_slot
     party_size = reservation.party_size
-    special_reqs = reservation.special_reqs or "None specified"
+    raw_reqs = reservation.special_reqs or ""
+
+    # Build a human-readable block; lines that start with [ALLERGY WARNING] are flagged
+    if raw_reqs:
+        req_lines = [r.strip() for r in raw_reqs.split(";") if r.strip()]
+        req_block = "\n".join(f"  • {line}" for line in req_lines)
+    else:
+        req_block = "  None specified"
+
     text = f"""============================================================
            MOUNTAIN HUT - RESERVATION CONFIRMATION
 ============================================================
@@ -56,7 +64,8 @@ BOOKING DETAILS (Reference: {ref})
 * Date:                {date_str}
 * Time Slot:           {time_slot}
 * Party Size:          {party_size} person(s)
-* Special Requests:    {special_reqs}
+* Special Requirements:
+{req_block}
 
 We look forward to welcoming you to the hut!
 
@@ -85,7 +94,25 @@ def format_booking_email_html(reservation: ReservationMailDTO) -> str:
     date_str = reservation.date_str
     time_slot = reservation.time_slot
     party_size = reservation.party_size
-    special_reqs = escape(reservation.special_reqs or "None specified")
+    raw_reqs = reservation.special_reqs or ""
+
+    # Build structured HTML rows for each requirement (MH-05)
+    if raw_reqs:
+        req_items = [escape(r.strip()) for r in raw_reqs.split(";") if r.strip()]
+        req_rows = ""
+        for item in req_items:
+            if item.startswith("[ALLERGY WARNING]"):
+                label = item[len("[ALLERGY WARNING]"):].strip()
+                req_rows += (
+                    f'<li style="color:#c2410c;font-weight:600;">'
+                    f'⚠️ <span style="background:#fff7ed;padding:2px 6px;border-radius:4px;">'
+                    f'[ALLERGY WARNING]</span> {label}</li>'
+                )
+            else:
+                req_rows += f'<li style="color:#334155;">{item}</li>'
+        req_html = f'<ul style="margin:4px 0 0 16px;padding:0;font-size:14px;">{req_rows}</ul>'
+    else:
+        req_html = '<span style="color:#94a3b8;font-size:14px;">None specified</span>'
     html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -132,7 +159,7 @@ def format_booking_email_html(reservation: ReservationMailDTO) -> str:
         </tr>
         <tr>
           <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; color: #64748b;">Special Requirements</td>
-          <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; font-weight: 500; color: #334155;">{special_reqs}</td>
+          <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; font-weight: 500; color: #334155;">{req_html}</td>
         </tr>
       </table>
 

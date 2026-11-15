@@ -4,8 +4,12 @@ from typing import List, Optional, Tuple
 from sqlalchemy import select, func
 from server.models.DAO.table import TableDAO
 from server.models.DAO.time_slot import SlotTableDAO, TimeSlotDAO
-from server.models.DAO.reservation import ReservationDAO, ReservationTableAssignmentDAO
-from server.models.DTO.reservation_dto import ReservationCreate
+from server.models.DAO.reservation import (
+    ReservationDAO,
+    ReservationTableAssignmentDAO,
+    SpecialRequirementDAO,
+)
+from server.models.DTO.reservation_dto import ReservationCreate, SpecialRequirementDTO
 from server.const import ReservationStatus, SlotStatus
 from server.models.error.notfound_error import NotFoundError
 from datetime import datetime, date, time
@@ -225,11 +229,24 @@ class ReservationRepository:
     async def transaction_add_reservation(self, 
         reservation:ReservationCreate,table_allocations:List[Tuple[SlotTableDAO, int]])->Tuple[ReservationDAO,List[ReservationTableAssignmentDAO]]:
         async with await self._get_session() as session:
+            # Normalise special_requirements to a plain string for the legacy TEXT column
+            sp_req_str: Optional[str] = None
+            if reservation.special_requirements:
+                items = reservation.special_requirements
+                if isinstance(items, str):
+                    sp_req_str = items
+                else:
+                    sp_req_str = "; ".join(
+                        f"{'[ALLERGY] ' if r.has_allergy else ''}{r.description}"
+                        for r in items
+                        if r.description.strip()
+                    ) or None
+
             res = ReservationDAO(
                     user_id=reservation.user_id,
                     slot_id=reservation.slot_id,
                     party_size=reservation.party_size,
-                    special_requirements=reservation.special_requirements,
+                    special_requirements=sp_req_str,
                     contact_name=reservation.contact_name,
                     contact_email=reservation.contact_email,
                     contact_phone=reservation.contact_phone,
@@ -237,6 +254,22 @@ class ReservationRepository:
                 )
             session.add(res)
             await session.flush()
+
+            # Atomically persist structured special requirements (MH-05)
+            if reservation.special_requirements:
+                items = reservation.special_requirements
+                if isinstance(items, str):
+                    items = [SpecialRequirementDTO(has_allergy=False, description=items)]
+                for req in items:
+                    if req.description.strip():
+                        sr = SpecialRequirementDAO(
+                            reservation_id=res.id,
+                            has_allergy=req.has_allergy,
+                            description=req.description.strip(),
+                        )
+                        session.add(sr)
+                await session.flush()
+
             assignments:List[dict]=[]
             for slot_table, seats in table_allocations:
                     table_numer=await session.execute(select(TableDAO.table_number).where(TableDAO.id==slot_table.table_id))
