@@ -1453,6 +1453,99 @@ button.back-link {
   color: #166534;
 }
 
+.availability-page {
+  width: min(100% - 2rem, 58rem);
+  padding: 5rem 0 4rem;
+}
+
+.availability-search {
+  margin-bottom: 1.2rem;
+}
+
+.availability-fields {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.availability-submit {
+  min-width: 12rem;
+  margin-top: 1.25rem;
+  padding: 0.7rem 1.2rem;
+}
+
+.availability-error {
+  display: block;
+  margin-top: 0.75rem;
+}
+
+.availability-result {
+  display: flex;
+  gap: 1rem;
+  padding: 1.4rem;
+  border: 1px solid #bbf7d0;
+  border-radius: 0.9rem;
+  background: #f0fdf4;
+  color: #166534;
+}
+
+.availability-result.unavailable {
+  border-color: #fecaca;
+  background: #fff7ed;
+  color: #9a3412;
+}
+
+.availability-result-icon {
+  display: grid;
+  width: 2.3rem;
+  height: 2.3rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 50%;
+  background: #dcfce7;
+  font-size: 1.2rem;
+  font-weight: 800;
+}
+
+.unavailable .availability-result-icon { background: #ffedd5; }
+.availability-result-content { min-width: 0; }
+.availability-result .eyebrow { margin: 0 0 0.35rem; color: inherit; font-size: 0.72rem; font-weight: 750; letter-spacing: 0.08em; }
+.availability-result h2 { margin: 0 0 0.4rem; color: #18212f; font-size: 1.3rem; }
+.availability-result-content > p { margin: 0.3rem 0; font-size: 0.9rem; }
+.layout-summary { padding-top: 0.25rem; }
+
+.availability-layout {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0.85rem 0 1rem;
+  padding: 0;
+  list-style: none;
+}
+
+.availability-layout li { display: flex; flex-wrap: wrap; gap: 0.35rem 0.7rem; font-size: 0.85rem; }
+.availability-layout li span { color: #475569; }
+
+.availability-book {
+  display: inline-flex;
+  min-height: 3rem;
+  align-items: center;
+  gap: 0.7rem;
+  margin-top: 0.3rem;
+  padding: 0.7rem 1rem;
+  border-radius: 0.5rem;
+  background: #1769aa;
+  color: #fff !important;
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.availability-book:hover { background: #125486; }
+.availability-footnote { margin-top: 1rem; color: #64748b; font-size: 0.82rem; }
+
+@media (max-width: 680px) {
+  .availability-page { width: min(100% - 1.25rem, 58rem); padding-top: 5rem; }
+  .availability-fields { grid-template-columns: 1fr; }
+  .availability-result { padding: 1rem; }
+}
+
 .confirmation-icon {
   display: grid;
   width: 2.3rem;
