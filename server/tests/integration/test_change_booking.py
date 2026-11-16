@@ -27,8 +27,8 @@ def test_a_change_is_mailed_with_the_new_details_and_without_tables(client, db, 
     assert "4 person(s)" in text and "changed from" in text and "2 person(s)" in text
     assert html.count("ALLERGY WARNING") == 1
     for body in (text, html):
-        # PO issue #24: the mail has no table numbers
-        assert f"{slot}-1" not in body and "Assigned" not in body
+        # PO issue #24: the mail has no tables ("Assigned Tables", "Table 1-1: 4 seat(s)")
+        assert "Assigned" not in body and "seat(s)" not in body
 
 
 def test_a_party_grows_on_its_own_table_when_the_seats_are_enough(client, db):
