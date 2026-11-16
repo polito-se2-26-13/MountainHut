@@ -245,6 +245,11 @@ class ReservationRepository:
             for assignment in old_assignments:
                 await session.delete(assignment)
             await session.flush()
+            # read the slot again, otherwise its free seats still count the seats of this booking,
+            # while any change is a new booking (PO issue #48)
+            target_slot = (await session.execute(
+                select(TimeSlotDAO).where(TimeSlotDAO.id == slot_id).execution_options(populate_existing=True)
+            )).scalar_one()
 
             try:
                 allocations = assign_tables_for_party(target_slot, party_size)
