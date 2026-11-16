@@ -15,7 +15,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from server.database import Base
-from server.const import ReservationStatus
+from server.models.enum.reservation_status import ReservationStatus
 
 if TYPE_CHECKING:
     from server.models.DAO.user import UserDAO

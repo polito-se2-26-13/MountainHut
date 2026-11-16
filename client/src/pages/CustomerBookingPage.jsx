@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Link, Navigate } from 'react-router'
+import { Button, Checkbox, DatePicker, Form, Input, InputNumber, Select } from 'antd'
+import dayjs from 'dayjs'
+import { Link, Navigate, useLocation, useNavigate } from 'react-router'
 import { apiRequest } from '../api/api.js'
 import { useAuth } from '../auth/AuthContext.jsx'
 import { useToast } from '../components/ToastProvider.jsx'
@@ -46,25 +48,38 @@ function formatAssignedTables(tables = []) {
 
 function CustomerBookingPage() {
   const { session } = useAuth()
-  const [slotDate, setSlotDate] = useState(localDateString())
+  const location = useLocation()
+  const availabilitySearch = location.state?.availabilitySearch
+  const [slotDate, setSlotDate] = useState(availabilitySearch?.date || localDateString())
   const [slotOptions, setSlotOptions] = useState([])
   const [slotOptionsDate, setSlotOptionsDate] = useState('')
-  const [slotId, setSlotId] = useState('')
+  const [slotId, setSlotId] = useState(availabilitySearch?.slotId != null ? String(availabilitySearch.slotId) : '')
   const [availability, setAvailability] = useState(null)
-  const [partySize, setPartySize] = useState(2)
+  const [partySize, setPartySize] = useState(availabilitySearch?.partySize ?? 2)
   const [contactName, setContactName] = useState(session?.userProfile?.fullName || '')
-  const [contactEmail, setContactEmail] = useState(session?.userProfile?.email || '')
+  const accountEmail = session?.userProfile?.email || ''
+  const [useAlternativeEmail, setUseAlternativeEmail] = useState(false)
+  const [alternativeEmail, setAlternativeEmail] = useState('')
+  const contactEmail = useAlternativeEmail ? alternativeEmail : accountEmail
   const [contactPhone, setContactPhone] = useState('')
-  const [specialReqs, setSpecialReqs] = useState('')
+  const [hasSpecialRequirements, setHasSpecialRequirements] = useState(true)
+  const [specialRequirements, setSpecialRequirements] = useState([{id: 0, description: '', hasAllergy: false}])
   const [isLoadingSlots, setIsLoadingSlots] = useState(true)
   const [isCheckingAvailability, setIsCheckingAvailability] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [bookingSuccessData, setBookingSuccessData] = useState(null)
   const [touched, setTouched] = useState({})
   const notify = useToast()
+  const navigate = useNavigate()
   const selectedSlot = slotOptionsDate === slotDate
     ? slotOptions.find((slot) => String(getSlotId(slot)) === String(slotId))
     : undefined
+
+  useEffect(() => {
+    if (!availabilitySearch?.time || availabilitySearch.date !== slotDate || slotOptionsDate !== slotDate) return
+    const matchingSlot = slotOptions.find((slot) => getSlotStart(slot)?.slice(0, 5) === availabilitySearch.time.slice(0, 5))
+    if (matchingSlot) setSlotId(String(getSlotId(matchingSlot)))
+  }, [availabilitySearch, slotDate, slotOptionsDate, slotOptions])
 
   useEffect(() => {
     if (!session?.isAuthenticated || session.userProfile.role !== 'Hiker') return undefined
@@ -148,8 +163,7 @@ function CustomerBookingPage() {
     setBookingSuccessData(null)
   }
 
-  async function handleSubmit(event) {
-    event.preventDefault()
+  async function handleSubmit() {
     setTouched({ partySize: true, contactName: true, contactEmail: true })
     setBookingSuccessData(null)
 
@@ -190,7 +204,12 @@ function CustomerBookingPage() {
           contact_name: contactName.trim(),
           contact_email: contactEmail.trim(),
           ...(contactPhone.trim() ? { contact_phone: contactPhone.trim() } : {}),
-          ...(specialReqs.trim() ? { special_requirements: specialReqs.trim() } : {}),
+          ...(hasSpecialRequirements && specialRequirements.some((item) => item.description.trim())
+            ? { special_requirements: specialRequirements.filter((item) => item.description.trim()).map((item) => ({
+              has_allergy: item.hasAllergy,
+              description: item.description.trim(),
+            })) }
+            : {}),
         }),
       })
       setBookingSuccessData({
@@ -203,7 +222,8 @@ function CustomerBookingPage() {
       setSlotId('')
       setAvailability(null)
       setPartySize(2)
-      setSpecialReqs('')
+      setHasSpecialRequirements(false)
+      setSpecialRequirements([])
     } catch (error) {
       notify(error.message || 'Your booking could not be completed. Please try again.')
     } finally {
@@ -217,7 +237,9 @@ function CustomerBookingPage() {
     <main className="page booking-page">
       <header className="booking-header">
         <div>
-          {/* <Link className="back-link" to="/home/hiker">Hiker home</Link> */}
+          <button className="back-link" type="button" onClick={() => window.history.length > 1 ? navigate(-1) : navigate('/home/hiker')}>
+            ← Back
+          </button>
           <p className="eyebrow">MOUNTAINHUT · GUEST BOOKING</p>
           <h1>Book a table</h1>
           <p className="form-intro">Choose a service time, tell us how many are joining, and we’ll take care of the seating.</p>
@@ -247,7 +269,7 @@ function CustomerBookingPage() {
         </section>
       )}
 
-      <form className="booking-layout" onSubmit={handleSubmit} noValidate>
+      <Form className="booking-layout mh-form" onFinish={handleSubmit} noValidate>
         <div className="booking-main-column">
           <section className="booking-panel" aria-labelledby="choose-time-title">
             <div className="booking-panel-heading">
@@ -257,19 +279,34 @@ function CustomerBookingPage() {
             <div className="booking-fields booking-time-fields">
               <label className="form-field">
                 <span>Date <span className="required-mark" aria-hidden="true">*</span></span>
-                <input type="date" min={localDateString()} required value={slotDate} onChange={(event) => handleDateChange(event.target.value)} />
+                <DatePicker
+                  className="mh-control"
+                  format="YYYY-MM-DD"
+                  value={slotDate ? dayjs(slotDate) : null}
+                  disabledDate={date => date.isBefore(dayjs(localDateString()), 'day')}
+                  onChange={date => handleDateChange(date ? date.format('YYYY-MM-DD') : '')}
+                  allowClear={false}
+                />
               </label>
               <label className="form-field">
                 <span>Service time <span className="required-mark" aria-hidden="true">*</span></span>
-                <select value={slotId} required onChange={(event) => { setSlotId(event.target.value); setAvailability(null); setIsCheckingAvailability(Boolean(event.target.value)); clearBookingConfirmation() }} disabled={isLoadingSlots || slotOptions.length === 0}>
-                  <option value="">{isLoadingSlots ? 'Loading service times…' : slotOptions.length ? 'Select a time' : 'No bookable times for this date'}</option>
-                  {slotOptions.map((slot) => {
+                <Select
+                  className="mh-control"
+                  value={slotId || undefined}
+                  placeholder={isLoadingSlots ? 'Loading service times…' : slotOptions.length ? 'Select a time' : 'No bookable times for this date'}
+                  loading={isLoadingSlots}
+                  onChange={(value) => { setSlotId(value); setAvailability(null); setIsCheckingAvailability(Boolean(value)); clearBookingConfirmation() }}
+                  disabled={isLoadingSlots || slotOptions.length === 0}
+                  options={slotOptions.map((slot) => {
                     const start = getSlotStart(slot)
                     const end = getSlotEnd(slot)
                     const meal = slot.meal_type ?? slot.mealType
-                    return <option key={getSlotId(slot)} value={getSlotId(slot)}>{start}{end ? ` – ${end}` : ''}{meal ? ` · ${meal}` : ''}</option>
+                    return {
+                      value: String(getSlotId(slot)),
+                      label: `${start}${end ? ` – ${end}` : ''}${meal ? ` · ${meal}` : ''}`,
+                    }
                   })}
-                </select>
+                />
               </label>
             </div>
             {isLoadingSlots && <p className="availability-hint">Finding service times for your selected date…</p>}
@@ -290,7 +327,7 @@ function CustomerBookingPage() {
             </div>
             <label className="form-field party-size-field">
               <span>Number of guests <span className="required-mark" aria-hidden="true">*</span></span>
-              <input type="number" min="1" max={availability ? remainingSeats : undefined} step="1" value={partySize} onChange={(event) => { setPartySize(event.target.value); clearBookingConfirmation() }} onBlur={() => setTouched((current) => ({ ...current, partySize: true }))} aria-invalid={Boolean(touched.partySize && partySizeError)} />
+              <InputNumber className="mh-control" min={1} step={1} value={partySize} onChange={(value) => { setPartySize(value ?? ''); clearBookingConfirmation() }} onBlur={() => setTouched((current) => ({ ...current, partySize: true }))} aria-invalid={Boolean(touched.partySize && partySizeError)} />
               {touched.partySize && partySizeError && <small className="field-error">{partySizeError}</small>}
               {availability && !partySizeError && <small className="field-hint">Up to {remainingSeats} guests can be booked for this time.</small>}
             </label>
@@ -304,22 +341,76 @@ function CustomerBookingPage() {
             <div className="booking-fields">
               <label className="form-field">
                 <span>Contact name <span className="required-mark" aria-hidden="true">*</span></span>
-                <input value={contactName} autoComplete="name" onChange={(event) => { setContactName(event.target.value); clearBookingConfirmation() }} onBlur={() => setTouched((current) => ({ ...current, contactName: true }))} aria-invalid={Boolean(touched.contactName && contactNameError)} />
+                <Input className="mh-control" value={contactName} autoComplete="name" onChange={(event) => { setContactName(event.target.value); clearBookingConfirmation() }} onBlur={() => setTouched((current) => ({ ...current, contactName: true }))} aria-invalid={Boolean(touched.contactName && contactNameError)} />
                 {touched.contactName && contactNameError && <small className="field-error">{contactNameError}</small>}
               </label>
-              <label className="form-field">
-                <span>Email <span className="required-mark" aria-hidden="true">*</span></span>
-                <input type="email" value={contactEmail} autoComplete="email" onChange={(event) => { setContactEmail(event.target.value); clearBookingConfirmation() }} onBlur={() => setTouched((current) => ({ ...current, contactEmail: true }))} aria-invalid={Boolean(touched.contactEmail && contactEmailError)} />
-                {touched.contactEmail && contactEmailError && <small className="field-error">{contactEmailError}</small>}
-              </label>
+              <div className="form-field form-field-wide">
+                <span>Confirmation email</span>
+                <p className="field-hint">By default, we’ll send the confirmation to your account email: <strong>{accountEmail || 'No account email available'}</strong></p>
+                <Checkbox checked={useAlternativeEmail} onChange={(event) => {
+                  setUseAlternativeEmail(event.target.checked)
+                  setTouched((current) => ({ ...current, contactEmail: false }))
+                  clearBookingConfirmation()
+                }}>
+                  I want to send the confirmation to a different email address.
+                </Checkbox>
+                {useAlternativeEmail && (
+                  <label className="form-field alternative-email-field">
+                    <span>Alternative email <span className="required-mark" aria-hidden="true">*</span></span>
+                    <Input className="mh-control" type="email" value={alternativeEmail} autoComplete="email" onChange={(event) => { setAlternativeEmail(event.target.value); clearBookingConfirmation() }} onBlur={() => setTouched((current) => ({ ...current, contactEmail: true }))} aria-invalid={Boolean(touched.contactEmail && contactEmailError)} />
+                    {touched.contactEmail && contactEmailError && <small className="field-error">{contactEmailError}</small>}
+                  </label>
+                )}
+              </div>
               <label className="form-field">
                 <span>Phone <span className="optional-mark">(optional)</span></span>
-                <input type="tel" value={contactPhone} autoComplete="tel" onChange={(event) => { setContactPhone(event.target.value); clearBookingConfirmation() }} />
+                <Input className="mh-control" type="tel" value={contactPhone} autoComplete="tel" onChange={(event) => { setContactPhone(event.target.value); clearBookingConfirmation() }} />
               </label>
-              <label className="form-field form-field-wide">
-                <span>Special requirements <span className="optional-mark">(optional)</span></span>
-                <textarea rows="4" value={specialReqs} placeholder="Dietary needs, allergies, or anything else we should know" onChange={(event) => { setSpecialReqs(event.target.value); clearBookingConfirmation() }} />
-              </label>
+              <div className="form-field form-field-wide requirements-field">
+                <div className="requirements-intro">
+                  <span>Special requirements <span className="optional-mark">(optional)</span></span>
+                  <p>Let us know about dietary needs or allergies so we can prepare for your group.</p>
+                </div>
+                {hasSpecialRequirements && (
+                  <div className="requirement-list">
+                    {specialRequirements.map((requirement, index) => (
+                      <article className="requirement-card" key={requirement.id}>
+                        <strong className="requirement-index">{index + 1}</strong>
+                        <label className="form-field">
+                          <span className="sr-only">Requirement {index + 1} description</span>
+                          <Input className="mh-control" value={requirement.description} placeholder={index === 0 ? 'e.g. 1 vegan, peanut allergy' : 'e.g. 2 vegetarians'} onChange={(event) => {
+                            const description = event.target.value
+                            setSpecialRequirements((items) => items.map((item) => item.id === requirement.id ? { ...item, description } : item))
+                            clearBookingConfirmation()
+                          }} />
+                        </label>
+                        <Checkbox className="allergy-checkbox" checked={requirement.hasAllergy} onChange={(event) => {
+                          setSpecialRequirements((items) => items.map((item) => item.id === requirement.id ? { ...item, hasAllergy: event.target.checked } : item))
+                          clearBookingConfirmation()
+                        }}>
+                          <span aria-hidden="true">⚠️ </span>This requirement involves an allergy
+                        </Checkbox>
+                        {specialRequirements.length > 1 && <Button className="requirement-remove" type="text" htmlType="button" aria-label={`Remove requirement ${index + 1}`} onClick={() => {
+                          setSpecialRequirements((items) => items.filter((item) => item.id !== requirement.id))
+                          clearBookingConfirmation()
+                        }}>Remove</Button>}
+                      </article>
+                    ))}
+                    <Button className="requirement-add" type="dashed" htmlType="button" onClick={() => {
+                      setSpecialRequirements((items) => [...items, { id: items.length + 1, description: '', hasAllergy: false }])
+                      clearBookingConfirmation()
+                    }}>＋ Add requirement</Button>
+                  </div>
+                )}
+                <Checkbox checked={!hasSpecialRequirements} onChange={(event) => {
+                  const noRequirements = event.target.checked
+                  setHasSpecialRequirements(!noRequirements)
+                  setSpecialRequirements(noRequirements ? [] : [{ id: `${Date.now()}`, description: '', hasAllergy: false }])
+                  clearBookingConfirmation()
+                }}>
+                  No dietary restrictions or allergies
+                </Checkbox>
+              </div>
             </div>
           </section>
         </div>
@@ -333,13 +424,13 @@ function CustomerBookingPage() {
           <div className="summary-line"><span>Guests</span><strong>{partySize || 0}</strong></div>
           {availability && <div className="summary-line"><span>Seats left</span><strong>{remainingSeats}</strong></div>}
           <p className="summary-note">Reservations must be made at least 2 hours before the service time.</p>
-          <button className="submit-button booking-submit" type="submit" disabled={!canSubmit || isSubmitting}>
+          <Button className="submit-button booking-submit" type="primary" htmlType="submit" disabled={!canSubmit || isSubmitting} loading={isSubmitting}>
             {isSubmitting ? 'Confirming booking…' : 'Confirm booking'}
-          </button>
+          </Button>
           {!canSubmit && !isSubmitting && <small className="submit-hint">Select an available time and enter valid guest and contact details to continue.</small>}
           <Link className="summary-back-link" to="/home/hiker">Back to home</Link>
         </aside>
-      </form>
+      </Form>
     </main>
   )
 }

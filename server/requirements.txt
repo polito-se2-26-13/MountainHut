@@ -12,3 +12,4 @@ email-validator
 pydantic-extra-types
 phonenumbers
 python-dotenv
+tzdata

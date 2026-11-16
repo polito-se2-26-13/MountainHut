@@ -2,15 +2,15 @@
 from typing import Optional, List
 from pydantic import ConfigDict
 from pydantic import BaseModel, EmailStr, Field
-from server.models.DTO.user_dto import Phone
+from server.models.DTO.user_dto import Phone, Name
 from server.models.DTO.slot_dto import Table
 
 class ReservationCreate(BaseModel):
     """Payload to book a table for a party in a specific time slot."""
     slot_id: int = Field(..., description="ID of the selected time slot")
     party_size: int = Field(..., ge=1, description="Number of people in the party")
-    user_id: int = Field(..., description="ID of the hiker making the booking")
-    contact_name: str = Field(...,max_length=100, min_length=1, description="Full name of contact hiker")
+    user_id: Optional[int] = Field(None, description="Ignored by the API, the hiker comes from the login token")
+    contact_name: Name = Field(..., description="Full name of contact hiker")
     contact_email: EmailStr = Field(..., min_length=5, max_length=100, description="Email for booking confirmation")
     contact_phone: Optional[Phone] = Field(None, description="Mobile number")
     special_requirements: Optional[str] = Field(None, description="Dietary requirements, allergies, notes")
@@ -30,6 +30,9 @@ class ReservationResponse(BaseModel):
     booking_reference: str
     user_id: int
     slot_id: int
+    date: Optional[str] = None
+    start_time: Optional[str] = None
+    end_time: Optional[str] = None
     party_size: int
     special_requirements: Optional[str] = None
     contact_name: str
@@ -37,13 +40,29 @@ class ReservationResponse(BaseModel):
     contact_phone: Optional[str] = None
     status: str
     assigned_tables: List[AssignedTableInfo] = []
-    created_at: Optional[str] = None
+    #created_at: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 
 
+class TableLayoutAssignment(BaseModel):
+    """Assigned seats breakdown at a specific table for a party (MH-04)."""
+    table_number: str
+    assigned_seats: int
+    location: Optional[str] = None
+
+
+class TableCapacityInfo(BaseModel):
+    """Real-time capacity and occupancy information for a physical table in a slot."""
+    table_number: str
+    capacity: int
+    occupied_seats: int
+    free_seats: int
+    location: Optional[str] = None
+
+
 class SlotAvailabilityResponse(BaseModel):
-    """Capacity and availability details for a time slot."""
+    """Capacity, availability, and table layout details for a time slot (MH-04)."""
     slot_id: int
     date: str
     start_time: str
@@ -53,6 +72,11 @@ class SlotAvailabilityResponse(BaseModel):
     total_capacity: int
     reserved_seats: int
     remaining_seats: int
+    is_available: bool = True
+    party_size: Optional[int] = None
+    layout_summary: Optional[str] = None
+    layout: Optional[List[TableLayoutAssignment]] = None
+    tables: Optional[List[TableCapacityInfo]] = None
 
 class ReservationMailDTO(BaseModel):
     hiker_name:str

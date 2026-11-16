@@ -1,5 +1,5 @@
 import { useRef } from 'react'
-import { useLocation, useNavigate } from 'react-router'
+import { Link, useLocation, useNavigate } from 'react-router'
 import { useAuth } from '../auth/AuthContext.jsx'
 
 function initialsForUser(user) {
@@ -35,6 +35,11 @@ function AccountMenu() {
             <strong>{session.userProfile.fullName || session.userProfile.email}</strong>
             <span>{session.userProfile.role}</span>
           </div>
+          {session.userProfile.role === 'Hiker' && (
+            <Link className="account-menu-link" to="/customer/reservations" onClick={() => { if (menuRef.current) menuRef.current.open = false }}>
+              <span aria-hidden="true">▤</span> Booking history
+            </Link>
+          )}
           <button className="account-signout" type="button" onClick={handleSignOut}>
             <span aria-hidden="true">↪</span> Sign out
           </button>

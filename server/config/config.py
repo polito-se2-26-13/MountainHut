@@ -1,4 +1,9 @@
+import os
+import secrets
 from pathlib import Path
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 BASEURL = "/api/"
 DATABASE_URL="sqlite+aiosqlite:///mountainHut.sqlite"
@@ -20,5 +25,7 @@ ROUTES = {
 
 # JWT Configuration
 TOKEN_LIFESPAN_HOURS = 24
-SECRET_KEY = "b}2ZzqQ!eQ!t7rFeT[GHs6FZ+*L]2VqR{vnLn>4-V3[5W-V{fk"
+# from server/.env and never in the code, since anyone who knows it can sign a login for any account;
+# without it a random key is made at every start, so the logins end when the server restarts
+SECRET_KEY = os.getenv("SECRET_KEY") or secrets.token_hex(32)
 ALGORITHM = "HS256"

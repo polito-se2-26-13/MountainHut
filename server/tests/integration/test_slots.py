@@ -2,6 +2,8 @@
 with the same requests the pages send."""
 from datetime import date, timedelta
 
+from sqlalchemy import text
+
 from server.models.DAO.table import TableDAO
 from server.models.DAO.time_slot import TimeSlotDAO
 from server.models.DAO.user import UserDAO
@@ -51,7 +53,7 @@ def test_slots_of_a_date_are_listed_as_the_pages_read_them(client, db):
     client.post("/api/slots", json=slot([("T1", 3)], day=OTHER_DAY), headers=employee)
 
     response = client.get(f"/api/slots?date={DAY}", headers=employee)
-
+    print(created)
     assert response.status_code == 200
     assert response.history == []
     assert response.json() == [{
@@ -86,6 +88,7 @@ def test_same_table_on_another_date_has_its_own_seats(client, db):
     employee = login_as(db, "Employee")
     client.post("/api/slots", json=slot([("T1", 6)]), headers=employee)
 
+    # more seats than the first time too: the PO in #17 lets the seats change from slot to slot
     response = client.post("/api/slots", json=slot([("T1", 8)], day=OTHER_DAY), headers=employee)
 
     assert response.status_code == 201
@@ -98,7 +101,7 @@ def test_saving_the_same_times_again_does_not_create_a_second_slot(client, db):
     employee = login_as(db, "Employee")
     first = client.post("/api/slots", json=slot([("T1", 4)], mealType="Lunch"), headers=employee).json()
 
-    second = client.post("/api/slots", json=slot([("T2", 2)]), headers=employee).json()
+    second = client.post("/api/slots", json=slot([("T2", 2)],mealType="Lunch"), headers=employee).json()
 
     assert second["slotId"] == first["slotId"]
     assert db.query(TimeSlotDAO).count() == 1
@@ -106,19 +109,56 @@ def test_saving_the_same_times_again_does_not_create_a_second_slot(client, db):
 
 def test_saving_a_table_again_changes_its_seats(client, db):
     employee = login_as(db, "Employee")
-    client.post("/api/slots", json=slot([("T1", 4)]), headers=employee)
-
     client.post("/api/slots", json=slot([("T1", 6)]), headers=employee)
 
-    assert client.get(f"/api/slots?date={DAY}", headers=employee).json()[0]["tables"] == [{"tableNumber": "T1", "seats": 6}]
+    client.post("/api/slots", json=slot([("T1", 4)]), headers=employee)
+
+    assert client.get(f"/api/slots?date={DAY}", headers=employee).json()[0]["tables"] == [{"tableNumber": "T1", "seats": 4}]
 
 
 def test_refused_request_leaves_nothing_behind(client, db):
     employee = login_as(db, "Employee")
 
     assert client.post("/api/slots", json=slot([("T1", 4), ("T2", 0)]), headers=employee).status_code == 422
-    assert client.post("/api/slots", json=slot([("T1", 4)], start="14:00"), headers=employee).status_code == 409
+    assert client.post("/api/slots", json=slot([("T1", 4)], start="14:00"), headers=employee).status_code == 422
 
+    assert db.query(TimeSlotDAO).count() == 0
+    assert db.query(TableDAO).count() == 0
+
+
+def test_a_slot_cannot_overlap_another_of_the_same_day(client, db):
+    employee = login_as(db, "Employee")
+    client.post("/api/slots", json=slot([("T1", 4)]), headers=employee)
+
+    assert client.post("/api/slots", json=slot([("T2", 4)], start="12:30", end="13:30"), headers=employee).status_code == 409
+    assert client.post("/api/slots", json=slot([("T2", 4)], start="11:00", end="14:00"), headers=employee).status_code == 409
+    # one after the other is fine, and so is the same time on another day
+    assert client.post("/api/slots", json=slot([("T2", 4)], start="13:00", end="14:00"), headers=employee).status_code == 201
+    assert client.post("/api/slots", json=slot([("T2", 4)], day=OTHER_DAY, start="12:30", end="13:30"), headers=employee).status_code == 201
+
+
+def test_overlap_is_found_also_with_the_times_of_the_sample_data(client, db):
+    employee = login_as(db, "Employee")
+    # the sample data writes 12:00:00, while the server writes 12:00:00.000000
+    db.execute(text("INSERT INTO time_slots (date, start_time, end_time, status) VALUES (:day, '12:00:00', '13:00:00', 'OPEN')"), {"day": DAY})
+    db.commit()
+
+    assert client.post("/api/slots", json=slot([("T2", 4)], start="12:30", end="13:30"), headers=employee).status_code == 409
+
+
+def test_a_slot_in_the_past_is_refused(client, db):
+    employee = login_as(db, "Employee")
+    yesterday = (date.today() - timedelta(days=1)).isoformat()
+
+    assert client.post("/api/slots", json=slot([("T1", 4)], day=yesterday), headers=employee).status_code == 422
+    assert db.query(TimeSlotDAO).count() == 0
+
+
+def test_tables_need_a_name_written_once(client, db):
+    employee = login_as(db, "Employee")
+
+    for tables in ([("", 4)], [("   ", 4)], [("x" * 51, 4)], [("T1", 4), ("T1", 2)]):
+        assert client.post("/api/slots", json=slot(tables), headers=employee).status_code == 422
     assert db.query(TimeSlotDAO).count() == 0
     assert db.query(TableDAO).count() == 0
 
@@ -129,6 +169,9 @@ def test_slot_without_tables_has_no_seats(client, db):
     created = client.post("/api/slots", json=slot([]), headers=employee).json()
 
     assert client.get(f"/api/slots/{created['slotId']}/availability").json()["total_capacity"] == 0
+    # it is still in the list, so the Employee can find it and add the tables
+    listed = client.get(f"/api/slots?date={DAY}", headers=employee).json()
+    assert [(s["slotId"], s["tables"]) for s in listed] == [(created["slotId"], [])]
 
 
 def test_hiker_books_a_slot_created_by_the_employee(client, db):
@@ -140,7 +183,6 @@ def test_hiker_books_a_slot_created_by_the_employee(client, db):
     booking = client.post("/api/reservations", json={
         "slot_id": listed["slotId"],
         "party_size": 8,
-        "user_id": db.query(UserDAO).filter_by(role="Hiker").one().id,
         "contact_name": "Anna Rossi",
         "contact_email": "anna@example.com",
     }, headers=hiker)
@@ -149,3 +191,21 @@ def test_hiker_books_a_slot_created_by_the_employee(client, db):
     assert booking.history == []
     assert booking.json()["assigned_tables"][0]["table_number"] == "T1"
     assert client.get(f"/api/slots/{listed['slotId']}/availability").json()["remaining_seats"] == 0
+
+
+def test_saving_again_keeps_the_seats_already_booked(client, db):
+    employee = login_as(db, "Employee")
+    hiker = login_as(db, "Hiker")
+    created = client.post("/api/slots", json=slot([("T1", 6)]), headers=employee).json()
+    # user_id for the code on dev, the login for the code that takes the hiker from the token
+    client.post("/api/reservations", json={
+        "slot_id": created["slotId"], "party_size": 5, "user_id": db.query(UserDAO).filter_by(role="Hiker").one().id,
+        "contact_name": "Anna Rossi", "contact_email": "anna@example.com",
+    }, headers=hiker)
+
+    refused = client.post("/api/slots", json=slot([("T1", 1)]), headers=employee)
+
+    assert refused.status_code == 409
+    assert "5 seats booked" in refused.json()["message"]
+    assert client.get(f"/api/slots/{created['slotId']}/availability").json()["total_capacity"] == 6
+    assert client.post("/api/slots", json=slot([("T1", 5)]), headers=employee).status_code == 201
