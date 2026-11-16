@@ -13,7 +13,9 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
 from server.database import Base, set_sqlite_pragma
-from server.const import SlotStatus, ReservationStatus,UserRole
+from server.models.enum.slot_status import SlotStatus
+from server.models.enum.reservation_status import ReservationStatus
+from server.models.enum.user_type import UserType
 
 from server.models.DAO.user import UserDAO
 from server.models.DAO.table import TableDAO
@@ -52,7 +54,7 @@ async def slot_db():
         password_hash="dummy",
         first_name="Alice",
         last_name="Walker",
-        role=UserRole.HIKER.value,
+        role=UserType.HIKER.value,
     )
 
     # Create physical tables
