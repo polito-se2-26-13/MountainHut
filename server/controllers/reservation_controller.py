@@ -124,6 +124,12 @@ class ReservationController():
                 raise ConflictError("Bookings can only be changed at least 48 hours before the slot.")
 
             target_slot_id = changes.slot_id if changes.slot_id is not None else current.slot_id
+            if target_slot_id != current.slot_id:
+                # in another slot it is a new booking there, so the MH-01 rules hold (PO issues #38 and #48)
+                new_slot = await self.repo.get_time_slot(target_slot_id)
+                if new_slot is None:
+                    raise NotFoundError("time slot not found")
+                validate_two_hour_rule(new_slot, None)
             target_party_size = changes.party_size if changes.party_size is not None else current.party_size
             requirements_changed = "special_requirements" in changes.model_fields_set
             target_requirements = changes.special_requirements if requirements_changed else None

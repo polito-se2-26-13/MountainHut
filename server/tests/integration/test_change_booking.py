@@ -54,3 +54,14 @@ def test_a_party_that_no_longer_fits_keeps_its_booking(client, db):
     read = client.get(f"/api/reservations/reference/{booking['booking_reference']}", headers=TOKENS[anna])
     assert read.json()["party_size"] == 3
     assert seats_by_table(read) == {f"{slot}-1": 3}
+
+
+def test_a_booking_moves_only_to_a_slot_that_a_new_booking_could_take(client, db):
+    # booking closes 2 hours before the slot (MH-01), also when a booking is moved there
+    anna = add_hiker(db)
+    booking = book(client, anna, add_slot(db, [6], hours_ahead=72), 2).json()
+    in_one_hour = add_slot(db, [6], hours_ahead=1)
+    in_three_days = add_slot(db, [6], hours_ahead=80)
+
+    assert change(client, anna, booking, slot_id=in_one_hour).status_code == 409
+    assert change(client, anna, booking, slot_id=in_three_days).json()["slot_id"] == in_three_days
