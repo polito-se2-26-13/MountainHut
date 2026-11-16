@@ -133,8 +133,9 @@ function CustomerReservationHistoryPage() {
   useEffect(() => {
     if (!session?.isAuthenticated || session.userProfile.role !== 'Hiker') return undefined;
     let active = true;
-    Promise.resolve().then(() => {
-      if (active) loadReservations();
+    void Promise.resolve().then(() => {
+      if (active) return loadReservations();
+      return undefined;
     });
     return () => {
       active = false;
@@ -430,9 +431,9 @@ function CustomerReservationHistoryPage() {
             aria-label="Close modify booking dialog"
             onClick={closeModal}
           />
-          <section
+          <dialog
+            open
             className="change-modal"
-            role="dialog"
             aria-modal="true"
             aria-labelledby="change-modal-title"
           >
@@ -501,7 +502,7 @@ function CustomerReservationHistoryPage() {
                       updateForm({ date: value?.format('YYYY-MM-DD') || '', slot_id: null });
                     }}
                     allowClear={false}
-                    popupStyle={{ zIndex: 1301 }}
+                    styles={{ popup: { root: { zIndex: 1301 } } }}
                   />
                 </label>
                 <label className="form-field">
@@ -671,7 +672,7 @@ function CustomerReservationHistoryPage() {
                 </Button>
               </footer>
             </form>
-          </section>
+          </dialog>
         </div>
       )}
     </main>

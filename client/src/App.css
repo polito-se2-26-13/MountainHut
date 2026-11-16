@@ -165,14 +165,18 @@
 .change-modal {
   position: relative;
   z-index: 1;
+  inset: auto;
   width: min(100%, 44rem);
   max-height: min(92vh, 56rem);
   overflow-y: auto;
+  margin: 0;
   padding: clamp(1.25rem, 4vw, 2rem);
   border: 1px solid #d8e5ed;
   border-radius: 1rem;
   background: #fff;
   box-shadow: 0 1.5rem 5rem rgb(0 0 0 / 28%);
+  color: inherit;
+  font: inherit;
 }
 
 .change-modal-heading,
