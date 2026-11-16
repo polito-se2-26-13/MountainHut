@@ -42,6 +42,13 @@ def userdao_to_userdto_detail(user:UserDAO)->UserDetailDTO:
         phone=user.phone
     )
 def reservationDTO_to_response(reservation:ReservationDAO, assigments: List[AssignedTableInfo]):
+    requirements = list(reservation.special_requirements_list or [])
+    req_list = [SpecialRequirementDTO.model_validate(requirement) for requirement in requirements]
+    has_allergies = any(requirement.has_allergy for requirement in requirements)
+    sp_req_text = reservation.special_requirements
+    if sp_req_text is None and requirements:
+        sp_req_text = "; ".join(requirement.description for requirement in requirements)
+
     return ReservationResponse(
         id=reservation.id,
         booking_reference=reservation.booking_reference,

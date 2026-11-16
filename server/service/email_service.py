@@ -14,7 +14,31 @@ BASE_DIR = Path(__file__).resolve().parents[1]
 ENV_PATH = BASE_DIR / ".env"
 load_dotenv(ENV_PATH, override=True)
 
-def format_booking_email_text(reservation: ReservationMailDTO) -> str:
+def _as_mail_dto(reservation: ReservationMailDTO | ReservationDAO) -> ReservationMailDTO:
+    if isinstance(reservation, ReservationMailDTO):
+        return reservation
+
+    assigned_tables = [
+        {
+            "table_number": assignment.slot_table.table.table_number,
+            "assigned_seats": assignment.assigned_seats,
+        }
+        for assignment in reservation.table_assignments
+        if assignment.slot_table and assignment.slot_table.table
+    ]
+    return ReservationMailDTO(
+        hiker_name=reservation.contact_name,
+        booking_reference=reservation.booking_reference,
+        contact_email=reservation.contact_email,
+        date_str=reservation.slot.date.isoformat(),
+        time_slot=f"{reservation.slot.start_time:%H:%M} - {reservation.slot.end_time:%H:%M}",
+        party_size=reservation.party_size,
+        special_reqs=reservation.special_requirements,
+        assigned_tables=assigned_tables,
+    )
+
+
+def format_booking_email_text(reservation: ReservationMailDTO | ReservationDAO) -> str:
     """
     Generate plain text confirmation email for a reservation (MH-03).
     Includes:
@@ -26,6 +50,7 @@ def format_booking_email_text(reservation: ReservationMailDTO) -> str:
     """
     """
 """
+    reservation = _as_mail_dto(reservation)
     hiker_name=reservation.hiker_name
     ref= reservation.booking_reference
     date_str = reservation.date_str
@@ -39,6 +64,10 @@ def format_booking_email_text(reservation: ReservationMailDTO) -> str:
         req_block = "\n".join(f"  • {line}" for line in req_lines)
     else:
         req_block = "  None specified"
+    table_block = "\n".join(
+        f"  Table {table['table_number']}: {table['assigned_seats']} seat(s)"
+        for table in reservation.assigned_tables
+    )
 
     text = f"""============================================================
            MOUNTAIN HUT - RESERVATION CONFIRMATION
@@ -57,7 +86,13 @@ BOOKING DETAILS (Reference: {ref})
 * Time Slot:           {time_slot}
 * Party Size:          {party_size} person(s)
 * Special Requirements:
-{req_block}
+{req_block}"""
+    if table_block:
+        text += f"""
+* Assigned Tables:
+{table_block}"""
+
+    text += """
 
 We look forward to welcoming you to the hut!
 
@@ -68,10 +103,11 @@ The Mountain Hut Team
     return text.strip()
 
 
-def format_booking_email_html(reservation: ReservationMailDTO) -> str:
+def format_booking_email_html(reservation: ReservationMailDTO | ReservationDAO) -> str:
     """
     Generate a clean, responsive HTML email template for booking confirmation (MH-03).
     """
+    reservation = _as_mail_dto(reservation)
     # name and requests are typed by the user: escaped, so they reach the mail as text and not as HTML or links
     hiker_name=escape(reservation.hiker_name)
     ref= reservation.booking_reference
@@ -97,6 +133,18 @@ def format_booking_email_html(reservation: ReservationMailDTO) -> str:
         req_html = f'<ul style="margin:4px 0 0 16px;padding:0;font-size:14px;">{req_rows}</ul>'
     else:
         req_html = '<span style="color:#94a3b8;font-size:14px;">None specified</span>'
+    tables_html = "".join(
+        f"<li>Table {escape(str(table['table_number']))}: {table['assigned_seats']} seat(s)</li>"
+        for table in reservation.assigned_tables
+    )
+    tables_row = (
+        f"""<tr>
+          <td style="padding: 10px 0; color: #64748b;">Assigned Tables</td>
+          <td style="padding: 10px 0; font-weight: 500; color: #334155;"><ul>{tables_html}</ul></td>
+        </tr>"""
+        if tables_html
+        else ""
+    )
     html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -145,6 +193,7 @@ def format_booking_email_html(reservation: ReservationMailDTO) -> str:
           <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; color: #64748b;">Special Requirements</td>
           <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; font-weight: 500; color: #334155;">{req_html}</td>
         </tr>
+        {tables_row}
       </table>
 
       <p style="margin-bottom: 0; font-size: 14px; color: #475569;">
@@ -162,12 +211,33 @@ def format_booking_email_html(reservation: ReservationMailDTO) -> str:
 </html>"""
     return html
 
-def send_booking_confirmation_email(reservation: ReservationMailDTO) -> Dict[str, Any]:
+def send_booking_confirmation_email(reservation: ReservationMailDTO | ReservationDAO) -> Dict[str, Any]:
+  reservation = _as_mail_dto(reservation)
   subject = f"Mountain Hut Booking Confirmation [{reservation.booking_reference}]"
   to_email = reservation.contact_email
   text_content = format_booking_email_text(reservation)
   html_content = format_booking_email_html(reservation)
   return sender_email(subject,to_email,text_content,html_content,reservation.booking_reference)
+
+
+def send_booking_change_email(
+    reservation: ReservationMailDTO | ReservationDAO,
+    previous_slot: str,
+    previous_party_size: int,
+) -> Dict[str, Any]:
+  reservation = _as_mail_dto(reservation)
+  subject = f"Mountain Hut Booking Changed [{reservation.booking_reference}]"
+  text_content = format_booking_email_text(reservation)
+  text_content += (
+      f"\n\nThis booking was changed from {previous_slot}, "
+      f"{previous_party_size} person(s).\n"
+  )
+  html_content = format_booking_email_html(reservation)
+  html_content += (
+      f"<p>This booking was changed from {escape(previous_slot)}, "
+      f"{previous_party_size} person(s).</p>"
+  )
+  return sender_email(subject, reservation.contact_email, text_content, html_content, reservation.booking_reference)
 
 def sender_email(subject:str,to_email:str,text_content:str,html_content:str,booking_ref:str) -> Dict[str, Any]:
   """

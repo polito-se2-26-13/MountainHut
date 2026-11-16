@@ -5,8 +5,12 @@ from sqlalchemy import select,func
 from server.models.DAO.user import UserDAO
 from server.models.DAO.table import TableDAO
 from server.models.DAO.time_slot import SlotTableDAO, TimeSlotDAO
-from server.models.DAO.reservation import ReservationDAO, ReservationTableAssignmentDAO
-from server.models.DTO.reservation_dto import AssignedTableInfo, ReservationCreate
+from server.models.DAO.reservation import (
+    ReservationDAO,
+    ReservationTableAssignmentDAO,
+    SpecialRequirementDAO,
+)
+from server.models.DTO.reservation_dto import AssignedTableInfo, ReservationCreate, SpecialRequirementDTO
 from server.models.enum.reservation_status import ReservationStatus
 from server.models.enum.slot_status import SlotStatus
 from server.models.enum.user_type import UserType
@@ -163,6 +167,13 @@ class ReservationRepository:
                 )
             session.add(res)
             await session.flush()
+            if not isinstance(reservation.special_requirements, str):
+                for requirement in reservation.special_requirements or []:
+                    session.add(SpecialRequirementDAO(
+                        reservation_id=res.id,
+                        has_allergy=requirement.has_allergy,
+                        description=requirement.description.strip(),
+                    ))
             assignments:List[AssignedTableInfo]=[]
             for slot_table, seats in table_allocations:
                     table_numer=await session.execute(select(TableDAO.table_number).where(TableDAO.id==slot_table.table_id))
@@ -182,6 +193,108 @@ class ReservationRepository:
                 await session.rollback()
                 raise ValueError(f"Failed to create reservation due to database constraint")
         return [res,assignments]
+
+    async def transaction_update_reservation(
+        self,
+        reference: str,
+        user_id: int,
+        slot_id: int,
+        party_size: int,
+        special_requirements,
+    ) -> Tuple[ReservationDAO, List[AssignedTableInfo], str, int]:
+        async with await self._get_session() as session:
+            result = await session.execute(
+                select(ReservationDAO).where(
+                    ReservationDAO.booking_reference == reference,
+                    ReservationDAO.user_id == user_id,
+                    ReservationDAO.status == ReservationStatus.CONFIRMED.value,
+                )
+            )
+            reservation = result.scalar_one_or_none()
+            if reservation is None:
+                raise NotFoundError("booking reference not found")
+
+            old_slot = reservation.slot
+            previous_slot = (
+                f"{old_slot.date.isoformat()} {old_slot.start_time:%H:%M}-{old_slot.end_time:%H:%M}"
+            )
+            previous_party_size = reservation.party_size
+
+            target_result = await session.execute(
+                select(TimeSlotDAO).where(TimeSlotDAO.id == slot_id)
+            )
+            target_slot = target_result.scalar_one_or_none()
+            if target_slot is None:
+                raise NotFoundError(f"Time slot with id {slot_id} not found.")
+            if target_slot.status != SlotStatus.OPEN.value:
+                raise ConflictError("time slot is not open")
+
+            if slot_id != reservation.slot_id:
+                duplicate = await session.execute(
+                    select(ReservationDAO).where(
+                        ReservationDAO.user_id == user_id,
+                        ReservationDAO.slot_id == slot_id,
+                        ReservationDAO.status == ReservationStatus.CONFIRMED.value,
+                        ReservationDAO.id != reservation.id,
+                    )
+                )
+                if duplicate.scalar_one_or_none() is not None:
+                    raise ConflictError("Hiker already has a confirmed booking for this time slot.")
+
+            old_assignments = list(reservation.table_assignments)
+            for assignment in old_assignments:
+                await session.delete(assignment)
+            await session.flush()
+
+            try:
+                allocations = assign_tables_for_party(target_slot, party_size)
+            except ConflictError:
+                await session.rollback()
+                raise
+
+            reservation.slot_id = slot_id
+            reservation.party_size = party_size
+            if special_requirements is not None:
+                reservation.special_requirements = self._requirements_text(special_requirements)
+                reservation.special_requirements_list.clear()
+                if not isinstance(special_requirements, str):
+                    reservation.special_requirements_list.extend(
+                        SpecialRequirementDAO(
+                            has_allergy=requirement.has_allergy,
+                            description=requirement.description.strip(),
+                        )
+                        for requirement in special_requirements
+                    )
+
+            assignments: List[AssignedTableInfo] = []
+            for slot_table, seats in allocations:
+                assignment = ReservationTableAssignmentDAO(
+                    reservation_id=reservation.id,
+                    slot_table_id=slot_table.id,
+                    assigned_seats=seats,
+                )
+                session.add(assignment)
+                assignments.append(
+                    reservationTableAssignmentDAO_to_AssignedTableInfo(
+                        assignment, slot_table.table.table_number
+                    )
+                )
+
+            await session.commit()
+            await session.refresh(reservation)
+            return reservation, assignments, previous_slot, previous_party_size
+
+    @staticmethod
+    def _requirements_text(requirements) -> Optional[str]:
+        if not requirements:
+            return None
+        if isinstance(requirements, str):
+            return requirements
+        return "; ".join(
+            f"{'[ALLERGY] ' if requirement.has_allergy else ''}{requirement.description.strip()}"
+            for requirement in requirements
+            if requirement.description.strip()
+        ) or None
 
     async def get_reservation_by_reference(self,reference:str)->tuple[ReservationDAO,list[AssignedTableInfo]]:
         async with await self._get_session() as session:

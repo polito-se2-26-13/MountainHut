@@ -35,6 +35,13 @@ class ReservationCreate(BaseModel):
     )
 
 
+class ReservationUpdate(BaseModel):
+    """Fields a hiker may change on an existing booking (MH-06)."""
+    slot_id: Optional[int] = None
+    party_size: Optional[int] = Field(None, ge=1)
+    special_requirements: Optional[Union[List[SpecialRequirementDTO], str]] = None
+
+
 class AssignedTableInfo(BaseModel):
     """Details of a table assigned to a reservation."""
     table_id: int
@@ -107,3 +114,4 @@ class ReservationMailDTO(BaseModel):
     time_slot: str
     party_size: int
     special_reqs: Optional[str]= "None specified"
+    assigned_tables: List[dict] = Field(default_factory=list)
