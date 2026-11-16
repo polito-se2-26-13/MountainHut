@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Optional, List
 from sqlalchemy import (
     String,
     Integer,
+    Boolean,
     Text,
     DateTime,
     ForeignKey,
@@ -67,6 +68,12 @@ class ReservationDAO(Base):
     slot: Mapped["TimeSlotDAO"] = relationship("TimeSlotDAO", back_populates="reservations", lazy="selectin")
     table_assignments: Mapped[List["ReservationTableAssignmentDAO"]] = relationship(
         "ReservationTableAssignmentDAO",
+        back_populates="reservation",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+    special_requirements_list: Mapped[List["SpecialRequirementDAO"]] = relationship(
+        "SpecialRequirementDAO",
         back_populates="reservation",
         cascade="all, delete-orphan",
         lazy="selectin",
@@ -157,4 +164,39 @@ class ReservationTableAssignmentDAO(Base):
         return (
             f"<ReservationTableAssignmentDAO(id={self.id}, res_id={self.reservation_id}, "
             f"slot_table_id={self.slot_table_id}, seats={self.assigned_seats})>"
+        )
+
+
+class SpecialRequirementDAO(Base):
+    """Special dietary requirement or allergy record for a booking (MH-05)."""
+    __tablename__ = "special_requirements"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    reservation_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("reservations.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    has_allergy: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    # Relationship to reservation
+    reservation: Mapped["ReservationDAO"] = relationship(
+        "ReservationDAO", back_populates="special_requirements_list", lazy="selectin"
+    )
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "reservationId": self.reservation_id,
+            "hasAllergy": self.has_allergy,
+            "has_allergy": self.has_allergy,
+            "description": self.description,
+        }
+
+    def __repr__(self) -> str:
+        return (
+            f"<SpecialRequirementDAO(id={self.id}, res_id={self.reservation_id}, "
+            f"has_allergy={self.has_allergy}, desc='{self.description[:30]}')>"
         )

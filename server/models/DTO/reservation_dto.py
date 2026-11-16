@@ -1,9 +1,26 @@
-"""DTOs for table reservation and slot availability (MH-44)."""
-from typing import Optional, List
-from pydantic import ConfigDict
-from pydantic import BaseModel, EmailStr, Field
+"""DTOs for table reservation, special requirements, and slot availability (MH-44 & MH-05)."""
+from typing import Optional, List, Union, Any
+from pydantic import ConfigDict, BaseModel, EmailStr, Field, model_validator
 from server.models.DTO.user_dto import Phone, Name
 from server.models.DTO.slot_dto import Table
+
+
+class SpecialRequirementDTO(BaseModel):
+    """Specific dietary requirement or allergy for a subset of the party (MH-05)."""
+    id: Optional[int] = None
+    has_allergy: bool = Field(default=False, description="Flag indicating if special care is needed for food allergies")
+    description: str = Field(..., min_length=1, max_length=500, description="Details of the dietary need")
+
+    model_config = ConfigDict(populate_by_name=True, from_attributes=True)
+
+    @model_validator(mode="before")
+    @classmethod
+    def check_fields(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            if "hasAllergy" in data and "has_allergy" not in data:
+                data["has_allergy"] = data["hasAllergy"]
+        return data
+
 
 class ReservationCreate(BaseModel):
     """Payload to book a table for a party in a specific time slot."""
@@ -13,7 +30,16 @@ class ReservationCreate(BaseModel):
     contact_name: Name = Field(..., description="Full name of contact hiker")
     contact_email: EmailStr = Field(..., min_length=5, max_length=100, description="Email for booking confirmation")
     contact_phone: Optional[Phone] = Field(None, description="Mobile number")
-    special_requirements: Optional[str] = Field(None, description="Dietary requirements, allergies, notes")
+    special_requirements: Optional[Union[List[SpecialRequirementDTO], str]] = Field(
+        None, description="Dietary requirements, allergies, notes (list of items or raw text)"
+    )
+
+
+class ReservationUpdate(BaseModel):
+    """Fields a hiker may change on an existing booking (MH-06)."""
+    slot_id: Optional[int] = None
+    party_size: Optional[int] = Field(None, ge=1)
+    special_requirements: Optional[Union[List[SpecialRequirementDTO], str]] = None
 
 
 class AssignedTableInfo(BaseModel):
@@ -35,6 +61,8 @@ class ReservationResponse(BaseModel):
     end_time: Optional[str] = None
     party_size: int
     special_requirements: Optional[str] = None
+    requirements: List[SpecialRequirementDTO] = []
+    has_allergies: bool = False
     contact_name: str
     contact_email: str
     contact_phone: Optional[str] = None
@@ -86,3 +114,4 @@ class ReservationMailDTO(BaseModel):
     time_slot: str
     party_size: int
     special_reqs: Optional[str]= "None specified"
+    assigned_tables: List[dict] = Field(default_factory=list)

@@ -3,8 +3,8 @@ from server.models.DAO.time_slot import TimeSlotDAO
 from server.models.DTO.error_dto import ErrorDTO
 from server.models.DTO.user_dto import UserResponseDTO,UserLoginResponse,UserDTO, UserDetailDTO
 from server.models.DAO.user import UserDAO
-from server.models.DTO.reservation_dto import ReservationResponse, AssignedTableInfo,ReservationMailDTO
-from server.models.DAO.reservation import ReservationDAO,ReservationTableAssignmentDAO
+from server.models.DTO.reservation_dto import ReservationResponse, AssignedTableInfo, ReservationMailDTO, SpecialRequirementDTO
+from server.models.DAO.reservation import ReservationDAO, ReservationTableAssignmentDAO
 from server.models.DTO.slot_dto import SlotResponse,Table,SlotDetail
 from server.models.DTO.table_dto import TableResponse
 from server.models.DTO.time_dto import TimeResponse
@@ -42,6 +42,13 @@ def userdao_to_userdto_detail(user:UserDAO)->UserDetailDTO:
         phone=user.phone
     )
 def reservationDTO_to_response(reservation:ReservationDAO, assigments: List[AssignedTableInfo]):
+    requirements = list(reservation.special_requirements_list or [])
+    req_list = [SpecialRequirementDTO.model_validate(requirement) for requirement in requirements]
+    has_allergies = any(requirement.has_allergy for requirement in requirements)
+    sp_req_text = reservation.special_requirements
+    if sp_req_text is None and requirements:
+        sp_req_text = "; ".join(requirement.description for requirement in requirements)
+
     return ReservationResponse(
         id=reservation.id,
         booking_reference=reservation.booking_reference,
@@ -51,7 +58,9 @@ def reservationDTO_to_response(reservation:ReservationDAO, assigments: List[Assi
         start_time=reservation.slot.start_time.strftime("%H:%M"),
         end_time=reservation.slot.end_time.strftime("%H:%M"),
         party_size=reservation.party_size,
-        special_requirements=reservation.special_requirements,
+        special_requirements=sp_req_text,
+        requirements=req_list,
+        has_allergies=has_allergies,
         contact_email=reservation.contact_email,
         contact_name=reservation.contact_name,
         contact_phone=reservation.contact_phone,
@@ -96,14 +105,27 @@ def tableList(tables: list[dict]):
     return tablesDto
 
 def reservationEmailDto_to_email(
-        ref:str,
-        email:str,
-        date:str,
-        timeSlot:str,
-        partySize:int,
-        spReq:str,
-        hikerName:str):
-    
+        ref: str,
+        email: str,
+        date: str,
+        timeSlot: str,
+        partySize: int,
+        spReq,          # str | List[SpecialRequirementDAO] | None
+        hikerName: str):
+    """Build a ReservationMailDTO for the confirmation email (MH-03 / MH-05).
+    spReq accepts the legacy plain string OR the ORM relationship list so the
+    controller can pass either without breaking backward compat."""
+
+    if isinstance(spReq, str) or spReq is None:
+        formatted = spReq or None
+    else:
+        # structured list from special_requirements_list relationship
+        parts = []
+        for sr in spReq:
+            prefix = "[ALLERGY WARNING] " if sr.has_allergy else ""
+            parts.append(f"{prefix}{sr.description}")
+        formatted = "; ".join(parts) if parts else None
+
     return ReservationMailDTO(
         booking_reference=ref,
         contact_email=email,

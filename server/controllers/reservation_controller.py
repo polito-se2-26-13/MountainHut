@@ -8,10 +8,17 @@ from server.models.error.forbidden_error import ForbiddenError
 from server.models.enum.slot_status import SlotStatus
 from server.service.booking_service import validate_two_hour_rule,assign_tables_for_party
 from server.service.mapper_service import reservationDTO_to_response,reservationEmailDto_to_email
-from server.service.email_service import send_booking_confirmation_email
+from server.service.email_service import (
+    send_booking_confirmation_email,
+    send_booking_change_email,
+    format_booking_email_html,
+    format_booking_email_text,
+)
 from fastapi import BackgroundTasks
 import asyncio
 import time
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 # One booking at a time between the check of the free seats and the save, otherwise two bookings sent
 # at the same moment both see the same free seats. Whoever takes or gives back seats (also the change of
@@ -74,7 +81,7 @@ class ReservationController():
                 timeSlot.date.strftime("%d/%m/%Y"),
                 f"{timeSlot.start_time:%H:%M}-{timeSlot.end_time:%H:%M}",
                 res.party_size,
-                res.special_requirements,
+                res.special_requirements_list or res.special_requirements,
                 res.hiker.full_name
             )
         # the answer does not wait for the mail server, which kept the whole backend busy for up to 20 seconds
@@ -98,3 +105,62 @@ class ReservationController():
             for r,a in res:
                 listRes.append(reservationDTO_to_response(r,a))
             return listRes
+
+    async def update_reservation(
+        self,
+        reference: str,
+        user_id: int,
+        changes,
+        background_tasks: BackgroundTasks | None = None,
+    ) -> ReservationResponse:
+        async with booking_lock:
+            current, _ = await self.repo.get_reservation_by_reference(reference)
+            if current is None or current.user_id != user_id:
+                raise ForbiddenError("you cannot change this reservation")
+            if current.status != "CONFIRMED":
+                raise ConflictError("only confirmed bookings can be changed")
+
+            cutoff = datetime.combine(
+                current.slot.date,
+                current.slot.start_time,
+                tzinfo=ZoneInfo("Europe/Rome"),
+            ) - timedelta(hours=48)
+            if datetime.now(ZoneInfo("Europe/Rome")) > cutoff:
+                raise ConflictError("Bookings can only be changed at least 48 hours before the slot.")
+
+            target_slot_id = changes.slot_id if changes.slot_id is not None else current.slot_id
+            target_party_size = changes.party_size if changes.party_size is not None else current.party_size
+            requirements_changed = "special_requirements" in changes.model_fields_set
+            target_requirements = changes.special_requirements if requirements_changed else None
+            updated, tables, previous_slot, previous_party_size = (
+                await self.repo.transaction_update_reservation(
+                    reference,
+                    user_id,
+                    target_slot_id,
+                    target_party_size,
+                    target_requirements,
+                )
+            )
+
+        if background_tasks is not None:
+            background_tasks.add_task(
+                send_booking_change_email,
+                updated,
+                previous_slot,
+                previous_party_size,
+            )
+        else:
+            send_booking_change_email(updated, previous_slot, previous_party_size)
+        return reservationDTO_to_response(updated, tables)
+
+    async def get_email_preview(self, reference: str):
+        res, _ = await self.repo.get_reservation_by_reference(reference)
+        if not res:
+            raise NotFoundError("booking reference not found")
+        return {
+            "booking_reference": res.booking_reference,
+            "recipient_email": res.contact_email,
+            "subject": f"Mountain Hut Booking Confirmation [{res.booking_reference}]",
+            "email_text": format_booking_email_text(res),
+            "email_html": format_booking_email_html(res),
+        }
