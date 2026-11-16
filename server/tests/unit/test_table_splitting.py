@@ -19,6 +19,7 @@ from server.repositories.reservation_repository import ReservationRepository
 from server.service.booking_service import (
     validate_two_hour_rule,
     assign_tables_for_party,
+    validate_change_deadline,
 )
 
 
@@ -86,6 +87,17 @@ async def test_two_hour_cutoff_rule(split_test_db):
     # 4. Booking after slot start -> Rejected
     with pytest.raises(ConflictError, match="at least 2 hours before"):
         validate_two_hour_rule(slot, current_time=datetime.combine(slot.date, time(12, 15),tzinfo=italy_tz))
+
+
+async def test_changes_close_at_exactly_48_hours_before_the_slot(split_test_db):
+    """MH-06, PO issue #43: for a meal at 12:00, changes close 48 hours before at 12:00, that time included."""
+    slot = (await split_test_db.execute(select(TimeSlotDAO).filter_by(id=1))).scalar_one()
+    italy_tz = ZoneInfo("Europe/Rome")
+    two_days_before = slot.date - timedelta(days=2)
+
+    validate_change_deadline(slot, current_time=datetime.combine(two_days_before, time(11, 59), tzinfo=italy_tz))
+    with pytest.raises(ConflictError, match="48 hours"):
+        validate_change_deadline(slot, current_time=datetime.combine(two_days_before, time(12, 0), tzinfo=italy_tz))
 
 
 async def test_best_fit_single_table_allocation(split_test_db):

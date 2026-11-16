@@ -27,6 +27,14 @@ def validate_two_hour_rule(
             f"Cutoff was {cutoff.strftime('%Y-%m-%d %H:%M')}, current time is {now.strftime('%Y-%m-%d %H:%M')}."
         )
 
+def validate_change_deadline(slot: TimeSlotDAO, current_time: Optional[datetime] = None) -> None:
+    """MH-06: a booking can be changed until 48 hours before its slot; PO issue #43: at that exact time it is already closed."""
+    italy_tz = ZoneInfo("Europe/Rome")
+    now = current_time or datetime.now(italy_tz)
+    deadline = datetime.combine(slot.date, slot.start_time, tzinfo=italy_tz) - timedelta(hours=48)
+    if now >= deadline:
+        raise ConflictError("Bookings can only be changed at least 48 hours before the slot.")
+
 def assign_tables_for_party(
     slot: TimeSlotDAO, party_size: int
 ) -> List[Tuple[SlotTableDAO, int]]:

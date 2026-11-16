@@ -6,14 +6,12 @@ from server.models.error.notfound_error import NotFoundError
 from server.models.error.conflict_error import ConflictError
 from server.models.error.forbidden_error import ForbiddenError
 from server.models.enum.slot_status import SlotStatus
-from server.service.booking_service import validate_two_hour_rule,assign_tables_for_party
+from server.service.booking_service import validate_two_hour_rule,assign_tables_for_party,validate_change_deadline
 from server.service.mapper_service import reservationDTO_to_response,reservationEmailDto_to_email
 from server.service.email_service import send_booking_confirmation_email, send_booking_change_email
 from fastapi import BackgroundTasks
 import asyncio
 import time
-from datetime import datetime, timedelta
-from zoneinfo import ZoneInfo
 
 # One booking at a time between the check of the free seats and the save, otherwise two bookings sent
 # at the same moment both see the same free seats. Whoever takes or gives back seats (also the change of
@@ -115,13 +113,7 @@ class ReservationController():
             if current.status != "CONFIRMED":
                 raise ConflictError("only confirmed bookings can be changed")
 
-            cutoff = datetime.combine(
-                current.slot.date,
-                current.slot.start_time,
-                tzinfo=ZoneInfo("Europe/Rome"),
-            ) - timedelta(hours=48)
-            if datetime.now(ZoneInfo("Europe/Rome")) > cutoff:
-                raise ConflictError("Bookings can only be changed at least 48 hours before the slot.")
+            validate_change_deadline(current.slot)
 
             target_slot_id = changes.slot_id if changes.slot_id is not None else current.slot_id
             if target_slot_id != current.slot_id:
