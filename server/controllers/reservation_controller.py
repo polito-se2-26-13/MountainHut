@@ -127,7 +127,7 @@ class ReservationController():
             target_party_size = changes.party_size if changes.party_size is not None else current.party_size
             requirements_changed = "special_requirements" in changes.model_fields_set
             target_requirements = changes.special_requirements if requirements_changed else None
-            updated, tables, previous_slot, previous_party_size = (
+            _, _, previous_slot, previous_party_size = (
                 await self.repo.transaction_update_reservation(
                     reference,
                     user_id,
@@ -137,13 +137,20 @@ class ReservationController():
                 )
             )
 
+        # read again and build the mail as the confirmation does: the mail no longer touches a closed session,
+        # it has no table numbers (PO issue #24) and it marks the allergies
+        res, tables = await self.repo.get_reservation_by_reference(reference)
+        mail = reservationEmailDto_to_email(
+            res.booking_reference,
+            res.contact_email,
+            res.slot.date.strftime("%d/%m/%Y"),
+            f"{res.slot.start_time:%H:%M}-{res.slot.end_time:%H:%M}",
+            res.party_size,
+            res.special_requirements_list or res.special_requirements,
+            res.hiker.full_name,
+        )
         if background_tasks is not None:
-            background_tasks.add_task(
-                send_booking_change_email,
-                updated,
-                previous_slot,
-                previous_party_size,
-            )
+            background_tasks.add_task(send_booking_change_email, mail, previous_slot, previous_party_size)
         else:
-            send_booking_change_email(updated, previous_slot, previous_party_size)
-        return reservationDTO_to_response(updated, tables)
+            send_booking_change_email(mail, previous_slot, previous_party_size)
+        return reservationDTO_to_response(res, tables)

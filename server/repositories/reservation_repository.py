@@ -216,7 +216,7 @@ class ReservationRepository:
 
             old_slot = reservation.slot
             previous_slot = (
-                f"{old_slot.date.isoformat()} {old_slot.start_time:%H:%M}-{old_slot.end_time:%H:%M}"
+                f"{old_slot.date:%d/%m/%Y} {old_slot.start_time:%H:%M}-{old_slot.end_time:%H:%M}"
             )
             previous_party_size = reservation.party_size
 
