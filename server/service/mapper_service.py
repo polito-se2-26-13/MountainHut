@@ -132,7 +132,7 @@ def reservationEmailDto_to_email(
         date_str=date,
         time_slot=timeSlot,
         party_size=partySize,
-        special_reqs=spReq,
+        special_reqs=formatted,
         hiker_name=hikerName
     )
 
