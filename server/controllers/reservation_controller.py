@@ -8,12 +8,7 @@ from server.models.error.forbidden_error import ForbiddenError
 from server.models.enum.slot_status import SlotStatus
 from server.service.booking_service import validate_two_hour_rule,assign_tables_for_party
 from server.service.mapper_service import reservationDTO_to_response,reservationEmailDto_to_email
-from server.service.email_service import (
-    send_booking_confirmation_email,
-    send_booking_change_email,
-    format_booking_email_html,
-    format_booking_email_text,
-)
+from server.service.email_service import send_booking_confirmation_email, send_booking_change_email
 from fastapi import BackgroundTasks
 import asyncio
 import time
@@ -152,15 +147,3 @@ class ReservationController():
         else:
             send_booking_change_email(updated, previous_slot, previous_party_size)
         return reservationDTO_to_response(updated, tables)
-
-    async def get_email_preview(self, reference: str):
-        res, _ = await self.repo.get_reservation_by_reference(reference)
-        if not res:
-            raise NotFoundError("booking reference not found")
-        return {
-            "booking_reference": res.booking_reference,
-            "recipient_email": res.contact_email,
-            "subject": f"Mountain Hut Booking Confirmation [{res.booking_reference}]",
-            "email_text": format_booking_email_text(res),
-            "email_html": format_booking_email_html(res),
-        }
