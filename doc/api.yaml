@@ -693,9 +693,10 @@ paths:
         - Reservations
       summary: Change an existing reservation
       description: |
-        Updates an existing reservation.
-        Hikers can modify only their own reservations.
-        Employees and wardens can modify reservations.
+        Changes the slot, the party size or the special requirements of a confirmed booking (MH-06).
+        Only the hiker who made the booking can change it, until 48 hours before its slot.
+        The change is treated as a new booking: its seats are given back and the tables are assigned again.
+        If the party does not fit, the answer is 409 and the booking stays as it was. Every change is notified by email.
       security:
         - BearerAuth: []
       parameters:
@@ -1124,7 +1125,7 @@ components:
           type: string
           nullable: true
           example: "+393331234567"
-        requirements:
+        special_requirements:
           type: array
           nullable: true
           items:
@@ -1169,10 +1170,17 @@ components:
           type: integer
           example: 4
         special_requirements:
-          type: array
+          type: string
           nullable: true
+          description: The requirements as one text, allergies marked with [ALLERGY]
+          example: "[ALLERGY] 1 vegan, peanut allergy; 2 vegetarians"
+        requirements:
+          type: array
           items:
             $ref: '#/components/schemas/Note'
+        has_allergies:
+          type: boolean
+          example: true
         contact_name:
           type: string
           example: Mario Rossi
@@ -1225,38 +1233,19 @@ components:
           example: false
     ReservationUpdate:
       type: object
-      required:
-        - slot_id
-        - party_size
-        - contact_name
-        - contact_email
+      description: Every field is optional; a missing field keeps its current value.
       properties:
         slot_id:
           type: integer
-          description: ID of the selected time slot
+          description: ID of the new time slot, which follows the rules of a new booking
           example: 2
         party_size:
           type: integer
           minimum: 1
           description: Number of people in the party
           example: 3
-        contact_name:
-          type: string
-          description: Full name of contact hiker
-          example: Mario Rossi
-        contact_email:
-          type: string
-          format: email
-          minLength: 5
-          maxLength: 100
-          description: Email for booking confirmation
-          example: mario@example.com
-        contact_phone:
-          type: string
-          nullable: true
-          description: Mobile number
-          example: "+393331234567"
-        requirements:
-          type: string
-          nullable: true
-          example: Vegetarian meal
+        special_requirements:
+          type: array
+          description: The new list of requirements, which replaces the old one; an empty list removes them
+          items:
+            $ref: '#/components/schemas/Note'

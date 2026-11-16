@@ -31,7 +31,7 @@ async def get_reservation_by_reference(reference:str,user=Depends(authenticate_u
 async def get_reservation_by_user_id(user=Depends(authenticate_user([UserType.HIKER]))):
      return await controller.get_reservation_by_user_id(user.id)
 
-@router.patch("/reference/{reference}",
+@router.put("/reference/{reference}/change",
               response_model=ReservationResponse,
               status_code=status.HTTP_200_OK)
 async def update_reservation(
