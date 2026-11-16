@@ -149,7 +149,7 @@ async def test_full_split_reservation_lifecycle(split_test_db):
         user_id=2,
         contact_name="Group Leader",
         contact_email="leader@test.com",
-        special_requirements="All outdoor gear",
+        special_requirements=[{"description": "All outdoor gear"}],
     )
     res = await ReservationController().create_reservation(payload)
 

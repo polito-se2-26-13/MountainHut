@@ -84,7 +84,9 @@ function CustomerReservationHistoryPage() {
               {reservation.assigned_tables?.length > 0 && (
                 <span>Tables: {reservation.assigned_tables.map((table) => `${table.table_number} (${table.assigned_seats} seats)`).join(', ')}</span>
               )}
-              {reservation.special_requirements && <span>Requests: {reservation.special_requirements}</span>}
+              {reservation.special_requirements?.length > 0 && (
+                <span>Requests: {reservation.special_requirements.map((requirement) => requirement.description).join(', ')}</span>
+              )}
               {(reservation.contact_name || reservation.contact_email) && (
                 <span>Contact: {[reservation.contact_name, reservation.contact_email, reservation.contact_phone].filter(Boolean).join(' · ')}</span>
               )}

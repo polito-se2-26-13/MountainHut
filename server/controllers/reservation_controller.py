@@ -1,14 +1,15 @@
 from server.models.enum.user_type import UserType
 from server.repositories.reservation_repository import ReservationRepository
-from server.models.DTO.reservation_dto import ReservationCreate,ReservationResponse
+from server.models.DTO.reservation_dto import ReservationCreate,ReservationResponse,ReservationUpdate
 from server.models.DAO.time_slot import TimeSlotDAO
 from server.models.error.notfound_error import NotFoundError
 from server.models.error.conflict_error import ConflictError
 from server.models.error.forbidden_error import ForbiddenError
 from server.models.enum.slot_status import SlotStatus
+from server.models.enum.reservation_status import ReservationStatus
 from server.service.booking_service import validate_two_hour_rule,assign_tables_for_party,validate_change_deadline
 from server.service.mapper_service import reservationDTO_to_response,reservationEmailDto_to_email
-from server.service.email_service import send_booking_confirmation_email, send_booking_change_email
+from server.service.email_service import send_booking_confirmation_email,send_booking_change_email
 from fastapi import BackgroundTasks
 import asyncio
 import time
@@ -74,7 +75,7 @@ class ReservationController():
                 timeSlot.date.strftime("%d/%m/%Y"),
                 f"{timeSlot.start_time:%H:%M}-{timeSlot.end_time:%H:%M}",
                 res.party_size,
-                res.special_requirements_list or res.special_requirements,
+                res.requirements,
                 res.hiker.full_name
             )
         # the answer does not wait for the mail server, which kept the whole backend busy for up to 20 seconds
@@ -99,56 +100,48 @@ class ReservationController():
                 listRes.append(reservationDTO_to_response(r,a))
             return listRes
 
-    async def update_reservation(
-        self,
-        reference: str,
-        user_id: int,
-        changes,
-        background_tasks: BackgroundTasks | None = None,
-    ) -> ReservationResponse:
+    async def update_reservation(self,reference:str,user_id:int,changes:ReservationUpdate,background_tasks:BackgroundTasks|None=None)->ReservationResponse:
+        """Change of a booking (MH-06): it is treated as a new booking, so the MH-01 rules hold (PO issues #38 and #48)"""
         async with booking_lock:
-            current, _ = await self.repo.get_reservation_by_reference(reference)
-            if current is None or current.user_id != user_id:
+            current,_= await self.repo.get_reservation_by_reference(reference)
+            if current is None:
+                raise NotFoundError("booking reference not found")
+            if current.user_id!=user_id:
                 raise ForbiddenError("you cannot change this reservation")
-            if current.status != "CONFIRMED":
+            if current.status!=ReservationStatus.CONFIRMED.value:
                 raise ConflictError("only confirmed bookings can be changed")
-
             validate_change_deadline(current.slot)
 
-            target_slot_id = changes.slot_id if changes.slot_id is not None else current.slot_id
-            if target_slot_id != current.slot_id:
-                # in another slot it is a new booking there, so the MH-01 rules hold (PO issues #38 and #48)
-                new_slot = await self.repo.get_time_slot(target_slot_id)
-                if new_slot is None:
+            slot_id=changes.slot_id if changes.slot_id is not None else current.slot_id
+            party_size=changes.party_size if changes.party_size is not None else current.party_size
+            if slot_id!=current.slot_id:
+                #check the new slot as for a new booking
+                newSlot=await self.repo.get_time_slot(slot_id)
+                if newSlot is None:
                     raise NotFoundError("time slot not found")
-                validate_two_hour_rule(new_slot, None)
-            target_party_size = changes.party_size if changes.party_size is not None else current.party_size
-            requirements_changed = "special_requirements" in changes.model_fields_set
-            target_requirements = changes.special_requirements if requirements_changed else None
-            _, _, previous_slot, previous_party_size = (
-                await self.repo.transaction_update_reservation(
-                    reference,
-                    user_id,
-                    target_slot_id,
-                    target_party_size,
-                    target_requirements,
-                )
-            )
+                if newSlot.status!=SlotStatus.OPEN:
+                    raise ConflictError("time slot is not open")
+                validate_two_hour_rule(newSlot,None)
+                if await self.repo.get_reservation_confirmed(user_id,slot_id) is not None:
+                    raise ConflictError("Hiker already has a confirmed booking for this time slot.")
+            # written before the change, for the email
+            previous_slot=f"{current.slot.date:%d/%m/%Y} {current.slot.start_time:%H:%M}-{current.slot.end_time:%H:%M}"
+            await self.repo.transaction_update_reservation(current.id,slot_id,party_size,changes.special_requirements)
 
-        # read again and build the mail as the confirmation does: the mail no longer touches a closed session,
-        # it has no table numbers (PO issue #24) and it marks the allergies
-        res, tables = await self.repo.get_reservation_by_reference(reference)
-        mail = reservationEmailDto_to_email(
-            res.booking_reference,
-            res.contact_email,
-            res.slot.date.strftime("%d/%m/%Y"),
-            f"{res.slot.start_time:%H:%M}-{res.slot.end_time:%H:%M}",
-            res.party_size,
-            res.special_requirements_list or res.special_requirements,
-            res.hiker.full_name,
-        )
+        # read again, so the answer and the email show the booking as it is now
+        res,tables= await self.repo.get_reservation_by_reference(reference)
+        mail=reservationEmailDto_to_email(
+                res.booking_reference,
+                res.contact_email,
+                res.slot.date.strftime("%d/%m/%Y"),
+                f"{res.slot.start_time:%H:%M}-{res.slot.end_time:%H:%M}",
+                res.party_size,
+                res.requirements,
+                res.hiker.full_name
+            )
+        # PO issue #41: every change is notified by email
         if background_tasks is not None:
-            background_tasks.add_task(send_booking_change_email, mail, previous_slot, previous_party_size)
+            background_tasks.add_task(send_booking_change_email,mail,previous_slot,current.party_size)
         else:
-            send_booking_change_email(mail, previous_slot, previous_party_size)
-        return reservationDTO_to_response(res, tables)
+            send_booking_change_email(mail,previous_slot,current.party_size)
+        return reservationDTO_to_response(res,tables)

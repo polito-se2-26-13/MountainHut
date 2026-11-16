@@ -26,7 +26,7 @@ def test_a_change_is_mailed_with_the_new_details_and_without_tables(client, db, 
     assert "Changed" in subject and booking["booking_reference"] in subject
     assert to == "anna@example.com"
     assert "4 person(s)" in text and "changed from" in text and "2 person(s)" in text
-    assert html.count("ALLERGY WARNING") == 1
+    assert "ALLERGY: 1 gluten allergy" in text and html.count("Allergy:") == 1
     for body in (text, html):
         # PO issue #24: the mail has no tables ("Assigned Tables", "Table 1-1: 4 seat(s)")
         assert "Assigned" not in body and "seat(s)" not in body
@@ -66,3 +66,16 @@ def test_a_booking_moves_only_to_a_slot_that_a_new_booking_could_take(client, db
 
     assert change(client, anna, booking, slot_id=in_one_hour).status_code == 409
     assert change(client, anna, booking, slot_id=in_three_days).json()["slot_id"] == in_three_days
+
+
+def test_requirements_left_out_stay_and_an_empty_list_removes_them(client, db):
+    anna = add_hiker(db)
+    booking = client.post("/api/reservations", json={
+        "slot_id": add_slot(db, [6], hours_ahead=72), "party_size": 2, "user_id": anna,
+        "contact_name": "Anna Rossi", "contact_email": "anna@example.com",
+        "special_requirements": [{"has_allergy": True, "description": "1 gluten allergy"}],
+    }, headers=TOKENS[anna]).json()
+
+    assert change(client, anna, booking, party_size=3).json()["special_requirements"] == [
+        {"has_allergy": True, "description": "1 gluten allergy"}]
+    assert change(client, anna, booking, special_requirements=[]).json()["special_requirements"] == []

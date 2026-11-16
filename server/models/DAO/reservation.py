@@ -49,7 +49,7 @@ class ReservationDAO(Base):
     party_size: Mapped[int] = mapped_column(Integer, nullable=False)
     special_requirements: Mapped[Optional[str]] = mapped_column(
         Text, nullable=True
-    )  # e.g., allergies, guide notes, high chairs (MH-03)
+    )  # free text of sprint 1, no longer written: from MH-05 the requirements are in `requirements`
     contact_name: Mapped[str] = mapped_column(String(200), nullable=False)
     contact_email: Mapped[str] = mapped_column(String(255), nullable=False)
     contact_phone: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
@@ -72,7 +72,8 @@ class ReservationDAO(Base):
         cascade="all, delete-orphan",
         lazy="selectin",
     )
-    special_requirements_list: Mapped[List["SpecialRequirementDAO"]] = relationship(
+    # MH-05: the list of requirements, each with its allergy flag; replacing the list deletes the old ones
+    requirements: Mapped[List["SpecialRequirementDAO"]] = relationship(
         "SpecialRequirementDAO",
         back_populates="reservation",
         cascade="all, delete-orphan",
@@ -168,35 +169,14 @@ class ReservationTableAssignmentDAO(Base):
 
 
 class SpecialRequirementDAO(Base):
-    """Special dietary requirement or allergy record for a booking (MH-05)."""
+    """One requirement of a booking for part of the party, e.g. "1 vegan, peanut allergy" (MH-05)."""
     __tablename__ = "special_requirements"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     reservation_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("reservations.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    has_allergy: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
+    has_allergy: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
 
-    # Relationship to reservation
-    reservation: Mapped["ReservationDAO"] = relationship(
-        "ReservationDAO", back_populates="special_requirements_list", lazy="selectin"
-    )
-
-    def to_dict(self) -> dict:
-        return {
-            "id": self.id,
-            "reservationId": self.reservation_id,
-            "hasAllergy": self.has_allergy,
-            "has_allergy": self.has_allergy,
-            "description": self.description,
-        }
-
-    def __repr__(self) -> str:
-        return (
-            f"<SpecialRequirementDAO(id={self.id}, res_id={self.reservation_id}, "
-            f"has_allergy={self.has_allergy}, desc='{self.description[:30]}')>"
-        )
+    reservation: Mapped["ReservationDAO"] = relationship("ReservationDAO", back_populates="requirements")

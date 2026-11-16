@@ -14,31 +14,7 @@ BASE_DIR = Path(__file__).resolve().parents[1]
 ENV_PATH = BASE_DIR / ".env"
 load_dotenv(ENV_PATH, override=True)
 
-def _as_mail_dto(reservation: ReservationMailDTO | ReservationDAO) -> ReservationMailDTO:
-    if isinstance(reservation, ReservationMailDTO):
-        return reservation
-
-    assigned_tables = [
-        {
-            "table_number": assignment.slot_table.table.table_number,
-            "assigned_seats": assignment.assigned_seats,
-        }
-        for assignment in reservation.table_assignments
-        if assignment.slot_table and assignment.slot_table.table
-    ]
-    return ReservationMailDTO(
-        hiker_name=reservation.contact_name,
-        booking_reference=reservation.booking_reference,
-        contact_email=reservation.contact_email,
-        date_str=reservation.slot.date.isoformat(),
-        time_slot=f"{reservation.slot.start_time:%H:%M} - {reservation.slot.end_time:%H:%M}",
-        party_size=reservation.party_size,
-        special_reqs=reservation.special_requirements,
-        assigned_tables=assigned_tables,
-    )
-
-
-def format_booking_email_text(reservation: ReservationMailDTO | ReservationDAO) -> str:
+def format_booking_email_text(reservation: ReservationMailDTO) -> str:
     """
     Generate plain text confirmation email for a reservation (MH-03).
     Includes:
@@ -50,25 +26,15 @@ def format_booking_email_text(reservation: ReservationMailDTO | ReservationDAO) 
     """
     """
 """
-    reservation = _as_mail_dto(reservation)
     hiker_name=reservation.hiker_name
     ref= reservation.booking_reference
     date_str = reservation.date_str
     time_slot = reservation.time_slot
     party_size = reservation.party_size
-    raw_reqs = reservation.special_reqs or ""
-
-    # Build a human-readable block; lines that start with [ALLERGY WARNING] are flagged
-    if raw_reqs:
-        req_lines = [r.strip() for r in raw_reqs.split(";") if r.strip()]
-        req_block = "\n".join(f"  • {line}" for line in req_lines)
-    else:
-        req_block = "  None specified"
-    table_block = "\n".join(
-        f"  Table {table['table_number']}: {table['assigned_seats']} seat(s)"
-        for table in reservation.assigned_tables
-    )
-
+    # one line per requirement (MH-05), the allergies marked so the kitchen notices them
+    special_reqs = "".join(
+        f"\n  - {'ALLERGY: ' if r.has_allergy else ''}{r.description}" for r in reservation.special_reqs
+    ) or "    None specified"
     text = f"""============================================================
            MOUNTAIN HUT - RESERVATION CONFIRMATION
 ============================================================
@@ -85,14 +51,7 @@ BOOKING DETAILS (Reference: {ref})
 * Date:                {date_str}
 * Time Slot:           {time_slot}
 * Party Size:          {party_size} person(s)
-* Special Requirements:
-{req_block}"""
-    if table_block:
-        text += f"""
-* Assigned Tables:
-{table_block}"""
-
-    text += """
+* Special Requests:{special_reqs}
 
 We look forward to welcoming you to the hut!
 
@@ -103,48 +62,20 @@ The Mountain Hut Team
     return text.strip()
 
 
-def format_booking_email_html(reservation: ReservationMailDTO | ReservationDAO) -> str:
+def format_booking_email_html(reservation: ReservationMailDTO) -> str:
     """
     Generate a clean, responsive HTML email template for booking confirmation (MH-03).
     """
-    reservation = _as_mail_dto(reservation)
     # name and requests are typed by the user: escaped, so they reach the mail as text and not as HTML or links
     hiker_name=escape(reservation.hiker_name)
     ref= reservation.booking_reference
     date_str = reservation.date_str
     time_slot = reservation.time_slot
     party_size = reservation.party_size
-    raw_reqs = reservation.special_reqs or ""
-
-    # Build structured HTML rows for each requirement (MH-05)
-    if raw_reqs:
-        req_items = [escape(r.strip()) for r in raw_reqs.split(";") if r.strip()]
-        req_rows = ""
-        for item in req_items:
-            if item.startswith("[ALLERGY WARNING]"):
-                label = item[len("[ALLERGY WARNING]"):].strip()
-                req_rows += (
-                    f'<li style="color:#c2410c;font-weight:600;">'
-                    f'⚠️ <span style="background:#fff7ed;padding:2px 6px;border-radius:4px;">'
-                    f'[ALLERGY WARNING]</span> {label}</li>'
-                )
-            else:
-                req_rows += f'<li style="color:#334155;">{item}</li>'
-        req_html = f'<ul style="margin:4px 0 0 16px;padding:0;font-size:14px;">{req_rows}</ul>'
-    else:
-        req_html = '<span style="color:#94a3b8;font-size:14px;">None specified</span>'
-    tables_html = "".join(
-        f"<li>Table {escape(str(table['table_number']))}: {table['assigned_seats']} seat(s)</li>"
-        for table in reservation.assigned_tables
-    )
-    tables_row = (
-        f"""<tr>
-          <td style="padding: 10px 0; color: #64748b;">Assigned Tables</td>
-          <td style="padding: 10px 0; font-weight: 500; color: #334155;"><ul>{tables_html}</ul></td>
-        </tr>"""
-        if tables_html
-        else ""
-    )
+    special_reqs = "<br>".join(
+        f'<strong style="color: #c2410c;">Allergy: {escape(r.description)}</strong>' if r.has_allergy else escape(r.description)
+        for r in reservation.special_reqs
+    ) or "None specified"
     html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -191,9 +122,8 @@ def format_booking_email_html(reservation: ReservationMailDTO | ReservationDAO) 
         </tr>
         <tr>
           <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; color: #64748b;">Special Requirements</td>
-          <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; font-weight: 500; color: #334155;">{req_html}</td>
+          <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; font-weight: 500; color: #334155;">{special_reqs}</td>
         </tr>
-        {tables_row}
       </table>
 
       <p style="margin-bottom: 0; font-size: 14px; color: #475569;">
@@ -211,32 +141,19 @@ def format_booking_email_html(reservation: ReservationMailDTO | ReservationDAO) 
 </html>"""
     return html
 
-def send_booking_confirmation_email(reservation: ReservationMailDTO | ReservationDAO) -> Dict[str, Any]:
-  reservation = _as_mail_dto(reservation)
+def send_booking_confirmation_email(reservation: ReservationMailDTO) -> Dict[str, Any]:
   subject = f"Mountain Hut Booking Confirmation [{reservation.booking_reference}]"
   to_email = reservation.contact_email
   text_content = format_booking_email_text(reservation)
   html_content = format_booking_email_html(reservation)
   return sender_email(subject,to_email,text_content,html_content,reservation.booking_reference)
 
-
-def send_booking_change_email(
-    reservation: ReservationMailDTO | ReservationDAO,
-    previous_slot: str,
-    previous_party_size: int,
-) -> Dict[str, Any]:
-  reservation = _as_mail_dto(reservation)
+def send_booking_change_email(reservation: ReservationMailDTO, previous_slot: str, previous_party_size: int) -> Dict[str, Any]:
+  """MH-06 and PO issue #41: every change of a booking is notified by email, with what it was before."""
   subject = f"Mountain Hut Booking Changed [{reservation.booking_reference}]"
-  text_content = format_booking_email_text(reservation)
-  text_content += (
-      f"\n\nThis booking was changed from {previous_slot}, "
-      f"{previous_party_size} person(s).\n"
-  )
-  html_content = format_booking_email_html(reservation)
-  html_content += (
-      f"<p>This booking was changed from {escape(previous_slot)}, "
-      f"{previous_party_size} person(s).</p>"
-  )
+  before = f"This booking was changed from {previous_slot}, {previous_party_size} person(s)."
+  text_content = f"{format_booking_email_text(reservation)}\n\n{before}"
+  html_content = format_booking_email_html(reservation).replace("</body>", f"<p>{before}</p></body>")
   return sender_email(subject, reservation.contact_email, text_content, html_content, reservation.booking_reference)
 
 def sender_email(subject:str,to_email:str,text_content:str,html_content:str,booking_ref:str) -> Dict[str, Any]:

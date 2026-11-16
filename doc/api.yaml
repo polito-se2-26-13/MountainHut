@@ -1170,17 +1170,9 @@ components:
           type: integer
           example: 4
         special_requirements:
-          type: string
-          nullable: true
-          description: The requirements as one text, allergies marked with [ALLERGY]
-          example: "[ALLERGY] 1 vegan, peanut allergy; 2 vegetarians"
-        requirements:
           type: array
           items:
             $ref: '#/components/schemas/Note'
-        has_allergies:
-          type: boolean
-          example: true
         contact_name:
           type: string
           example: Mario Rossi
@@ -1221,16 +1213,19 @@ components:
           example: 4
     Note:
       type: object
+      description: One requirement for part of the party (MH-05)
       required:
         - description
-        - hasAllergy
       properties:
         description:
           type: string
-          example: Vegetarian meal
-        hasAllergy:
+          minLength: 1
+          maxLength: 500
+          example: 1 vegan, peanut allergy
+        has_allergy:
           type: boolean
-          example: false
+          default: false
+          example: true
     ReservationUpdate:
       type: object
       description: Every field is optional; a missing field keeps its current value.

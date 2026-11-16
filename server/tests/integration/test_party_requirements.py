@@ -28,11 +28,7 @@ def test_each_requirement_is_saved_with_its_allergy_flag(client, db):
     assert response.status_code == 201
     read = client.get(f"/api/reservations/reference/{response.json()['booking_reference']}", headers=TOKENS[anna])
     for booking in (response.json(), read.json()):
-        assert [(r["has_allergy"], r["description"]) for r in booking["requirements"]] == [
-            (True, "1 vegan, peanut allergy"),
-            (False, "2 vegetarians"),
-        ]
-        assert booking["has_allergies"] is True
+        assert booking["special_requirements"] == REQUIREMENTS
 
 
 def test_the_confirmation_lists_the_requirements_and_flags_only_the_allergy(client, db, monkeypatch):
@@ -49,4 +45,12 @@ def test_the_confirmation_lists_the_requirements_and_flags_only_the_allergy(clie
     for body in (text, html):
         assert "1 vegan, peanut allergy" in body
         assert "2 vegetarians" in body
-    assert html.count("ALLERGY WARNING") == 1
+    assert text.count("ALLERGY:") == 1 and html.count("Allergy:") == 1
+
+
+def test_a_requirement_without_a_description_is_refused(client, db):
+    anna = add_hiker(db)
+
+    response = book_with(client, anna, add_slot(db, [6]), [{"has_allergy": True, "description": "   "}])
+
+    assert response.status_code == 422
