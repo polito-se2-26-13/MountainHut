@@ -568,38 +568,6 @@ header .back-link {
   color: #64748b;
 }
 
-.role-picker {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.5rem;
-  margin-bottom: 1.5rem;
-  padding: 0.3rem;
-  border-radius: 0.7rem;
-  background: #f1f5f9;
-}
-
-.role-option {
-  min-height: 2.7rem;
-  border: 0;
-  border-radius: 0.5rem;
-  background: transparent;
-  color: #475569;
-  cursor: pointer;
-  font: inherit;
-  font-size: 0.9rem;
-  font-weight: 600;
-}
-
-.role-option.selected {
-  background: #fff;
-  color: #1769aa;
-  box-shadow: 0 1px 3px rgb(15 23 42 / 12%);
-}
-
-.role-option:focus-visible {
-  outline: 3px solid rgb(23 105 170 / 30%);
-}
-
 .login-fields {
   display: grid;
   gap: 1.2rem;
@@ -1089,12 +1057,6 @@ header .back-link {
   background: #eff6ff;
 }
 
-.slot-validation-note {
-  margin-top: 0.7rem;
-  color: #b42318 !important;
-  font-size: 0.82rem;
-}
-
 .slot-form-footer {
   display: flex;
   align-items: center;
@@ -1265,12 +1227,6 @@ header .back-link {
   display: grid;
   gap: 0.75rem;
   margin-top: 0.2rem;
-}
-
-.requirement-example {
-  margin: 0;
-  color: #64748b;
-  font-size: 0.8rem;
 }
 
 .requirement-card {

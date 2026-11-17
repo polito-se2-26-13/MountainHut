@@ -16,12 +16,8 @@ function createTable(tableNumber = '', seats = 2) {
 }
 
 function slotLabel(slot) {
-  if (slot.label) return slot.label;
-  const timeRange = [slot.startTime, slot.endTime].filter(Boolean).join('–');
-  const tables = Array.isArray(slot.tables) ? slot.tables : [];
-  const seats = tables.reduce((sum, table) => sum + Number(table.seats || 0), 0);
-  const date = slot.date || slot.slotDate || '';
-  return `${date} ${timeRange} (${tables.length} tables / ${seats} seats)`;
+  const seats = slot.tables.reduce((sum, table) => sum + table.seats, 0);
+  return `${slot.date} ${slot.startTime}–${slot.endTime} (${slot.tables.length} tables / ${seats} seats)`;
 }
 
 // the warden manages the hut, so they set up times and tables like an employee
@@ -45,7 +41,6 @@ function EmployeeSlotConfigPage() {
   const [copySourceOptions, setCopySourceOptions] = useState([]);
   const [selectedSourceSlotId, setSelectedSourceSlotId] = useState('');
   const [isLoadingSources, setIsLoadingSources] = useState(false);
-  const [isCopying, setIsCopying] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [sourceRefreshKey, setSourceRefreshKey] = useState(0);
   const notify = useToast();
@@ -110,7 +105,7 @@ function EmployeeSlotConfigPage() {
     }));
   }
 
-  async function copyTables() {
+  function copyTables() {
     if (!selectedSourceSlotId) {
       notify('Choose a saved time slot to copy first.');
       return;
@@ -122,23 +117,11 @@ function EmployeeSlotConfigPage() {
       notify('The selected saved time slot is no longer available.');
       return;
     }
-    setIsCopying(true);
-    try {
-      const sourceTables = source.tables;
-      if (!Array.isArray(sourceTables))
-        throw new Error('The selected time slot has no table configuration.');
-      setFormData(current => ({
-        ...current,
-        tables: sourceTables.map(table =>
-          createTable(String(table.tableNumber ?? ''), Number(table.seats) || 1)
-        ),
-      }));
-      notify(`Copied ${sourceTables.length} table${sourceTables.length === 1 ? '' : 's'} from the selected time slot.`, 'success');
-    } catch (error) {
-      notify(error.message || 'Could not copy the saved table configuration.');
-    } finally {
-      setIsCopying(false);
-    }
+    setFormData(current => ({
+      ...current,
+      tables: source.tables.map(table => createTable(table.tableNumber, table.seats)),
+    }));
+    notify(`Copied ${source.tables.length} table${source.tables.length === 1 ? '' : 's'} from the selected time slot.`, 'success');
   }
 
   function validate() {
@@ -321,10 +304,9 @@ function EmployeeSlotConfigPage() {
               className="secondary-button copy-button"
               htmlType="button"
               onClick={copyTables}
-              disabled={isCopying || isLoadingSources || !copySourceOptions.length}
-              loading={isCopying}
+              disabled={isLoadingSources || !copySourceOptions.length}
             >
-              {isCopying ? 'Copying…' : 'Copy table configuration'}
+              Copy table configuration
             </Button>
           </div>
 
