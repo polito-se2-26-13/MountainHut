@@ -91,9 +91,199 @@
   color: #536174;
 }
 
-.reservation-history-list li strong {
+.reservation-history-list li.reservation-card-modifiable {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 1.5rem;
+}
+
+.reservation-card-details {
+  display: grid;
+  min-width: 0;
+  gap: 0.45rem;
+}
+
+.reservation-card-details strong {
   color: #173f58;
   font-size: 1.05rem;
+}
+
+.booking-change-action {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.35rem;
+}
+
+.booking-change-action small {
+  color: #6b7280;
+  text-align: right;
+}
+
+@media (max-width: 760px) {
+  .reservation-history-list li.reservation-card-modifiable {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+
+  .booking-change-action {
+    align-items: flex-start;
+    margin-top: 0.4rem;
+  }
+
+  .booking-change-action small {
+    text-align: left;
+  }
+}
+
+.change-modal-backdrop {
+  position: fixed;
+  z-index: 1200;
+  inset: 0;
+  display: grid;
+  overflow-y: auto;
+  place-items: center;
+  padding: 1.25rem;
+  background: rgb(13 27 39 / 62%);
+}
+
+.change-modal-backdrop-dismiss {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  border: 0;
+  background: transparent;
+  cursor: default;
+}
+
+/* Date and time popups render in a body portal; keep them above the modal backdrop. */
+.ant-picker-dropdown,
+.ant-select-dropdown {
+  z-index: 1301 !important;
+}
+
+.change-modal {
+  position: relative;
+  z-index: 1;
+  inset: auto;
+  width: min(100%, 44rem);
+  max-height: min(92vh, 56rem);
+  overflow-y: auto;
+  margin: 0;
+  padding: clamp(1.25rem, 4vw, 2rem);
+  border: 1px solid #d8e5ed;
+  border-radius: 1rem;
+  background: #fff;
+  box-shadow: 0 1.5rem 5rem rgb(0 0 0 / 28%);
+  color: inherit;
+  font: inherit;
+}
+
+.change-modal-heading,
+.change-modal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.change-modal-heading h2 {
+  margin: 0;
+  color: #173f58;
+  font-size: 1.8rem;
+}
+
+.change-modal-heading .eyebrow {
+  margin: 0 0 0.35rem;
+}
+
+.change-modal-close {
+  width: 2.5rem;
+  height: 2.5rem;
+  border: 0;
+  border-radius: 50%;
+  background: #f1f5f9;
+  color: #334155;
+  font-size: 1.6rem;
+  cursor: pointer;
+}
+
+.change-booking-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin: 1.25rem 0;
+  padding: 1rem;
+  border-radius: 0.7rem;
+  background: #f3f8fb;
+  color: #536174;
+}
+
+.change-booking-summary span {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.change-booking-summary strong {
+  color: #173f58;
+}
+
+.change-capacity-hint {
+  display: block;
+  margin: 0;
+  color: #536174;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.change-modal-form {
+  display: grid;
+  gap: 1rem;
+}
+
+.change-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem 1.25rem;
+}
+
+.change-fields > .form-field {
+  display: grid;
+  align-content: start;
+  gap: 0.45rem;
+}
+
+.change-modal-form .party-size-field {
+  max-width: none;
+}
+
+.change-fields .change-requirements-field {
+  grid-column: 1 / -1;
+}
+
+.change-error-banner {
+  margin: 1rem 0;
+}
+
+.change-modal-actions {
+  justify-content: flex-end;
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e2e8f0;
+}
+
+@media (max-width: 600px) {
+  .change-booking-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .change-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .change-fields .change-requirements-field {
+    grid-column: auto;
+  }
 }
 
 .page a {

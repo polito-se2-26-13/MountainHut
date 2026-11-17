@@ -333,42 +333,15 @@ function CustomerBookingPage() {
             </label>
           </section>
 
-          <section className="booking-panel" aria-labelledby="contact-title">
+          <section className="booking-panel" aria-labelledby="requirements-title">
             <div className="booking-panel-heading">
               <span className="section-step">03</span>
-              <div><h2 id="contact-title">Contact details</h2><p>We’ll send your booking confirmation to this email.</p></div>
+              <div><h2 id="requirements-title">Special requirements</h2><p>Share dietary needs or allergies for your group.</p></div>
             </div>
             <div className="booking-fields">
-              <label className="form-field">
-                <span>Contact name <span className="required-mark" aria-hidden="true">*</span></span>
-                <Input className="mh-control" value={contactName} autoComplete="name" onChange={(event) => { setContactName(event.target.value); clearBookingConfirmation() }} onBlur={() => setTouched((current) => ({ ...current, contactName: true }))} aria-invalid={Boolean(touched.contactName && contactNameError)} />
-                {touched.contactName && contactNameError && <small className="field-error">{contactNameError}</small>}
-              </label>
-              <div className="form-field form-field-wide">
-                <span>Confirmation email</span>
-                <p className="field-hint">By default, we’ll send the confirmation to your account email: <strong>{accountEmail || 'No account email available'}</strong></p>
-                <Checkbox checked={useAlternativeEmail} onChange={(event) => {
-                  setUseAlternativeEmail(event.target.checked)
-                  setTouched((current) => ({ ...current, contactEmail: false }))
-                  clearBookingConfirmation()
-                }}>
-                  I want to send the confirmation to a different email address.
-                </Checkbox>
-                {useAlternativeEmail && (
-                  <label className="form-field alternative-email-field">
-                    <span>Alternative email <span className="required-mark" aria-hidden="true">*</span></span>
-                    <Input className="mh-control" type="email" value={alternativeEmail} autoComplete="email" onChange={(event) => { setAlternativeEmail(event.target.value); clearBookingConfirmation() }} onBlur={() => setTouched((current) => ({ ...current, contactEmail: true }))} aria-invalid={Boolean(touched.contactEmail && contactEmailError)} />
-                    {touched.contactEmail && contactEmailError && <small className="field-error">{contactEmailError}</small>}
-                  </label>
-                )}
-              </div>
-              <label className="form-field">
-                <span>Phone <span className="optional-mark">(optional)</span></span>
-                <Input className="mh-control" type="tel" value={contactPhone} autoComplete="tel" onChange={(event) => { setContactPhone(event.target.value); clearBookingConfirmation() }} />
-              </label>
               <div className="form-field form-field-wide requirements-field">
                 <div className="requirements-intro">
-                  <span>Special requirements <span className="optional-mark">(optional)</span></span>
+                  <span>Special requirements</span>
                   <p>Let us know about dietary needs or allergies so we can prepare for your group.</p>
                 </div>
                 {hasSpecialRequirements && (
@@ -411,6 +384,42 @@ function CustomerBookingPage() {
                   No dietary restrictions or allergies
                 </Checkbox>
               </div>
+            </div>
+          </section>
+
+          <section className="booking-panel" aria-labelledby="contact-title">
+            <div className="booking-panel-heading">
+              <span className="section-step">04</span>
+              <div><h2 id="contact-title">Contact details</h2><p>We’ll send your booking confirmation to this email.</p></div>
+            </div>
+            <div className="booking-fields">
+              <label className="form-field">
+                <span>Contact name <span className="required-mark" aria-hidden="true">*</span></span>
+                <Input className="mh-control" value={contactName} autoComplete="name" onChange={(event) => { setContactName(event.target.value); clearBookingConfirmation() }} onBlur={() => setTouched((current) => ({ ...current, contactName: true }))} aria-invalid={Boolean(touched.contactName && contactNameError)} />
+                {touched.contactName && contactNameError && <small className="field-error">{contactNameError}</small>}
+              </label>
+              <div className="form-field form-field-wide">
+                <span>Confirmation email</span>
+                <p className="field-hint">By default, we’ll send the confirmation to your account email: <strong>{accountEmail || 'No account email available'}</strong></p>
+                <Checkbox checked={useAlternativeEmail} onChange={(event) => {
+                  setUseAlternativeEmail(event.target.checked)
+                  setTouched((current) => ({ ...current, contactEmail: false }))
+                  clearBookingConfirmation()
+                }}>
+                  I want to send the confirmation to a different email address.
+                </Checkbox>
+                {useAlternativeEmail && (
+                  <label className="form-field alternative-email-field">
+                    <span>Alternative email <span className="required-mark" aria-hidden="true">*</span></span>
+                    <Input className="mh-control" type="email" value={alternativeEmail} autoComplete="email" onChange={(event) => { setAlternativeEmail(event.target.value); clearBookingConfirmation() }} onBlur={() => setTouched((current) => ({ ...current, contactEmail: true }))} aria-invalid={Boolean(touched.contactEmail && contactEmailError)} />
+                    {touched.contactEmail && contactEmailError && <small className="field-error">{contactEmailError}</small>}
+                  </label>
+                )}
+              </div>
+              <label className="form-field">
+                <span>Phone <span className="optional-mark">(optional)</span></span>
+                <Input className="mh-control" type="tel" value={contactPhone} autoComplete="tel" onChange={(event) => { setContactPhone(event.target.value); clearBookingConfirmation() }} />
+              </label>
             </div>
           </section>
         </div>
