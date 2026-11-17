@@ -25,6 +25,7 @@ async def test_database_migrations_and_seed_data(tmp_path):
 
         assert "001_initial_schema.sql" in applied
         assert "002_seed_data.sql" in applied
+        assert "003_sprint2_availability_migration.sql" in applied
 
         # 2. Check that all expected tables exist
         async with engine.connect() as conn:
@@ -54,11 +55,11 @@ async def test_database_migrations_and_seed_data(tmp_path):
             expected_counts = {
                 "hut_info": 1,
                 "users": 5,
-                "tables": 6,
-                "time_slots": 4,
-                "slot_tables": 16,
-                "reservations": 3,
-                "reservation_table_assignments": 4,
+                "tables": 14,
+                "time_slots": 8,
+                "slot_tables": 25,
+                "reservations": 8,
+                "reservation_table_assignments": 9,
             }
 
             for table, expected in expected_counts.items():
@@ -97,6 +98,11 @@ async def test_database_migrations_and_seed_data(tmp_path):
                 1: 4,
                 2: 2,
                 3: 10,
+                4: 4,
+                5: 1,
+                6: 1,
+                7: 4,
+                8: 4,
             }
 
             # 6. Check migration tracking
@@ -107,6 +113,7 @@ async def test_database_migrations_and_seed_data(tmp_path):
 
             assert "001_initial_schema.sql" in versions
             assert "002_seed_data.sql" in versions
+            assert "003_sprint2_availability_migration.sql" in versions
 
             # 7. Check foreign key integrity
             result = await conn.execute(
@@ -174,6 +181,10 @@ async def test_seed_time_slot_table_relationships(seeded_engine):
         1: {"T1": 6, "T2": 4, "T3": 8, "T4": 4, "T5": 6, "T6": 6},
         2: {"T1": 6, "T2": 4, "T3": 8, "T4": 4, "T5": 6, "T6": 6},
         3: {"T1": 6, "T2": 4, "T3": 8, "T4": 4},
+        5: {"T7": 2, "T8": 2, "T9": 2},
+        6: {"T10": 6, "T11": 4, "T12": 2},
+        7: {"T13": 4, "T14": 4},
+        8: {"T13": 4},
     }
 
     assert actual == expected
@@ -214,6 +225,11 @@ async def test_seed_reservation_relationships(seeded_engine):
         (1, "Alex", "Smith", 3, 1, 4, "CONFIRMED"),
         (2, "Elena", "Moretti", 4, 1, 2, "CONFIRMED"),
         (3, "John", "Doe", 5, 2, 10, "CONFIRMED"),
+        (4, "Alex", "Smith", 3, 6, 4, "CONFIRMED"),
+        (5, "Elena", "Moretti", 4, 6, 1, "CONFIRMED"),
+        (6, "John", "Doe", 5, 6, 1, "CONFIRMED"),
+        (7, "Alex", "Smith", 3, 7, 4, "CONFIRMED"),
+        (8, "Elena", "Moretti", 4, 7, 4, "CONFIRMED"),
     ]
 
     assert actual == expected
@@ -241,7 +257,7 @@ async def test_seed_reservation_assignments(seeded_engine):
 
     actual = {
         reservation_id: {}
-        for reservation_id in (1, 2, 3)
+        for reservation_id in range(1, 9)
     }
 
     for reservation_id, table_number, seats in rows:
@@ -251,6 +267,11 @@ async def test_seed_reservation_assignments(seeded_engine):
         1: {"T1": 4},
         2: {"T1": 2},
         3: {"T2": 2, "T3": 8},
+        4: {"T10": 4},
+        5: {"T11": 1},
+        6: {"T12": 1},
+        7: {"T13": 4},
+        8: {"T14": 4},
     }
 
     assert actual == expected
@@ -337,3 +358,57 @@ async def test_seed_data_business_integrity(seeded_engine):
             WHERE rta.assigned_seats > st.available_seats
         """))
         assert result.scalar_one() == 0
+@pytest.mark.asyncio
+async def test_sprint2_mh04_availability_scenarios(seeded_engine):
+    """Verify Sprint 2 (003 migration) performance indexes and MH-04 availability scenarios."""
+    async with seeded_engine.connect() as conn:
+        # 1. Check Sprint 2 composite performance indexes exist
+        result = await conn.execute(
+            text("""
+                SELECT name
+                FROM sqlite_master
+                WHERE type = 'index'
+            """)
+        )
+        index_names = {row[0] for row in result.fetchall()}
+        expected_indexes = {
+            "idx_slot_tables_slot_avail",
+            "idx_reservations_slot_status",
+            "idx_rta_slot_res",
+            "idx_time_slots_date_status",
+            "idx_time_slots_lookup",
+        }
+        assert expected_indexes.issubset(index_names)
+
+        # 2. Check free seats per table for Slot 5 (3 tables of 2 = 6 free seats)
+        #    and Slot 6 (2 + 3 + 1 = 6 free seats), and Slot 7 (0 free seats)
+        result = await conn.execute(
+            text("""
+                SELECT
+                    st.slot_id,
+                    t.table_number,
+                    st.available_seats - COALESCE(SUM(
+                        CASE WHEN r.status = 'CONFIRMED' THEN rta.assigned_seats ELSE 0 END
+                    ), 0) AS free_seats
+                FROM slot_tables st
+                JOIN tables t ON st.table_id = t.id
+                LEFT JOIN reservation_table_assignments rta ON rta.slot_table_id = st.id
+                LEFT JOIN reservations r ON r.id = rta.reservation_id
+                WHERE st.slot_id IN (5, 6, 7)
+                GROUP BY st.slot_id, t.id, t.table_number, st.available_seats
+                ORDER BY st.slot_id, t.id
+            """)
+        )
+        free_by_slot = {}
+        for slot_id, table_number, free_seats in result.fetchall():
+            free_by_slot.setdefault(slot_id, {})[table_number] = free_seats
+
+        assert free_by_slot[5] == {"T7": 2, "T8": 2, "T9": 2}
+        assert free_by_slot[6] == {"T10": 2, "T11": 3, "T12": 1}
+        assert free_by_slot[7] == {"T13": 0, "T14": 0}
+
+        # 3. Check Slot 8 is CLOSED
+        result = await conn.execute(
+            text("SELECT status FROM time_slots WHERE id = 8")
+        )
+        assert result.scalar_one() == "CLOSED"

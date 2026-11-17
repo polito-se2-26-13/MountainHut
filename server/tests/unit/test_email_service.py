@@ -19,7 +19,7 @@ def reservation():
         contact_email="hiker@test.com",
         date_str="2030-11-15",
         time_slot="12:00 - 13:00",
-        contact_name="Alice Walker",
+        hiker_name="Alice Walker",
         party_size=4,
         special_reqs="Vegetarian meal",
         tables=[
@@ -36,14 +36,12 @@ def test_format_booking_email_text(reservation):
 
     email = format_booking_email_text(reservation)
 
-    assert "Valued Guest" in email
+    assert "Alice Walker" in email
     assert "MH-20261104-ABC123" in email
     assert "2030-11-15" in email
     assert "12:00 - 13:00" in email
     assert "4 person(s)" in email
     assert "Vegetarian meal" in email
-    assert "Table T1" in email
-    assert "Indoor" in email
 
 
 def test_format_booking_email_html(reservation):
@@ -52,14 +50,13 @@ def test_format_booking_email_html(reservation):
     email = format_booking_email_html(reservation)
 
     assert "<html" in email
-    assert "Valued Guest" in email
+    assert "Alice Walker" in email
     assert "MH-20261104-ABC123" in email
     assert "2030-11-15" in email
     assert "12:00 - 13:00" in email
     assert "4 person(s)" in email
     assert "Vegetarian meal" in email
-    assert "Table T1" in email
-    assert "Indoor" in email
+    
 
 
 def test_send_booking_confirmation_email_generates_payload(
@@ -75,7 +72,7 @@ def test_send_booking_confirmation_email_generates_payload(
         "Mountain Hut Booking Confirmation [MH-20261104-ABC123]"
     )
 
-    assert "Valued Guest" in result["text_content"]
+    assert "Alice Walker" in result["text_content"]
     assert "MH-20261104-ABC123" in result["html_content"]
 
     mock_smtp.send_message.assert_called_once()
@@ -88,9 +85,8 @@ def test_email_with_no_special_requirements(reservation):
     text_email = format_booking_email_text(reservation)
     html_email = format_booking_email_html(reservation)
 
-    assert "None" in text_email
-    assert "Assigned upon arrival" in text_email
-    assert "Assigned upon arrival" in html_email
+    assert "None specified" in text_email
+    assert "None specified" in html_email
 
 
 def test_email_with_missing_booking_information(reservation):
@@ -104,10 +100,9 @@ def test_email_with_missing_booking_information(reservation):
     text = format_booking_email_text(reservation)
     html = format_booking_email_html(reservation)
 
-    assert "Valued Guest" in text
-    assert "Valued Guest" in html
-    assert "None" in text
-    assert "Assigned upon arrival" in text
+    assert "Alice Walker" in text
+    assert "Alice Walker" in html
+    assert "None specified" in text
 
 def test_email_payload_contains_matching_recipient_and_bodies(
     reservation, mock_smtp

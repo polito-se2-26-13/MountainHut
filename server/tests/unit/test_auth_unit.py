@@ -11,7 +11,7 @@ from server.controllers.user_controller import UserController
 from server.models.DTO.user_dto import UserCreateDTO, UserLoginDTO
 from server.models.enum.user_type import UserType
 from server.models.error.conflict_error import ConflictError
-from server.models.error.notfound_error import NotFoundError
+from server.models.error.unauthorized_error import UnauthorizedError
 from server.service import auth_service
 from server.config.config import SECRET_KEY, ALGORITHM
 
@@ -26,7 +26,7 @@ def create_user_dao():
         first_name="Anna",
         last_name="Li",
         phone=None,
-        role=UserType.Hiker.value
+        role=UserType.HIKER.value
     )
 
 
@@ -34,9 +34,10 @@ def create_user_dto():
     return UserCreateDTO(
         email="anna@example.com",
         password="Password123!",
-        role=UserType.Hiker,
+        role=UserType.HIKER,
         firstName="Anna",
-        lastName="Li"
+        lastName="Li",
+        phone="+39 340 1234567",
     )
 
 
@@ -156,7 +157,7 @@ async def test_login_user_success(monkeypatch):
     assert result.token == "fake-jwt-token"
     assert result.user.email == "anna@example.com"
     assert result.user.firstName == "Anna"
-    assert result.user.role == UserType.Hiker
+    assert result.user.role == UserType.HIKER
 
 
 @pytest.mark.asyncio
@@ -171,7 +172,7 @@ async def test_login_user_not_found():
         password="Password123!"
     )
 
-    with pytest.raises(NotFoundError):
+    with pytest.raises(UnauthorizedError):
         await controller.login_user(login_data)
 
 
@@ -193,7 +194,7 @@ async def test_login_user_wrong_password(monkeypatch):
         password="WrongPassword!"
     )
 
-    with pytest.raises(NotFoundError):
+    with pytest.raises(UnauthorizedError):
         await controller.login_user(login_data)
 
 
@@ -237,7 +238,7 @@ def test_generate_token_contains_user_information():
         id=1,
         email="anna@example.com",
         password="hashed_password",
-        role=UserType.Hiker,
+        role=UserType.HIKER,
         firstName="Anna",
         lastName="Li"
     )
@@ -251,7 +252,7 @@ def test_generate_token_contains_user_information():
     )
 
     assert payload["sub"] == "anna@example.com"
-    assert payload["role"] == UserType.Hiker.value
+    assert payload["role"] == UserType.HIKER.value
     assert "exp" in payload
 
 
@@ -267,7 +268,7 @@ async def test_process_token_rejects_invalid_token():
 async def test_process_token_rejects_expired_token():
     expired_payload = {
         "sub": "anna@example.com",
-        "role": UserType.Hiker.value,
+        "role": UserType.HIKER.value,
         "exp": datetime.now(timezone.utc) - timedelta(hours=1)
     }
 
@@ -290,7 +291,7 @@ async def test_process_token_rejects_unauthorized_role():
     # Create a valid JWT for a Hiker
     payload = {
         "sub": "anna@example.com",
-        "role": UserType.Hiker.value,
+        "role": UserType.HIKER.value,
         "exp": datetime.now(timezone.utc) + timedelta(hours=1)
     }
 
@@ -316,7 +317,7 @@ async def test_process_token_rejects_unauthorized_role():
         with pytest.raises(HTTPException) as exc:
             await auth_service.process_token(
                 f"Bearer {token}",
-                allowed_roles=[UserType.Employee]
+                allowed_roles=[UserType.EMPLOYEE]
             )
 
     assert exc.value.status_code == 403
@@ -326,7 +327,7 @@ async def test_process_token_rejects_unauthorized_role():
 async def test_process_token_accepts_valid_token():
     payload = {
         "sub": "anna@example.com",
-        "role": UserType.Hiker.value,
+        "role": UserType.HIKER.value,
         "exp": datetime.now(timezone.utc) + timedelta(hours=1)
     }
 
@@ -349,7 +350,7 @@ async def test_process_token_accepts_valid_token():
 
         result = await auth_service.process_token(
             f"Bearer {token}",
-            allowed_roles=[UserType.Hiker]
+            allowed_roles=[UserType.HIKER]
         )
 
     assert result == fake_user
@@ -363,7 +364,7 @@ async def test_process_token_rejects_user_not_found():
     """A valid JWT is rejected when its user no longer exists in the database."""
     payload = {
         "sub": "missing@example.com",
-        "role": UserType.Hiker.value,
+        "role": UserType.HIKER.value,
         "exp": datetime.now(timezone.utc) + timedelta(hours=1),
     }
     token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
