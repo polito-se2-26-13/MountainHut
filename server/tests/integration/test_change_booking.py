@@ -1,5 +1,7 @@
 """Integration tests of MH-06, change a booking: PUT /api/reservations/reference/{reference}/change.
 Any change is treated as a new booking (PO issues #38 and #48) and is notified by email (#41)."""
+from server.models.DAO.reservation import ReservationDAO
+from server.models.DAO.time_slot import TimeSlotDAO
 from server.service.email_service import email_subject, format_booking_email_html, format_booking_email_text
 from test_booking import TOKENS, add_hiker, add_slot, book, seats_by_table
 
@@ -124,3 +126,32 @@ def test_a_booking_moved_to_a_full_slot_is_told_there_are_not_enough_seats(clien
 
     assert response.status_code == 409
     assert "Not enough seats" in response.json()["message"]
+
+
+def test_a_booking_whose_meal_is_less_than_48_hours_away_cannot_change(client, db):
+    # PO issue #43: the 48 hours count on the booked slot too, also when only the party changes
+    anna = add_hiker(db)
+    booking = book(client, anna, add_slot(db, [6], hours_ahead=30), 2).json()
+
+    response = change(client, anna, booking, party_size=3)
+
+    assert response.status_code == 409 and "48 hours" in response.json()["message"]
+
+
+def test_only_a_confirmed_booking_on_an_open_slot_can_change(client, db):
+    anna = add_hiker(db)
+    slot = add_slot(db, [6], hours_ahead=72)
+    booking = book(client, anna, slot, 2).json()
+
+    # the staff closed the slot
+    db.query(TimeSlotDAO).filter_by(id=slot).update({"status": "CLOSED"})
+    db.commit()
+    closed = change(client, anna, booking, party_size=3)
+    assert closed.status_code == 409 and "not open" in closed.json()["message"]
+
+    # the slot is open again, but the booking is no longer confirmed
+    db.query(TimeSlotDAO).filter_by(id=slot).update({"status": "OPEN"})
+    db.query(ReservationDAO).filter_by(id=booking["id"]).update({"status": "CANCELLED"})
+    db.commit()
+    cancelled = change(client, anna, booking, party_size=3)
+    assert cancelled.status_code == 409 and "only confirmed" in cancelled.json()["message"]
