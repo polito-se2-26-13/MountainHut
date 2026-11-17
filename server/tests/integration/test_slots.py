@@ -137,6 +137,17 @@ def test_a_slot_cannot_overlap_another_of_the_same_day(client, db):
     assert client.post("/api/slots", json=slot([("T2", 4)], day=OTHER_DAY, start="12:30", end="13:30"), headers=employee).status_code == 201
 
 
+def test_saving_the_same_times_with_another_meal_keeps_one_slot(client, db):
+    employee = login_as(db, "Employee")
+    client.post("/api/slots", json=slot([("T1", 4)], mealType="Lunch"), headers=employee)
+
+    # PO issue 31: the same times again are the same slot, whatever the meal, or a hiker could book both
+    assert client.post("/api/slots", json=slot([("T1", 4)], mealType="Dinner"), headers=employee).status_code == 201
+    assert client.post("/api/slots", json=slot([("T1", 4)]), headers=employee).status_code == 201
+
+    assert db.query(TimeSlotDAO).count() == 1
+
+
 def test_overlap_is_found_also_with_the_times_of_the_sample_data(client, db):
     employee = login_as(db, "Employee")
     # the sample data writes 12:00:00, while the server writes 12:00:00.000000

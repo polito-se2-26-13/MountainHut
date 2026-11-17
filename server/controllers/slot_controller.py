@@ -39,7 +39,7 @@ class SlotController():
             raise ConflictError("the slot overlaps another slot of the same day")
 
         #search time slot, or create it: the employee chooses date and times freely (MH-02)
-        slotTime=await self.repo.find_slot_time(slot.date,slot.startTime,slot.endTime,slot.mealType)
+        slotTime=await self.repo.find_slot_time(slot.date,slot.startTime,slot.endTime)
         if slotTime is None:
             slotTime=await self.repo.add_slot_time(slot)
         else:

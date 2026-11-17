@@ -6,7 +6,6 @@ from server.models.DAO.table import TableDAO
 from server.models.DAO.time_slot import TimeSlotDAO, SlotTableDAO
 from server.models.DTO.slot_dto import SlotCreation, Table
 from datetime import date, time, datetime
-from server.models.enum.meal_type import MealType
 
 class SlotRepository:
 
@@ -16,7 +15,7 @@ class SlotRepository:
     async def _get_session(self) -> AsyncSession:
         return self._session or AsyncSessionLocal()
 
-    async def find_slot_time(self, date:date,startTime:time,endTime:time,mealType:MealType)->TimeSlotDAO|None:
+    async def find_slot_time(self, date:date,startTime:time,endTime:time)->TimeSlotDAO|None:
         # the meal is not part of the search: a second slot at the same time could be booked twice by a hiker
         async with await self._get_session() as session:
             result = await session.execute(
@@ -24,7 +23,6 @@ class SlotRepository:
                     TimeSlotDAO.date == date,
                     func.time(TimeSlotDAO.start_time) == startTime.strftime("%H:%M:%S"),
                     func.time(TimeSlotDAO.end_time) == endTime.strftime("%H:%M:%S"),
-                    TimeSlotDAO.meal_type == mealType,
                 )
             )
 
