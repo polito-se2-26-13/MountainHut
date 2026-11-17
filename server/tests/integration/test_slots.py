@@ -172,6 +172,25 @@ def test_a_slot_in_the_past_is_refused(client, db):
     assert db.query(TimeSlotDAO).count() == 0
 
 
+def test_a_time_with_a_utc_offset_is_refused(client, db):
+    employee = login_as(db, "Employee")
+
+    assert client.post("/api/slots", json=slot([("T1", 4)], start="12:00+01:00"), headers=employee).status_code == 422
+    assert client.post("/api/slots", json=slot([("T1", 4)], start="12:00+01:00", end="13:00+01:00"), headers=employee).status_code == 422
+    assert db.query(TimeSlotDAO).count() == 0
+
+
+def test_slots_are_listed_by_date_and_time(client, db):
+    employee = login_as(db, "Employee")
+    client.post("/api/slots", json=slot([("T1", 4)], day=OTHER_DAY, start="08:00", end="09:00"), headers=employee)
+    client.post("/api/slots", json=slot([("T1", 4)], start="19:00", end="20:00"), headers=employee)
+    client.post("/api/slots", json=slot([("T1", 4)], start="12:00", end="13:00"), headers=employee)
+
+    listed = client.get("/api/slots", headers=employee).json()
+
+    assert [(s["date"], s["startTime"]) for s in listed] == [(DAY, "12:00"), (DAY, "19:00"), (OTHER_DAY, "08:00")]
+
+
 def test_tables_need_a_name_written_once(client, db):
     employee = login_as(db, "Employee")
 

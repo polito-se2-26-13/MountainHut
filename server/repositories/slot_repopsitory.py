@@ -114,6 +114,8 @@ class SlotRepository:
                 select(TimeSlotDAO, TableDAO.table_number,SlotTableDAO.available_seats)
                 .outerjoin(SlotTableDAO, SlotTableDAO.slot_id == TimeSlotDAO.id)
                 .outerjoin(TableDAO, TableDAO.id == SlotTableDAO.table_id)
+                # by time, and the tables of a slot in the order they were added
+                .order_by(TimeSlotDAO.date, func.time(TimeSlotDAO.start_time), SlotTableDAO.id)
             )
             if date is not None:
                 query = query.where(TimeSlotDAO.date==date)

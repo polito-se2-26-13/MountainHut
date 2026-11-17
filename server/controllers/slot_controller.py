@@ -2,6 +2,7 @@ from server.models.DAO.table import TableDAO
 from server.models.DTO.slot_dto import SlotCreation
 from server.repositories.slot_repopsitory import SlotRepository
 from server.repositories.reservation_repository import ReservationRepository
+from server.controllers.reservation_controller import booking_lock
 from server.models.error.conflict_error import ConflictError
 from server.models.error.notfound_error import NotFoundError
 from server.service.mapper_service import slotTableDto_to_response, timeSlotDAO_to_response,tableDAO_to_response
@@ -19,6 +20,9 @@ class SlotController():
         self.repo=SlotRepository()
 
     async def setUpSlot(self,slot: SlotCreation):
+        # an offset like 12:00+01:00 cannot be compared with a time without it, which gave a 500
+        if slot.startTime.tzinfo or slot.endTime.tzinfo:
+            raise UnprocessableContent("times are Italian times, without a UTC offset")
         if(slot.startTime>=slot.endTime):
             raise UnprocessableContent("start time must be less then end time")
         # slot times are Italian, the server clock may not be (Docker runs in UTC)
@@ -37,33 +41,36 @@ class SlotController():
             if t.tableNumber in names:
                 raise UnprocessableContent(f"table {t.tableNumber} is written twice")
             names.add(t.tableNumber)
-        # PO issue 31: two slots of the same day can follow each other but cannot overlap
-        if await self.repo.find_overlapping_slot(slot.date,slot.startTime,slot.endTime):
-            raise ConflictError("the slot overlaps another slot of the same day")
+        # the lock of the bookings: no booking lands between the check of the booked seats and the save,
+        # and two equal saves sent together cannot both create the slot
+        async with booking_lock:
+            # PO issue 31: two slots of the same day can follow each other but cannot overlap
+            if await self.repo.find_overlapping_slot(slot.date,slot.startTime,slot.endTime):
+                raise ConflictError("the slot overlaps another slot of the same day")
 
-        #search time slot, or create it: the employee chooses date and times freely (MH-02)
-        slotTime=await self.repo.find_slot_time(slot.date,slot.startTime,slot.endTime)
-        if slotTime is None:
-            slotTime=await self.repo.add_slot_time(slot)
-        else:
-            # saving the same times again updates that slot, also its meal when one is chosen
-            if slot.mealType:
-                slotTime.meal_type=slot.mealType
-            # saving the slot again cannot leave a table with fewer seats than the ones already booked on it
-            booked={st.table.table_number: st.occupied_seats for st in slotTime.slot_tables}
+            #search time slot, or create it: the employee chooses date and times freely (MH-02)
+            slotTime=await self.repo.find_slot_time(slot.date,slot.startTime,slot.endTime)
+            if slotTime is None:
+                slotTime=await self.repo.add_slot_time(slot)
+            else:
+                # saving the same times again updates that slot, also its meal when one is chosen
+                if slot.mealType:
+                    slotTime.meal_type=slot.mealType
+                # saving the slot again cannot leave a table with fewer seats than the ones already booked on it
+                booked={st.table.table_number: st.occupied_seats for st in slotTime.slot_tables}
+                for t in slot.tables:
+                    if t.seats<booked.get(t.tableNumber,0):
+                        raise ConflictError(f"table {t.tableNumber} already has {booked[t.tableNumber]} seats booked")
+
+            #search table, or create it: there is no fixed set of tables and seats differ per slot (PO issue 17)
+            tables: list[tuple[TableDAO,int]]=[]
             for t in slot.tables:
-                if t.seats<booked.get(t.tableNumber,0):
-                    raise ConflictError(f"table {t.tableNumber} already has {booked[t.tableNumber]} seats booked")
-
-        #search table, or create it: there is no fixed set of tables and seats differ per slot (PO issue 17)
-        tables: list[tuple[TableDAO,int]]=[]
-        for t in slot.tables:
-            table=await self.repo.find_table(t.tableNumber)
-            if table is None:
-                table=await self.repo.add_table(t.tableNumber,t.seats)
-            tables.append((table,t.seats))
-        #add table
-        result=await self.repo.transaction_add_table(slotTime,tables)
+                table=await self.repo.find_table(t.tableNumber)
+                if table is None:
+                    table=await self.repo.add_table(t.tableNumber,t.seats)
+                tables.append((table,t.seats))
+            #add table
+            result=await self.repo.transaction_add_table(slotTime,tables)
         return slotTableDto_to_response(slotTime,result)
 
     async def getSlotTime(self,date:date)->list[SlotDetail]:

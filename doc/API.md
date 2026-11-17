@@ -8,7 +8,7 @@ Errors return `{"code": 409, "message": "message", "name": "ConflictError"}`. In
 **get slots for copy**
 
 name: `/api/slots?date={date}`<br>
-parameter: `date` (query, `YYYY-MM-DD`) — date whose existing service slots should be returned. Without it, all slots are returned.<br>
+parameter: `date` (query, `YYYY-MM-DD`) — date whose existing service slots should be returned. Without it, all slots are returned. The slots come ordered by date and start time.<br>
 header: `Authorization: Bearer <token>` (Hiker, Employee or Warden)<br>
 
 HTTP Status: 200 ok, 401 unauthorized, 403 forbidden, 422 invalid date, 500 ISE<br>
@@ -316,7 +316,7 @@ body:
 `mealType` is optional. Suggested values: `Lunch`, `Dinner`, `Snack`.<br>
 Saving the same date and times again adds or updates only the listed tables and takes the new `mealType` when one is sent, while the other tables stay as they are. A table number used for the first time creates the table. A table cannot get fewer seats than the ones already booked on it.<br>
 A new slot cannot overlap another slot of the same day, while one right after another is fine. Every table needs a name of 1 to 50 characters, written once.<br>
-HTTP Status: 201 created, 401 unauthorized, 403 forbidden, 409 overlaps another slot of the same day or fewer seats than the booked ones, 422 invalid request, start time not before end time, slot in the past or invalid table name, 500 ISE<br>
+HTTP Status: 201 created, 401 unauthorized, 403 forbidden, 409 overlaps another slot of the same day or fewer seats than the booked ones, 422 invalid request, start time not before end time, a time with a UTC offset, slot in the past or invalid table name, 500 ISE<br>
 JSON response:
 ```json
 // 201
