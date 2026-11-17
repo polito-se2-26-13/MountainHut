@@ -103,3 +103,5 @@ class ReservationMailDTO(BaseModel):
     time_slot: str
     party_size: int
     special_reqs: List[SpecialRequirementDTO] = []
+    # true for the mail of a change (MH-06), so the hiker sees that the booking was changed
+    changed: bool = False

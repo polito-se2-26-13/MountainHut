@@ -35,7 +35,7 @@ def send_confirmation_with_retry(mail, waits=(5, 10)):
         print(f"confirmation email not sent for {mail.booking_reference}: {result.get('error')}", flush=True)
 
 
-def confirm_by_mail(res,background_tasks:BackgroundTasks|None):
+def confirm_by_mail(res,background_tasks:BackgroundTasks|None,changed:bool=False):
     """Mail of a new or a changed booking, with its details as they are now (MH-03, PO issue #41)"""
     mail=reservationEmailDto_to_email(
             res.booking_reference,
@@ -44,7 +44,8 @@ def confirm_by_mail(res,background_tasks:BackgroundTasks|None):
             f"{res.slot.start_time:%H:%M}-{res.slot.end_time:%H:%M}",
             res.party_size,
             res.requirements,
-            res.hiker.full_name
+            res.hiker.full_name,
+            changed
         )
     # the answer does not wait for the mail server, which kept the whole backend busy for up to 20 seconds
     if background_tasks is not None:
@@ -130,5 +131,5 @@ class ReservationController():
 
         # read again, so the answer and the email show the booking as it is now
         res,tables= await self.repo.get_reservation_by_reference(reference)
-        confirm_by_mail(res,background_tasks)
+        confirm_by_mail(res,background_tasks,changed=True)
         return reservationDTO_to_response(res,tables)

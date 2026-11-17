@@ -1,6 +1,6 @@
 """Integration tests of MH-06, change a booking: PUT /api/reservations/reference/{reference}/change.
 Any change is treated as a new booking (PO issues #38 and #48) and is notified by email (#41)."""
-from server.service.email_service import format_booking_email_html, format_booking_email_text
+from server.service.email_service import email_subject, format_booking_email_html, format_booking_email_text
 from test_booking import TOKENS, add_hiker, add_slot, book, seats_by_table
 
 
@@ -28,6 +28,11 @@ def test_a_change_is_confirmed_by_email_with_the_new_details(client, db, monkeyp
     assert len(sent) == 2 and mail.contact_email == "anna@example.com"
     text, html = format_booking_email_text(mail), format_booking_email_html(mail)
     assert "4 person(s)" in text and "ALLERGY: 1 gluten allergy" in text and html.count("Allergy:") == 1
+    # the hiker sees it is a change, not a second booking, while the first mail stays a confirmation
+    assert email_subject(mail).startswith("Mountain Hut Booking Updated")
+    assert "has been changed" in text and "has been changed" in html
+    assert email_subject(sent[0]).startswith("Mountain Hut Booking Confirmation")
+    assert "has been changed" not in format_booking_email_text(sent[0])
 
 
 def test_a_party_grows_on_its_own_table_when_the_seats_are_enough(client, db):
