@@ -4,6 +4,9 @@ import dayjs from 'dayjs'
 import { Link, useNavigate } from 'react-router'
 import { apiRequest } from '../api/api.js'
 import { useAuth } from '../auth/AuthContext.jsx'
+import { isAtLeast } from '../utils/slots.js'
+
+const TWO_HOURS_MS = 2 * 60 * 60 * 1000
 
 function localDateString() {
   const now = new Date()
@@ -43,8 +46,10 @@ function AvailabilityPage() {
 
   const seatedPartySize = Number(result?.party_size ?? result?.partySize ?? partySize)
   const remaining = Number(result?.remaining_seats ?? result?.remainingSeats ?? 0)
-  const isAvailable = Boolean(result?.is_available ?? (String(result?.status || '').toUpperCase() === 'OPEN' && remaining >= Number(partySize)))
   const resultStartTime = result?.start_time ?? result?.startTime ?? time
+  // bookings close 2 hours before the service (PO #7), so a closer time is not offered as available
+  const bookingClosed = Boolean(result) && !isAtLeast(result?.date ?? date, resultStartTime, TWO_HOURS_MS)
+  const isAvailable = !bookingClosed && Boolean(result?.is_available ?? (String(result?.status || '').toUpperCase() === 'OPEN' && remaining >= Number(partySize)))
   const resultEndTime = result?.end_time ?? result?.endTime
   const layout = result?.layout ?? result?.layout_details ?? result?.layoutDetails ?? []
   const layoutSummary = result?.layout_summary ?? result?.layoutSummary
@@ -83,7 +88,7 @@ function AvailabilityPage() {
           </label>
           <label className="form-field">
             <span>Party size <span className="required-mark" aria-hidden="true">*</span></span>
-            <InputNumber className="mh-control" min={1} step={1} value={partySize} onChange={(value) => setPartySize(value ?? '')} />
+            <InputNumber className="mh-control" min={1} step={1} value={partySize} onChange={(value) => { setPartySize(value ?? ''); setResult(null); setError('') }} />
           </label>
         </div>
         {error && <p className="field-error availability-error" role="alert">{error}</p>}
@@ -94,9 +99,11 @@ function AvailabilityPage() {
         <section className={`availability-result${isAvailable ? '' : ' unavailable'}`} role="status" aria-live="polite">
           <span className="availability-result-icon" aria-hidden="true">{isAvailable ? '✓' : '!'}</span>
           <div className="availability-result-content">
-            <p className="eyebrow">{isAvailable ? 'GOOD NEWS' : 'NO SPACE FOR THIS PARTY'}</p>
-            <h2>{isAvailable ? 'There is availability' : 'Not enough seats available'}</h2>
-            <p>{isAvailable
+            <p className="eyebrow">{isAvailable ? 'GOOD NEWS' : bookingClosed ? 'BOOKINGS CLOSED' : 'NO SPACE FOR THIS PARTY'}</p>
+            <h2>{isAvailable ? 'There is availability' : bookingClosed ? 'This service can no longer be booked' : 'Not enough seats available'}</h2>
+            <p>{bookingClosed
+              ? 'Bookings close 2 hours before the service. You can try another date or time.'
+              : isAvailable
               ? `Your party of ${seatedPartySize} can be seated for ${resultStartTime}${resultEndTime ? `–${resultEndTime}` : ''}. ${remaining} seat${remaining === 1 ? '' : 's'} remain.`
               : `There are ${remaining} seat${remaining === 1 ? '' : 's'} remaining for this service, which is not enough for ${seatedPartySize}. You can try another date or time.`}</p>
             {isAvailable && layoutSummary && <p className="layout-summary"><strong>Seating preview:</strong> {layoutSummary}{/\bseats?\b/i.test(layoutSummary) ? '' : ' seats'}</p>}
