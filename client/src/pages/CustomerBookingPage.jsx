@@ -84,7 +84,8 @@ function CustomerBookingPage() {
   }, [slotDate, session, notify])
 
   useEffect(() => {
-    if (!selectedSlot) return undefined
+    // after sign out the session is gone and the page is leaving, so nothing to ask
+    if (!selectedSlot || !session?.isAuthenticated) return undefined
     let active = true
     apiRequest(`/slots/${encodeURIComponent(getSlotId(selectedSlot))}/availability`, {
       headers: { Authorization: `Bearer ${session.token}` },

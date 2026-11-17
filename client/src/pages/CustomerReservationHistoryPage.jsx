@@ -11,7 +11,14 @@ import { formatSlotLabel, getSlotId, getSlotStart, isAtLeast, normalizeSlots } f
 const CHANGE_WINDOW_MS = 48 * 60 * 60 * 1000;
 
 function formatTables(tables) {
-  return tables.map(table => `${table.table_number} (${table.assigned_seats} seats)`).join(', ');
+  return tables
+    .map(table => `${table.table_number} (${table.assigned_seats} seat${table.assigned_seats === 1 ? '' : 's'})`)
+    .join(', ');
+}
+
+// the latest service first, and on the same day the later time first
+function newestFirst(a, b) {
+  return `${b.date} ${b.start_time}`.localeCompare(`${a.date} ${a.start_time}`);
 }
 
 function slotPlaceholder(isLoading, availableSlots) {
@@ -43,7 +50,7 @@ function CustomerReservationHistoryPage() {
       headers: { Authorization: `Bearer ${session.token}` },
     })
       .then(response => {
-        if (active) setReservations(response.sort((a, b) => b.date.localeCompare(a.date)));
+        if (active) setReservations(response.sort(newestFirst));
       })
       .catch(requestError => {
         if (active) notify(requestError.message);
@@ -176,7 +183,7 @@ function CustomerReservationHistoryPage() {
       setReservations(list =>
         list
           .map(item => (item.id === updated.id ? updated : item))
-          .sort((a, b) => b.date.localeCompare(a.date))
+          .sort(newestFirst)
       );
       closeModal();
       notify('Booking updated. A confirmation email is on its way.', 'success');
@@ -232,7 +239,7 @@ function CustomerReservationHistoryPage() {
                     </span>
                   )}
                   <span>
-                    {reservation.party_size ?? '—'} guests ·{' '}
+                    {reservation.party_size ?? '—'} guest{reservation.party_size === 1 ? '' : 's'} ·{' '}
                     {reservation.status || 'Status unavailable'}
                   </span>
                   {reservation.assigned_tables?.length > 0 && (
