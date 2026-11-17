@@ -118,16 +118,6 @@ class ReservationRepository:
             )
             slot = result.scalar_one_or_none()
             if not slot:
-                # If exact time range doesn't match, check by start_time
-                res_start = await session.execute(
-                    select(TimeSlotDAO).where(
-                        TimeSlotDAO.date == slot_date,
-                        TimeSlotDAO.start_time == slot_time,
-                    )
-                )
-                slot = res_start.scalar_one_or_none()
-
-            if not slot:
                 raise NotFoundError(
                     f"Time slot not found for date '{slot_date.isoformat()}' and time '{slot_time.strftime('%H:%M')}'."
                 )
@@ -152,15 +142,13 @@ class ReservationRepository:
             await session.flush()
             assignments:List[AssignedTableInfo]=[]
             for slot_table, seats in table_allocations:
-                    table_numer=await session.execute(select(TableDAO.table_number).where(TableDAO.id==slot_table.table_id))
-                    number=str(table_numer.scalar_one())
                     assignment = ReservationTableAssignmentDAO(
                         reservation_id=res.id,
                         slot_table_id=slot_table.id,
                         assigned_seats=seats,
                     )
                     session.add(assignment)
-                    assignments.append(reservationTableAssignmentDAO_to_AssignedTableInfo(assignment,number))
+                    assignments.append(reservationTableAssignmentDAO_to_AssignedTableInfo(assignment,slot_table.table.table_number))
             
             try:
                 await session.commit()

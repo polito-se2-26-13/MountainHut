@@ -92,11 +92,11 @@ class ReservationController():
         async with booking_lock:
             timeSlot=await self._check_slot_for_booking(reservation.slot_id,reservation.user_id)
 
-            # Check available capacity (Capacity Deduction constraint)
-            avail = await self.repo.get_slot_availability(reservation.slot_id)
-            if reservation.party_size > avail["remaining_seats"]:
+            # Check available capacity (Capacity Deduction constraint), on the slot just read, as the change does
+            remaining = sum(st.free_seats for st in timeSlot.slot_tables if st.is_available)
+            if reservation.party_size > remaining:
                 raise ConflictError(
-                    f"Not enough seats available (requested {reservation.party_size}, remaining {avail['remaining_seats']})."
+                    f"Not enough seats available (requested {reservation.party_size}, remaining {remaining})."
                 )
             #allocation
             table_allocations = assign_tables_for_party(timeSlot, reservation.party_size)

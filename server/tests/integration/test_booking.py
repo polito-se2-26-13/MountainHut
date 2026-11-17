@@ -1,6 +1,6 @@
 """Integration tests of the Book a table story (MH-01): POST /api/reservations,
 GET /api/reservations/{reference} and GET /api/slots/{slot_id}/availability."""
-from datetime import datetime, timedelta
+from datetime import datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 from server.models.DAO.reservation import ReservationDAO
@@ -67,7 +67,8 @@ def test_party_gets_a_table_and_the_booking_is_saved(client, db):
     assert response.status_code == 201
     booking = response.json()
     assert booking["status"] == "CONFIRMED"
-    assert booking["booking_reference"]
+    # the date in the reference is the Italian one, as the slots
+    assert booking["booking_reference"].startswith(f"MH-{datetime.now(ZoneInfo('Europe/Rome')):%Y%m%d}-")
     assert seats_by_table(response) == {f"{slot}-1": 4}
     saved = db.get(ReservationDAO, booking["id"])
     assert saved.slot_id == slot
@@ -151,6 +152,7 @@ def test_party_larger_than_the_free_seats_is_refused(client, db):
     response = book(client, hiker, slot, 7)
 
     assert response.status_code == 409
+    assert response.json()["message"] == "Not enough seats available (requested 7, remaining 6)."
     assert db.query(ReservationDAO).count() == 0
 
 
@@ -357,3 +359,17 @@ def test_a_booking_that_is_no_longer_confirmed_gives_its_seats_back(client, db):
     db.commit()
 
     assert client.get(f"/api/slots/{slot}/availability").json()["remaining_seats"] == 6
+
+
+def test_availability_by_date_and_time_finds_the_slot_running_at_that_time(client, db):
+    # fixed times, so the slot never runs past midnight
+    slot = TimeSlotDAO(date=datetime.now().date() + timedelta(days=3), start_time=time(12, 0), end_time=time(13, 0), status="OPEN")
+    db.add(slot)
+    db.commit()
+    day = slot.date.isoformat()
+
+    for at in ("12:00", "12:30"):
+        found = client.get("/api/slots/availability", params={"date": day, "time": at})
+        assert found.status_code == 200
+        assert found.json()["slot_id"] == slot.id
+    assert client.get("/api/slots/availability", params={"date": day, "time": "13:00"}).status_code == 404

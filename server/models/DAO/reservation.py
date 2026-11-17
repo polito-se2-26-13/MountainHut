@@ -1,6 +1,7 @@
 """Reservation and Table Assignment database models (MH-01 & MH-03)."""
 import uuid
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from typing import TYPE_CHECKING, Optional, List
 
 from sqlalchemy import (
@@ -25,7 +26,8 @@ if TYPE_CHECKING:
 
 def generate_booking_reference() -> str:
     """Generate a readable, unique booking reference code (MH-03)."""
-    return f"MH-{datetime.now().strftime('%Y%m%d')}-{uuid.uuid4().hex[:6].upper()}"
+    # the date of the hut, also on a server clock in UTC
+    return f"MH-{datetime.now(ZoneInfo('Europe/Rome')).strftime('%Y%m%d')}-{uuid.uuid4().hex[:6].upper()}"
 
 
 class ReservationDAO(Base):
