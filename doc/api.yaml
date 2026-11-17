@@ -1204,10 +1204,6 @@ components:
         table_number:
           type: string
           example: T01
-        location:
-          type: string
-          nullable: true
-          example: Ground floor
         assigned_seats:
           type: integer
           example: 4

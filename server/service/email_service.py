@@ -1,18 +1,16 @@
 """Email Template & Formatting Service (MH-03: Receive Confirmation)."""
 from html import escape
-from typing import Dict, Any, Optional
-from server.models.DAO.reservation import ReservationDAO
+from typing import Dict, Any
 import os
 import smtplib
 from email.message import EmailMessage
 from dotenv import load_dotenv
 from server.models.DTO.reservation_dto import ReservationMailDTO
 from pathlib import Path
-from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parents[1]
 ENV_PATH = BASE_DIR / ".env"
-load_dotenv(ENV_PATH, override=True)
+load_dotenv(ENV_PATH)
 
 def format_booking_email_text(reservation: ReservationMailDTO) -> str:
     """
@@ -24,8 +22,6 @@ def format_booking_email_text(reservation: ReservationMailDTO) -> str:
     - possible party requirements (allergies)
     - name of the hiker who made the reservation
     """
-    """
-"""
     hiker_name=reservation.hiker_name
     ref= reservation.booking_reference
     date_str = reservation.date_str

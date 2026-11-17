@@ -3,7 +3,6 @@ from typing import Annotated, Optional, List
 from pydantic import ConfigDict
 from pydantic import BaseModel, EmailStr, Field, StringConstraints
 from server.models.DTO.user_dto import Phone, Name
-from server.models.DTO.slot_dto import Table
 
 
 class SpecialRequirementDTO(BaseModel):
@@ -37,7 +36,6 @@ class AssignedTableInfo(BaseModel):
     """Details of a table assigned to a reservation."""
     table_id: int
     table_number: str
-    location: Optional[str] = None
     assigned_seats: int
 
 
@@ -57,7 +55,6 @@ class ReservationResponse(BaseModel):
     contact_phone: Optional[str] = None
     status: str
     assigned_tables: List[AssignedTableInfo] = []
-    #created_at: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 

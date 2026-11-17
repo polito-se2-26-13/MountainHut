@@ -58,7 +58,7 @@ def reservationDTO_to_response(reservation:ReservationDAO, assigments: List[Assi
         status=reservation.status,
         assigned_tables=assigments
         )
-def slotTableDto_to_response(slotTime:TimeSlotDAO,table_list:Table)->SlotResponse:
+def slotTableDto_to_response(slotTime:TimeSlotDAO,table_list:list[Table])->SlotResponse:
     return SlotResponse(
         slotId=slotTime.id,
         date=slotTime.date,
@@ -69,7 +69,7 @@ def slotTableDto_to_response(slotTime:TimeSlotDAO,table_list:Table)->SlotRespons
         message="Slot created successfully"
     ) 
 
-def slots_deatils_to_response(slots:list[tuple[TimeSlotDAO, list[Table]]])->SlotDetail:
+def slots_deatils_to_response(slots:list[tuple[TimeSlotDAO, list[Table]]])->list[SlotDetail]:
     results:list[SlotDetail]=[]
     for slot,tables in slots:
         results.append(SlotDetail(
@@ -81,19 +81,6 @@ def slots_deatils_to_response(slots:list[tuple[TimeSlotDAO, list[Table]]])->Slot
             tables=tables
         ))
     return results
-
-def tableList(tables: list[dict]):
-    tablesDto = []
-
-    for table in tables:
-        tablesDto.append(
-            Table(
-                tableNumber=table["table_number"],
-                seats=table["available_seats"]
-            )
-        )
-
-    return tablesDto
 
 def reservationEmailDto_to_email(
         ref:str,
@@ -124,7 +111,6 @@ def reservationTableAssignmentDAO_to_AssignedTableInfo(assigned:ReservationTable
                     table_id=assigned.slot_table_id,
                     table_number=number,
                     assigned_seats=assigned.assigned_seats,
-                    location=None
                 )
 def timeSlotDAO_to_response(timeDao:TimeSlotDAO)->TimeResponse:
     return TimeResponse(

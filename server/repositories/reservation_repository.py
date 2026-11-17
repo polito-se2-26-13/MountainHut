@@ -1,7 +1,7 @@
 from server.database import AsyncSessionLocal
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional, Tuple
-from sqlalchemy import select,func
+from sqlalchemy import select
 from server.models.DAO.user import UserDAO
 from server.models.DAO.table import TableDAO
 from server.models.DAO.time_slot import SlotTableDAO, TimeSlotDAO
@@ -13,7 +13,7 @@ from server.models.enum.user_type import UserType
 from server.models.error.notfound_error import NotFoundError
 from server.models.error.conflict_error import ConflictError
 from server.service.booking_service import assign_tables_for_party
-from datetime import datetime, date, time
+from datetime import date, time
 
 from server.service.mapper_service import reservationTableAssignmentDAO_to_AssignedTableInfo,specialRequirementDTO_to_DAO
 

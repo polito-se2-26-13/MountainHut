@@ -274,7 +274,7 @@ def test_booking_can_be_read_by_its_reference(client, db):
 
     assert response.status_code == 200
     assert response.json()["id"] == booking["id"]
-    assert response.json()["assigned_tables"][0]["table_number"] == f"{slot}-1"
+    assert response.json()["assigned_tables"] == [{"table_id": booking["assigned_tables"][0]["table_id"], "table_number": f"{slot}-1", "assigned_seats": 2}]
     assert client.get("/api/reservations/NOPE", headers=TOKENS[hiker]).status_code == 404
 
 

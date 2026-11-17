@@ -168,7 +168,6 @@ JSON response:
     {
       "table_id": 1,
       "table_number": "T1",
-      "location": "Indoor Main Hall",
       "assigned_seats": 4
     }
   ],
@@ -214,7 +213,6 @@ JSON response:
       {
         "table_id": 1,
         "table_number": "T1",
-        "location": "Indoor Main Hall",
         "assigned_seats": 4
       }
     ],
@@ -380,7 +378,6 @@ JSON response:
     {
       "table_id": 1,
       "table_number": "T1",
-      "location": "Indoor Main Hall",
       "assigned_seats": 4
     }
   ],

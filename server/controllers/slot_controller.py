@@ -4,7 +4,6 @@ from server.repositories.slot_repopsitory import SlotRepository
 from server.repositories.reservation_repository import ReservationRepository
 from server.controllers.reservation_controller import booking_lock
 from server.models.error.conflict_error import ConflictError
-from server.models.error.notfound_error import NotFoundError
 from server.service.mapper_service import slotTableDto_to_response, timeSlotDAO_to_response,tableDAO_to_response
 from server.models.error.unprocessable_content import UnprocessableContent
 from server.models.DTO.slot_dto import SlotDetail
