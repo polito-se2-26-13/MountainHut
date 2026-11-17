@@ -191,6 +191,7 @@ def test_closed_slot_cannot_be_booked(client, db):
     slot = add_slot(db, [6], status="CLOSED")
 
     assert book(client, hiker, slot, 2).status_code == 409
+    assert not client.get(f"/api/slots/{slot}/availability").json()["is_available"]
 
 
 def test_availability_counts_the_booked_seats(client, db):
@@ -275,14 +276,13 @@ def test_booking_can_be_read_by_its_reference(client, db):
     assert response.status_code == 200
     assert response.json()["id"] == booking["id"]
     assert response.json()["assigned_tables"] == [{"table_id": booking["assigned_tables"][0]["table_id"], "table_number": f"{slot}-1", "assigned_seats": 2}]
-    assert client.get("/api/reservations/NOPE", headers=TOKENS[hiker]).status_code == 404
+    assert client.get("/api/reservations/reference/NOPE", headers=TOKENS[hiker]).status_code == 404
 
 
 def test_bookings_are_read_only_with_the_login(client, db):
     anna = add_hiker(db)
     booking = book(client, anna, add_slot(db, [6]), 2).json()
-    
-    print(client.get(f"/api/reservations/user").request.headers)
+
     assert client.get(f"/api/reservations/user").status_code == 401
     assert client.get(f"/api/reservations/reference/{booking['booking_reference']}").status_code == 401
 
@@ -290,12 +290,14 @@ def test_bookings_are_read_only_with_the_login(client, db):
 def test_a_hiker_reads_only_their_own_bookings(client, db):
     anna = add_hiker(db)
     other = add_hiker(db, email="other@example.com")
-    booking = book(client, anna, add_slot(db, [6]), 2).json()
+    slot = add_slot(db, [6])
+    booking = book(client, anna, slot, 2).json()
+    # a booking of another hiker in the same slot, which anna must not see
+    assert book(client, other, slot, 2).status_code == 201
     employee = UserDAO(email="employee@example.com", password_hash="x", first_name="E", last_name="E", role="Employee")
     db.add(employee)
     db.commit()
 
-    #assert client.get(f"/api/reservations/user/", headers=TOKENS[other]).status_code == 403
     assert client.get(f"/api/reservations/reference/{booking['booking_reference']}", headers=TOKENS[other]).status_code == 403
     mine = client.get(f"/api/reservations/user/", headers=TOKENS[anna])
     assert mine.status_code == 200
