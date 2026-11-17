@@ -213,7 +213,7 @@ async def test_confirmation_email_follows_the_product_owner(test_db, monkeypatch
         user_id=1,
         contact_name="Somebody Else",
         contact_email="other@example.com",
-        special_requirements=[{"description": "Gluten-free bread"}],
+        special_requirements=[{"has_allergy": True, "description": "1 peanut allergy"}, {"description": "Gluten-free bread"}],
     )
 
     res = await ReservationController().create_reservation(payload)
@@ -229,6 +229,9 @@ async def test_confirmation_email_follows_the_product_owner(test_db, monkeypatch
         assert "Gluten-free bread" in body
         assert "T1" not in body and "T2" not in body
         assert "Assigned" not in body and "adjacent" not in body and "2 hours" not in body
+    # MH-05: only the allergy is marked
+    assert "ALLERGY: 1 peanut allergy" in format_booking_email_text(sent[0])
+    assert format_booking_email_html(sent[0]).count("Allergy:") == 1
 
 
 def test_confirmation_email_without_requirements_says_so():
@@ -239,7 +242,6 @@ def test_confirmation_email_without_requirements_says_so():
         date_str="01/12/2026",
         time_slot="12:30-13:30",
         party_size=2,
-        special_reqs=[],
     )
 
     assert "None specified" in format_booking_email_text(mail)

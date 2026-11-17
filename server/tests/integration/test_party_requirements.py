@@ -1,7 +1,6 @@
 """Integration tests of MH-05, party requirements: a booking has a list of requirements,
 each with its own allergy flag and description, as in the example of the story."""
-from server.service.email_service import format_booking_email_html, format_booking_email_text
-from test_booking import TOKENS, add_hiker, add_slot
+from test_booking import TOKENS, add_hiker, add_slot, book
 
 REQUIREMENTS = [
     {"has_allergy": True, "description": "1 vegan, peanut allergy"},
@@ -9,21 +8,10 @@ REQUIREMENTS = [
 ]
 
 
-def book_with(client, hiker, slot, requirements):
-    return client.post("/api/reservations", json={
-        "slot_id": slot,
-        "party_size": 4,
-        "user_id": hiker,
-        "contact_name": "Anna Rossi",
-        "contact_email": "anna@example.com",
-        "special_requirements": requirements,
-    }, headers=TOKENS[hiker])
-
-
 def test_each_requirement_is_saved_with_its_allergy_flag(client, db):
     anna = add_hiker(db)
 
-    response = book_with(client, anna, add_slot(db, [6]), REQUIREMENTS)
+    response = book(client, anna, add_slot(db, [6]), 4, special_requirements=REQUIREMENTS)
 
     assert response.status_code == 201
     read = client.get(f"/api/reservations/reference/{response.json()['booking_reference']}", headers=TOKENS[anna])
@@ -31,26 +19,9 @@ def test_each_requirement_is_saved_with_its_allergy_flag(client, db):
         assert booking["special_requirements"] == REQUIREMENTS
 
 
-def test_the_confirmation_lists_the_requirements_and_flags_only_the_allergy(client, db, monkeypatch):
-    sent = []
-    monkeypatch.setattr(
-        "server.controllers.reservation_controller.send_booking_confirmation_email",
-        lambda mail: sent.append(mail) or {"status": "SENT"},
-    )
-    anna = add_hiker(db)
-
-    book_with(client, anna, add_slot(db, [6]), REQUIREMENTS)
-
-    text, html = format_booking_email_text(sent[0]), format_booking_email_html(sent[0])
-    for body in (text, html):
-        assert "1 vegan, peanut allergy" in body
-        assert "2 vegetarians" in body
-    assert text.count("ALLERGY:") == 1 and html.count("Allergy:") == 1
-
-
 def test_a_requirement_without_a_description_is_refused(client, db):
     anna = add_hiker(db)
 
-    response = book_with(client, anna, add_slot(db, [6]), [{"has_allergy": True, "description": "   "}])
+    response = book(client, anna, add_slot(db, [6]), 4, special_requirements=[{"has_allergy": True, "description": "   "}])
 
     assert response.status_code == 422

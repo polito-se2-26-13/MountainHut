@@ -1,7 +1,7 @@
 """DTOs for table reservation and slot availability (MH-44)."""
-from typing import Optional, List
+from typing import Annotated, Optional, List
 from pydantic import ConfigDict
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, StringConstraints
 from server.models.DTO.user_dto import Phone, Name
 from server.models.DTO.slot_dto import Table
 
@@ -9,10 +9,10 @@ from server.models.DTO.slot_dto import Table
 class SpecialRequirementDTO(BaseModel):
     """One requirement for part of the party, with its own allergy flag (MH-05)."""
     has_allergy: bool = False
-    description: str = Field(..., min_length=1, max_length=500)
+    # spaces are cut first, as in Name, so a description of only spaces is refused
+    description: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=500)]
 
-    # spaces are cut first, so a description of only spaces is refused
-    model_config = ConfigDict(from_attributes=True, str_strip_whitespace=True)
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ReservationCreate(BaseModel):
@@ -27,10 +27,10 @@ class ReservationCreate(BaseModel):
 
 
 class ReservationUpdate(BaseModel):
-    """What a hiker can change in a booking (MH-06); a field left out keeps its value."""
-    slot_id: Optional[int] = None
-    party_size: Optional[int] = Field(None, ge=1)
-    special_requirements: Optional[List[SpecialRequirementDTO]] = None
+    """What a hiker can change in a booking (MH-06), sent whole as the change window of the history page does."""
+    slot_id: int = Field(..., description="ID of the selected time slot")
+    party_size: int = Field(..., ge=1, description="Number of people in the party")
+    special_requirements: List[SpecialRequirementDTO] = Field([], description="Dietary requirements and allergies")
 
 
 class AssignedTableInfo(BaseModel):

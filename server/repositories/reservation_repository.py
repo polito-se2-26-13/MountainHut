@@ -5,7 +5,7 @@ from sqlalchemy import select,func
 from server.models.DAO.user import UserDAO
 from server.models.DAO.table import TableDAO
 from server.models.DAO.time_slot import SlotTableDAO, TimeSlotDAO
-from server.models.DAO.reservation import ReservationDAO, ReservationTableAssignmentDAO, SpecialRequirementDAO
+from server.models.DAO.reservation import ReservationDAO, ReservationTableAssignmentDAO
 from server.models.DTO.reservation_dto import AssignedTableInfo, ReservationCreate, SpecialRequirementDTO
 from server.models.enum.reservation_status import ReservationStatus
 from server.models.enum.slot_status import SlotStatus
@@ -15,7 +15,7 @@ from server.models.error.conflict_error import ConflictError
 from server.service.booking_service import assign_tables_for_party
 from datetime import datetime, date, time
 
-from server.service.mapper_service import reservationTableAssignmentDAO_to_AssignedTableInfo
+from server.service.mapper_service import reservationTableAssignmentDAO_to_AssignedTableInfo,specialRequirementDTO_to_DAO
 
 class ReservationRepository:
 
@@ -142,8 +142,7 @@ class ReservationRepository:
                     user_id=reservation.user_id,
                     slot_id=reservation.slot_id,
                     party_size=reservation.party_size,
-                    requirements=[SpecialRequirementDAO(has_allergy=r.has_allergy, description=r.description)
-                                  for r in reservation.special_requirements],
+                    requirements=specialRequirementDTO_to_DAO(reservation.special_requirements),
                     contact_name=reservation.contact_name,
                     contact_email=reservation.contact_email,
                     contact_phone=reservation.contact_phone,
@@ -172,25 +171,20 @@ class ReservationRepository:
         return [res,assignments]
 
     async def transaction_update_reservation(self, reservation_id: int, slot_id: int, party_size: int,
-                                             requirements: Optional[List[SpecialRequirementDTO]]) -> None:
-        """MH-06: a change is a new booking (PO issue #48), so the booking gives its seats back and gets its
-        tables again with the MH-01 rules. If the party does not fit, nothing is saved (PO issue #38)."""
+                                             requirements: List[SpecialRequirementDTO]) -> None:
+        """Gives the booking's seats back and assigns its tables again, all in one commit (MH-06)."""
         async with await self._get_session() as session:
             reservation = await session.get(ReservationDAO, reservation_id)
-            for assignment in list(reservation.table_assignments):
-                await session.delete(assignment)
+            # delete-orphan deletes the old assignments at the flush
+            reservation.table_assignments.clear()
             await session.flush()
             # read the slot again, otherwise its free seats still count the seats given back just above
-            slot = (await session.execute(
-                select(TimeSlotDAO).where(TimeSlotDAO.id == slot_id).execution_options(populate_existing=True)
-            )).scalar_one()
-            # a ConflictError here closes the session without commit, so the booking stays as it was
+            slot = await session.get(TimeSlotDAO, slot_id, populate_existing=True)
+            # a ConflictError here closes the session without commit, so the booking stays as it was (PO issue #38)
             allocations = assign_tables_for_party(slot, party_size)
             reservation.slot_id = slot_id
             reservation.party_size = party_size
-            if requirements is not None:
-                reservation.requirements = [SpecialRequirementDAO(has_allergy=r.has_allergy, description=r.description)
-                                            for r in requirements]
+            reservation.requirements = specialRequirementDTO_to_DAO(requirements)
             for slot_table, seats in allocations:
                 session.add(ReservationTableAssignmentDAO(
                     reservation_id=reservation_id, slot_table_id=slot_table.id, assigned_seats=seats))

@@ -43,13 +43,14 @@ def add_slot(db, seats, hours_ahead=24, status="OPEN"):
     return slot.id
 
 
-def book(client, hiker, slot, party_size):
+def book(client, hiker, slot, party_size, **extra):
     return client.post("/api/reservations", json={
         "slot_id": slot,
         "party_size": party_size,
         "user_id": hiker,
         "contact_name": "Anna Rossi",
         "contact_email": "anna@example.com",
+        **extra,
     }, headers=TOKENS[hiker])
 
 

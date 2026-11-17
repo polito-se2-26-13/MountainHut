@@ -72,10 +72,9 @@ class ReservationDAO(Base):
         cascade="all, delete-orphan",
         lazy="selectin",
     )
-    # MH-05: the list of requirements, each with its allergy flag; replacing the list deletes the old ones
+    # delete-orphan: the change of a booking (MH-06) replaces the whole list
     requirements: Mapped[List["SpecialRequirementDAO"]] = relationship(
         "SpecialRequirementDAO",
-        back_populates="reservation",
         cascade="all, delete-orphan",
         lazy="selectin",
     )
@@ -178,5 +177,3 @@ class SpecialRequirementDAO(Base):
     )
     has_allergy: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False)
-
-    reservation: Mapped["ReservationDAO"] = relationship("ReservationDAO", back_populates="requirements")

@@ -31,7 +31,7 @@ def format_booking_email_text(reservation: ReservationMailDTO) -> str:
     date_str = reservation.date_str
     time_slot = reservation.time_slot
     party_size = reservation.party_size
-    # one line per requirement (MH-05), the allergies marked so the kitchen notices them
+    # PO issues #4 and #29: one line per requirement, the allergies marked
     special_reqs = "".join(
         f"\n  - {'ALLERGY: ' if r.has_allergy else ''}{r.description}" for r in reservation.special_reqs
     ) or "    None specified"
@@ -147,14 +147,6 @@ def send_booking_confirmation_email(reservation: ReservationMailDTO) -> Dict[str
   text_content = format_booking_email_text(reservation)
   html_content = format_booking_email_html(reservation)
   return sender_email(subject,to_email,text_content,html_content,reservation.booking_reference)
-
-def send_booking_change_email(reservation: ReservationMailDTO, previous_slot: str, previous_party_size: int) -> Dict[str, Any]:
-  """MH-06 and PO issue #41: every change of a booking is notified by email, with what it was before."""
-  subject = f"Mountain Hut Booking Changed [{reservation.booking_reference}]"
-  before = f"This booking was changed from {previous_slot}, {previous_party_size} person(s)."
-  text_content = f"{format_booking_email_text(reservation)}\n\n{before}"
-  html_content = format_booking_email_html(reservation).replace("</body>", f"<p>{before}</p></body>")
-  return sender_email(subject, reservation.contact_email, text_content, html_content, reservation.booking_reference)
 
 def sender_email(subject:str,to_email:str,text_content:str,html_content:str,booking_ref:str) -> Dict[str, Any]:
   """

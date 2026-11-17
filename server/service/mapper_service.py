@@ -4,7 +4,7 @@ from server.models.DTO.error_dto import ErrorDTO
 from server.models.DTO.user_dto import UserResponseDTO,UserLoginResponse,UserDTO, UserDetailDTO
 from server.models.DAO.user import UserDAO
 from server.models.DTO.reservation_dto import ReservationResponse, AssignedTableInfo,ReservationMailDTO,SpecialRequirementDTO
-from server.models.DAO.reservation import ReservationDAO,ReservationTableAssignmentDAO
+from server.models.DAO.reservation import ReservationDAO,ReservationTableAssignmentDAO,SpecialRequirementDAO
 from server.models.DTO.slot_dto import SlotResponse,Table,SlotDetail
 from server.models.DTO.table_dto import TableResponse
 from server.models.DTO.time_dto import TimeResponse
@@ -51,7 +51,7 @@ def reservationDTO_to_response(reservation:ReservationDAO, assigments: List[Assi
         start_time=reservation.slot.start_time.strftime("%H:%M"),
         end_time=reservation.slot.end_time.strftime("%H:%M"),
         party_size=reservation.party_size,
-        special_requirements=[SpecialRequirementDTO.model_validate(r) for r in reservation.requirements],
+        special_requirements=reservation.requirements,
         contact_email=reservation.contact_email,
         contact_name=reservation.contact_name,
         contact_phone=reservation.contact_phone,
@@ -110,9 +110,12 @@ def reservationEmailDto_to_email(
         date_str=date,
         time_slot=timeSlot,
         party_size=partySize,
-        special_reqs=[SpecialRequirementDTO.model_validate(r) for r in spReq],
+        special_reqs=spReq,
         hiker_name=hikerName
     )
+
+def specialRequirementDTO_to_DAO(requirements:list[SpecialRequirementDTO])->list[SpecialRequirementDAO]:
+    return [SpecialRequirementDAO(has_allergy=r.has_allergy,description=r.description) for r in requirements]
 
 def reservationTableAssignmentDAO_to_AssignedTableInfo(assigned:ReservationTableAssignmentDAO,number:str)->AssignedTableInfo:
     return AssignedTableInfo(

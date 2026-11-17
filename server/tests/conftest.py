@@ -8,5 +8,3 @@ def no_real_mail(monkeypatch):
         "server.controllers.reservation_controller.send_booking_confirmation_email",
         lambda mail: {"status": "SENT"},
     )
-    # every other mail, as the one of a changed booking (MH-06), stops here
-    monkeypatch.setattr("server.service.email_service.sender_email", lambda *args: {"status": "SENT"})
