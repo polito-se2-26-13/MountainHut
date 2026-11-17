@@ -20,7 +20,7 @@ test('an employee creates a slot with its tables and a hiker sees its free seats
   await page.getByLabel('Table number 2').fill('T2')
   await page.getByLabel('Seats at table 2').fill('6')
   await page.getByRole('button', { name: 'Save time slot' }).click()
-  await expect(page.getByText('Slot created successfully')).toBeVisible()
+  await expect(page.getByText('Time slot and table configuration saved.')).toBeVisible()
 
   // a hiker, in a browser of their own, finds the new slot with the 10 seats of its two tables
   const hiker = await (await browser.newContext()).newPage()

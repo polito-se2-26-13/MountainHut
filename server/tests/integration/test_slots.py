@@ -146,6 +146,8 @@ def test_saving_the_same_times_with_another_meal_keeps_one_slot(client, db):
     assert client.post("/api/slots", json=slot([("T1", 4)]), headers=employee).status_code == 201
 
     assert db.query(TimeSlotDAO).count() == 1
+    # the meal chosen the second time is kept, and a save without a meal leaves it as it is
+    assert db.query(TimeSlotDAO).one().meal_type == "Dinner"
 
 
 def test_overlap_is_found_also_with_the_times_of_the_sample_data(client, db):

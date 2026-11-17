@@ -76,6 +76,8 @@ class SlotRepository:
         table_list = []
         async with await self._get_session() as session:
             try:
+                # the slot was read in another session, so its meal is written here with the tables
+                (await session.get(TimeSlotDAO,slotTime.id)).meal_type=slotTime.meal_type
                 for t,seat in tables:
                     slotTable=await session.execute(select(SlotTableDAO).where(
                         SlotTableDAO.table_id==t.id,

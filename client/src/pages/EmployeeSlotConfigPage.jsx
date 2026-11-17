@@ -43,6 +43,12 @@ function slotLabel(slot) {
 // the warden manages the hut, so they set up times and tables like an employee
 const staffRoles = ['Employee', 'Warden'];
 
+// Enter in a date or time field confirms that value only, it must not send the half-filled form;
+// it runs on the form, after the picker has already taken the typed value
+function keepEnterInField(event) {
+  if (event.key === 'Enter' && event.target.closest('.ant-picker')) event.preventDefault();
+}
+
 function EmployeeSlotConfigPage() {
   const { session } = useAuth();
   const [formData, setFormData] = useState({
@@ -180,7 +186,7 @@ function EmployeeSlotConfigPage() {
 
     setIsSaving(true);
     try {
-      const result = await apiRequest('/slots', {
+      await apiRequest('/slots', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -197,7 +203,7 @@ function EmployeeSlotConfigPage() {
           })),
         }),
       });
-      notify(result?.message || 'Time slot and table configuration saved.', 'success');
+      notify('Time slot and table configuration saved.', 'success');
       setSourceRefreshKey(current => current + 1);
     } catch (error) {
       notify(error.message || 'Could not save this time slot.');
@@ -224,7 +230,7 @@ function EmployeeSlotConfigPage() {
         </div>
       </header>
 
-      <Form className="slot-form mh-form" onFinish={handleSubmit} noValidate>
+      <Form className="slot-form mh-form" onFinish={handleSubmit} onKeyDown={keepEnterInField} noValidate>
         <section className="slot-panel" aria-labelledby="slot-details-title">
           <div className="section-heading">
             <div>
