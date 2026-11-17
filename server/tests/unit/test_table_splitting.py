@@ -100,6 +100,25 @@ async def test_changes_close_at_exactly_48_hours_before_the_slot(split_test_db):
         validate_change_deadline(slot, current_time=datetime.combine(two_days_before, time(12, 0), tzinfo=italy_tz))
 
 
+def test_rules_count_real_hours_when_the_clock_goes_forward():
+    """On Sunday 28 March 2027 the clock jumps from 02:00 to 03:00, so the night is one hour shorter."""
+    italy_tz = ZoneInfo("Europe/Rome")
+    sunday = date(2027, 3, 28)
+
+    # a slot at 04:00 is 2 real hours after 01:00, not after the 02:00 the wall clock would say
+    early = TimeSlotDAO(date=sunday, start_time=time(4, 0), end_time=time(5, 0))
+    validate_two_hour_rule(early, current_time=datetime.combine(sunday, time(1, 0), tzinfo=italy_tz))
+    with pytest.raises(ConflictError, match="at least 2 hours before"):
+        validate_two_hour_rule(early, current_time=datetime.combine(sunday, time(1, 30), tzinfo=italy_tz))
+
+    # a slot at 12:00 on Sunday is 48 real hours after Friday at 11:00
+    lunch = TimeSlotDAO(date=sunday, start_time=time(12, 0), end_time=time(13, 0))
+    friday = sunday - timedelta(days=2)
+    validate_change_deadline(lunch, current_time=datetime.combine(friday, time(10, 59), tzinfo=italy_tz))
+    with pytest.raises(ConflictError, match="48 hours"):
+        validate_change_deadline(lunch, current_time=datetime.combine(friday, time(11, 0), tzinfo=italy_tz))
+
+
 async def test_best_fit_single_table_allocation(split_test_db):
     """
     Test MH-01: Keep party together at one table using the smallest set of seats.
