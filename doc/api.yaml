@@ -1231,6 +1231,7 @@ components:
       required:
         - slot_id
         - party_size
+        - special_requirements
       properties:
         slot_id:
           type: integer
@@ -1243,6 +1244,6 @@ components:
           example: 3
         special_requirements:
           type: array
-          description: The new list of requirements, which replaces the old one; an empty or missing list removes them
+          description: The new list of requirements, which replaces the old one; an empty list removes them
           items:
             $ref: '#/components/schemas/SpecialRequirementDTO'

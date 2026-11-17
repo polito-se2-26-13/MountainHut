@@ -156,7 +156,10 @@ JSON response:
   "start_time": "12:00",
   "end_time": "13:00",
   "party_size": 4,
-  "special_requirements": "2 vegetarian meals, 1 gluten allergy",
+  "special_requirements": [
+    {"has_allergy": false, "description": "2 vegetarian meals"},
+    {"has_allergy": true, "description": "1 gluten allergy"}
+  ],
   "contact_name": "Alex Smith",
   "contact_email": "hiker1@example.com",
   "contact_phone": "+39 340 1234567",
@@ -199,7 +202,10 @@ JSON response:
     "start_time": "12:00",
     "end_time": "13:00",
     "party_size": 4,
-    "special_requirements": "2 vegetarian meals, 1 gluten allergy",
+    "special_requirements": [
+      {"has_allergy": false, "description": "2 vegetarian meals"},
+      {"has_allergy": true, "description": "1 gluten allergy"}
+    ],
     "contact_name": "Alex Smith",
     "contact_email": "hiker1@example.com",
     "contact_phone": "+39 340 1234567",
@@ -343,7 +349,10 @@ body, where `user_id` can be left out because the hiker comes from the token:
   "contact_name": "Alex Smith",
   "contact_email": "hiker1@example.com",
   "contact_phone": "+39 340 1234567",
-  "special_requirements": "2 vegetarian meals, 1 gluten allergy"
+  "special_requirements": [
+    {"has_allergy": false, "description": "2 vegetarian meals"},
+    {"has_allergy": true, "description": "1 gluten allergy"}
+  ]
 }
 ```
 HTTP Status: 201 created, 401 unauthorized, 403 forbidden, 404 slot not found, 409 slot closed, too late, already booked or not enough seats, 422 invalid request, 500 ISE<br>
@@ -359,7 +368,10 @@ JSON response:
   "start_time": "12:00",
   "end_time": "13:00",
   "party_size": 4,
-  "special_requirements": "2 vegetarian meals, 1 gluten allergy",
+  "special_requirements": [
+    {"has_allergy": false, "description": "2 vegetarian meals"},
+    {"has_allergy": true, "description": "1 gluten allergy"}
+  ],
   "contact_name": "Alex Smith",
   "contact_email": "hiker1@example.com",
   "contact_phone": "+39 340 1234567",
@@ -384,5 +396,24 @@ JSON response:
 ```
 
 ## PUT
+
+**change reservation**
+
+name: `/api/reservations/reference/{reference}/change`<br>
+parameter: `reference` booking reference<br>
+header: `Authorization: Bearer <token>` (Hiker, owner of the booking)<br>
+body, the whole booking again; the list replaces the old requirements and an empty list removes them:
+```json
+{
+  "slot_id": 2,
+  "party_size": 5,
+  "special_requirements": [
+    {"has_allergy": true, "description": "1 gluten allergy"}
+  ]
+}
+```
+The change is treated as a new booking (MH-06): it is allowed until 48 hours before the old slot and before the new one, the seats are given back and the tables assigned again, and the confirmation is sent again by email.<br>
+HTTP Status: 200 ok, 401 unauthorized, 403 not the owner, 404 booking or slot not found, 409 not confirmed, too late, slot closed, already booked in that slot or not enough seats (the booking stays as it was), 422 invalid request, 500 ISE<br>
+JSON response: the booking as in **create reservation**, with code 200.
 
 ## DELETE

@@ -175,11 +175,10 @@ class ReservationRepository:
         """Gives the booking's seats back and assigns its tables again, all in one commit (MH-06)."""
         async with await self._get_session() as session:
             reservation = await session.get(ReservationDAO, reservation_id)
-            # delete-orphan deletes the old assignments at the flush
+            # the booking gives its seats back: the slot stops counting them, and delete-orphan deletes them at the flush
             reservation.table_assignments.clear()
             await session.flush()
-            # read the slot again, otherwise its free seats still count the seats given back just above
-            slot = await session.get(TimeSlotDAO, slot_id, populate_existing=True)
+            slot = await session.get(TimeSlotDAO, slot_id)
             # a ConflictError here closes the session without commit, so the booking stays as it was (PO issue #38)
             allocations = assign_tables_for_party(slot, party_size)
             reservation.slot_id = slot_id

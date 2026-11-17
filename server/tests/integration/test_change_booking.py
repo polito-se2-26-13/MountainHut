@@ -81,3 +81,16 @@ def test_a_hiker_changes_only_their_own_bookings(client, db):
     booking = book(client, anna, add_slot(db, [6], hours_ahead=72), 2).json()
 
     assert change(client, other, booking, party_size=3).status_code == 403
+
+def test_a_change_without_the_requirements_is_refused_and_keeps_them(client, db):
+    # the window always sends the list: a missing one must not be read as "remove the allergies"
+    anna = add_hiker(db)
+    gluten = [{"has_allergy": True, "description": "1 gluten allergy"}]
+    booking = book(client, anna, add_slot(db, [6], hours_ahead=72), 2, special_requirements=gluten).json()
+
+    response = client.put(f"/api/reservations/reference/{booking['booking_reference']}/change",
+                          json={"slot_id": booking["slot_id"], "party_size": 3}, headers=TOKENS[anna])
+
+    assert response.status_code == 422
+    read = client.get(f"/api/reservations/reference/{booking['booking_reference']}", headers=TOKENS[anna])
+    assert read.json()["special_requirements"] == gluten

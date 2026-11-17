@@ -30,7 +30,7 @@ class ReservationUpdate(BaseModel):
     """What a hiker can change in a booking (MH-06), sent whole as the change window of the history page does."""
     slot_id: int = Field(..., description="ID of the selected time slot")
     party_size: int = Field(..., ge=1, description="Number of people in the party")
-    special_requirements: List[SpecialRequirementDTO] = Field([], description="Dietary requirements and allergies")
+    special_requirements: List[SpecialRequirementDTO] = Field(..., description="Dietary requirements and allergies")
 
 
 class AssignedTableInfo(BaseModel):
