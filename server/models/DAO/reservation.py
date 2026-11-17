@@ -64,7 +64,7 @@ class ReservationDAO(Base):
     )
 
     # Relationships with eager selectin loading for async operations
-    hiker: Mapped["UserDAO"] = relationship("UserDAO", back_populates="reservations", lazy="selectin")
+    hiker: Mapped["UserDAO"] = relationship("UserDAO", lazy="selectin")
     slot: Mapped["TimeSlotDAO"] = relationship("TimeSlotDAO", back_populates="reservations", lazy="selectin")
     table_assignments: Mapped[List["ReservationTableAssignmentDAO"]] = relationship(
         "ReservationTableAssignmentDAO",
