@@ -94,3 +94,16 @@ def test_a_change_without_the_requirements_is_refused_and_keeps_them(client, db)
     assert response.status_code == 422
     read = client.get(f"/api/reservations/reference/{booking['booking_reference']}", headers=TOKENS[anna])
     assert read.json()["special_requirements"] == gluten
+
+def test_a_party_changes_in_a_slot_shared_with_other_bookings(client, db):
+    # the other bookings of the slot are counted too, as in the sample data
+    anna = add_hiker(db)
+    other = add_hiker(db, email="other@example.com")
+    slot = add_slot(db, [4, 6], hours_ahead=72)
+    book(client, other, slot, 4)
+    booking = book(client, anna, slot, 2).json()
+
+    response = change(client, anna, booking, party_size=5)
+
+    assert response.status_code == 200
+    assert sum(seats_by_table(response).values()) == 5

@@ -178,7 +178,9 @@ class ReservationRepository:
             # the booking gives its seats back: the slot stops counting them, and delete-orphan deletes them at the flush
             reservation.table_assignments.clear()
             await session.flush()
-            slot = await session.get(TimeSlotDAO, slot_id)
+            # load the slot again with all its bookings: after the flush they would be read one by one,
+            # which async SQLAlchemy cannot do (MissingGreenlet when other bookings share the slot)
+            slot = await session.get(TimeSlotDAO, slot_id, populate_existing=True)
             # a ConflictError here closes the session without commit, so the booking stays as it was (PO issue #38)
             allocations = assign_tables_for_party(slot, party_size)
             reservation.slot_id = slot_id
