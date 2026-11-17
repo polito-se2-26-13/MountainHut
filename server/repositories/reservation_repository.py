@@ -182,6 +182,10 @@ class ReservationRepository:
             # which async SQLAlchemy cannot do (MissingGreenlet when other bookings share the slot)
             slot = await session.get(TimeSlotDAO, slot_id, populate_existing=True)
             # a ConflictError here closes the session without commit, so the booking stays as it was (PO issue #38)
+            remaining = sum(st.free_seats for st in slot.slot_tables if st.is_available)
+            if party_size > remaining:
+                # the same check and message as a new booking
+                raise ConflictError(f"Not enough seats available (requested {party_size}, remaining {remaining}).")
             allocations = assign_tables_for_party(slot, party_size)
             reservation.slot_id = slot_id
             reservation.party_size = party_size

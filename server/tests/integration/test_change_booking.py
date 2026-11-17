@@ -107,3 +107,15 @@ def test_a_party_changes_in_a_slot_shared_with_other_bookings(client, db):
 
     assert response.status_code == 200
     assert sum(seats_by_table(response).values()) == 5
+
+def test_a_booking_moved_to_a_full_slot_is_told_there_are_not_enough_seats(client, db):
+    anna = add_hiker(db)
+    other = add_hiker(db, email="other@example.com")
+    full = add_slot(db, [4], hours_ahead=80)
+    book(client, other, full, 4)
+    booking = book(client, anna, add_slot(db, [6], hours_ahead=72), 2).json()
+
+    response = change(client, anna, booking, slot_id=full)
+
+    assert response.status_code == 409
+    assert "Not enough seats" in response.json()["message"]
