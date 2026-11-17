@@ -1,26 +1,28 @@
+// GET /api/slots answers with a list of SlotDetail, in camelCase
 export function normalizeSlots(response) {
-  if (Array.isArray(response)) return response
-  if (Array.isArray(response?.slots)) return response.slots
-  if (Array.isArray(response?.items)) return response.items
-  return []
+  return Array.isArray(response) ? response : []
 }
 
 export function getSlotId(slot) {
-  return slot.slot_id ?? slot.slotId ?? slot.id
+  return slot.slotId
 }
 
 export function getSlotStart(slot) {
-  return slot.start_time ?? slot.startTime ?? slot.time
+  return slot.startTime
 }
 
 export function getSlotEnd(slot) {
-  return slot.end_time ?? slot.endTime ?? ''
+  return slot.endTime
 }
 
 export function formatSlotLabel(slot) {
-  const end = getSlotEnd(slot)
-  const meal = slot.meal_type ?? slot.mealType
-  return `${getSlotStart(slot)}${end ? ` – ${end}` : ''}${meal ? ` · ${meal}` : ''}`
+  return `${slot.startTime} – ${slot.endTime}${slot.mealType ? ` · ${slot.mealType}` : ''}`
+}
+
+// today in the browser's time zone, as YYYY-MM-DD (toISOString alone would give the UTC day)
+export function localDateString() {
+  const now = new Date()
+  return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10)
 }
 
 // only a hint for the page: the server checks the deadline in Europe/Rome time and decides

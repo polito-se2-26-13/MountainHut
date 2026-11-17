@@ -5,12 +5,7 @@ import { Link, Navigate } from 'react-router';
 import { apiRequest } from '../api/api.js';
 import { useAuth } from '../auth/AuthContext.jsx';
 import { useToast } from '../components/ToastProvider.jsx';
-
-function localDateString() {
-  const now = new Date();
-  const localDate = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
-  return localDate.toISOString().slice(0, 10);
-}
+import { getSlotId, localDateString, normalizeSlots } from '../utils/slots.js';
 
 function createTable(tableNumber = '', seats = 2) {
   return {
@@ -18,17 +13,6 @@ function createTable(tableNumber = '', seats = 2) {
     tableNumber,
     seats,
   };
-}
-
-function readSlotsResponse(response) {
-  if (Array.isArray(response)) return response;
-  if (Array.isArray(response?.slots)) return response.slots;
-  if (Array.isArray(response?.items)) return response.items;
-  return [];
-}
-
-function slotId(slot) {
-  return slot.slotId ?? slot.id;
 }
 
 function slotLabel(slot) {
@@ -80,7 +64,7 @@ function EmployeeSlotConfigPage() {
       headers: { Authorization: `Bearer ${session.token}` },
     })
       .then(result => {
-        if (active) setCopySourceOptions(readSlotsResponse(result));
+        if (active) setCopySourceOptions(normalizeSlots(result));
       })
       .catch(error => {
         if (active) notify(error.message || 'Could not load saved time slots.');
@@ -132,7 +116,7 @@ function EmployeeSlotConfigPage() {
       return;
     }
     const source = copySourceOptions.find(
-      slot => String(slotId(slot)) === String(selectedSourceSlotId)
+      slot => String(getSlotId(slot)) === String(selectedSourceSlotId)
     );
     if (!source) {
       notify('The selected saved time slot is no longer available.');
@@ -327,9 +311,8 @@ function EmployeeSlotConfigPage() {
                 onChange={value => setSelectedSourceSlotId(value)}
                 disabled={isLoadingSources || copySourceOptions.length === 0}
                 loading={isLoadingSources}
-                options={copySourceOptions.map((slot, index) => ({
-                  key: slotId(slot) ?? index,
-                  value: String(slotId(slot)),
+                options={copySourceOptions.map(slot => ({
+                  value: String(getSlotId(slot)),
                   label: slotLabel(slot),
                 }))}
               />

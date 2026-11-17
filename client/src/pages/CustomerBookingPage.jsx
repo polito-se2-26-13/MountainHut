@@ -6,22 +6,9 @@ import { apiRequest } from '../api/api.js'
 import { useAuth } from '../auth/AuthContext.jsx'
 import { useToast } from '../components/ToastProvider.jsx'
 import RequirementsEditor, { newRequirement, requirementsBody } from '../components/RequirementsEditor.jsx'
-import { formatSlotLabel, getSlotEnd, getSlotId, getSlotStart, isAtLeast, normalizeSlots } from '../utils/slots.js'
+import { formatSlotLabel, getSlotEnd, getSlotId, getSlotStart, isAtLeast, localDateString, normalizeSlots } from '../utils/slots.js'
 
 const TWO_HOURS_MS = 2 * 60 * 60 * 1000
-
-function localDateString() {
-  const now = new Date()
-  return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10)
-}
-
-function formatAssignedTables(tables = []) {
-  return tables.map((table) => ({
-    tableNumber: table.table_number ?? table.tableNumber ?? '—',
-    seats: table.assigned_seats ?? table.assignedSeats ?? 0,
-    location: table.location ?? table.tableLocation,
-  }))
-}
 
 function CustomerBookingPage() {
   const { session } = useAuth()
@@ -58,7 +45,7 @@ function CustomerBookingPage() {
     })
       .then((response) => {
         const upcomingSlots = normalizeSlots(response)
-          .filter((slot) => getSlotId(slot) != null && isAtLeast(slotDate, getSlotStart(slot), TWO_HOURS_MS))
+          .filter((slot) => isAtLeast(slotDate, getSlotStart(slot), TWO_HOURS_MS))
           .sort((a, b) => getSlotStart(a).localeCompare(getSlotStart(b)))
         if (active) {
           setSlotOptions(upcomingSlots)
@@ -95,8 +82,8 @@ function CustomerBookingPage() {
     return () => { active = false }
   }, [selectedSlot, session, notify])
 
-  const remainingSeats = Number(availability?.remaining_seats ?? availability?.remainingSeats ?? 0)
-  const isSlotOpen = (availability?.status || '').toUpperCase() === 'OPEN'
+  const remainingSeats = availability?.remaining_seats ?? 0
+  const isSlotOpen = availability?.status === 'OPEN'
   const contactNameError = !contactName.trim() ? 'Contact name is required.' : ''
   const contactEmailError = !contactEmail.trim()
     ? 'Contact email is required.'
@@ -196,8 +183,6 @@ function CustomerBookingPage() {
     }
   }
 
-  const assignedTables = formatAssignedTables(bookingSuccessData?.assigned_tables || bookingSuccessData?.assignedTables || [])
-
   return (
     <main className="page booking-page">
       <header className="booking-header">
@@ -216,14 +201,14 @@ function CustomerBookingPage() {
           <div className="confirmation-content">
             <p className="eyebrow">BOOKING CONFIRMED</p>
             <h2 id="booking-confirmation-title">Your table is reserved</h2>
-            <p>Reference <strong>{bookingSuccessData.booking_reference || '—'}</strong></p>
-            <p>{bookingSuccessData.bookingDate} · {bookingSuccessData.bookingTime}{bookingSuccessData.bookingEndTime ? `–${bookingSuccessData.bookingEndTime}` : ''} · {bookingSuccessData.bookedPartySize} guest{bookingSuccessData.bookedPartySize === 1 ? '' : 's'}</p>
-            {assignedTables.length > 0 && (
+            <p>Reference <strong>{bookingSuccessData.booking_reference}</strong></p>
+            <p>{bookingSuccessData.bookingDate} · {bookingSuccessData.bookingTime}–{bookingSuccessData.bookingEndTime} · {bookingSuccessData.bookedPartySize} guest{bookingSuccessData.bookedPartySize === 1 ? '' : 's'}</p>
+            {bookingSuccessData.assigned_tables.length > 0 && (
               <div className="assigned-tables">
                 <strong>Assigned seating</strong>
-                {assignedTables.map((table, index) => (
-                  <span key={`${table.tableNumber}-${index}`}>
-                    Table {table.tableNumber} · {table.seats} seat{table.seats === 1 ? '' : 's'}{table.location ? ` · ${table.location}` : ''}
+                {bookingSuccessData.assigned_tables.map((table) => (
+                  <span key={table.table_id}>
+                    Table {table.table_number} · {table.assigned_seats} seat{table.assigned_seats === 1 ? '' : 's'}{table.location ? ` · ${table.location}` : ''}
                   </span>
                 ))}
               </div>
@@ -342,7 +327,7 @@ function CustomerBookingPage() {
           <h2>Mountain Hut</h2>
           <div className="summary-divider" />
           <div className="summary-line"><span>Date</span><strong>{slotDate || 'Choose a date'}</strong></div>
-          <div className="summary-line"><span>Time</span><strong>{selectedSlot ? `${getSlotStart(selectedSlot)}${getSlotEnd(selectedSlot) ? ` – ${getSlotEnd(selectedSlot)}` : ''}` : 'Choose a time'}</strong></div>
+          <div className="summary-line"><span>Time</span><strong>{selectedSlot ? `${getSlotStart(selectedSlot)} – ${getSlotEnd(selectedSlot)}` : 'Choose a time'}</strong></div>
           <div className="summary-line"><span>Guests</span><strong>{partySize || 0}</strong></div>
           {availability && <div className="summary-line"><span>Seats left</span><strong>{remainingSeats}</strong></div>}
           <p className="summary-note">Reservations must be made at least 2 hours before the service time.</p>
