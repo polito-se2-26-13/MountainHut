@@ -24,6 +24,11 @@ test('an employee creates a slot with its tables and a hiker sees its free seats
   // Back goes to the home of the role, not to the page before in the browser history
   await page.getByRole('link', { name: '← Back' }).click()
   await expect(page).toHaveURL(/\/home\/employee/)
+  // also from a page opened directly, as from a shared link, where the history has nothing before it
+  const guest = await (await browser.newContext()).newPage()
+  await guest.goto('/availability')
+  await guest.getByRole('link', { name: '← Back' }).click()
+  await expect(guest).toHaveURL(/localhost:5199\/$/)
 
   // a hiker, in a browser of their own, finds the new slot with the 10 seats of its two tables
   const hiker = await (await browser.newContext()).newPage()
