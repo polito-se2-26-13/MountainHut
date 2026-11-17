@@ -117,7 +117,6 @@ function AvailabilityPage() {
               to={bookingPath}
               state={{ availabilitySearch: {
                 date: result?.date ?? date,
-                time: resultStartTime,
                 partySize: seatedPartySize,
                 slotId: result?.slot_id ?? result?.slotId,
               } }}>

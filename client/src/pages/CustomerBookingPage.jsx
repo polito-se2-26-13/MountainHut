@@ -52,12 +52,6 @@ function CustomerBookingPage() {
     : undefined
 
   useEffect(() => {
-    if (!availabilitySearch?.time || availabilitySearch.date !== slotDate || slotOptionsDate !== slotDate) return
-    const matchingSlot = slotOptions.find((slot) => getSlotStart(slot)?.slice(0, 5) === availabilitySearch.time.slice(0, 5))
-    if (matchingSlot) setSlotId(String(getSlotId(matchingSlot)))
-  }, [availabilitySearch, slotDate, slotOptionsDate, slotOptions])
-
-  useEffect(() => {
     if (!session?.isAuthenticated || session.userProfile.role !== 'Hiker') return undefined
     let active = true
     apiRequest(`/slots?date=${encodeURIComponent(slotDate)}`, {
