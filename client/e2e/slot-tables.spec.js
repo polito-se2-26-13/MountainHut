@@ -21,6 +21,9 @@ test('an employee creates a slot with its tables and a hiker sees its free seats
   await page.getByLabel('Seats at table 2').fill('6')
   await page.getByRole('button', { name: 'Save time slot' }).click()
   await expect(page.getByText('Time slot and table configuration saved.')).toBeVisible()
+  // Back goes to the home of the role, not to the page before in the browser history
+  await page.getByRole('link', { name: '← Back' }).click()
+  await expect(page).toHaveURL(/\/home\/employee/)
 
   // a hiker, in a browser of their own, finds the new slot with the 10 seats of its two tables
   const hiker = await (await browser.newContext()).newPage()

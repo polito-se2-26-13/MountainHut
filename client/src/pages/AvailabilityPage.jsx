@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Button, DatePicker, InputNumber, TimePicker } from 'antd'
 import dayjs from 'dayjs'
-import { Link, useNavigate } from 'react-router'
+import { Link } from 'react-router'
 import { apiRequest } from '../api/api.js'
 import { useAuth } from '../auth/AuthContext.jsx'
 import { isAtLeast } from '../utils/slots.js'
@@ -15,7 +15,6 @@ function localDateString() {
 
 function AvailabilityPage() {
   const { session } = useAuth()
-  const navigate = useNavigate()
   const [date, setDate] = useState(localDateString())
   const [time, setTime] = useState('')
   const [partySize, setPartySize] = useState(2)
@@ -60,7 +59,7 @@ function AvailabilityPage() {
     <main className="page availability-page">
       <header className="booking-header">
         <div>
-          <button className="back-link" type="button" onClick={() => navigate(-1)}>← Back</button>
+          <Link className="back-link" to={session?.isAuthenticated ? `/home/${session.userProfile.role.toLowerCase()}` : '/'}>← Back</Link>
           <p className="eyebrow">MOUNTAINHUT · PLAN YOUR VISIT</p>
           <h1>Check availability</h1>
           <p className="form-intro">Choose a date, service time, and group size to see whether we can seat your party.</p>

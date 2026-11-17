@@ -553,13 +553,9 @@
   text-decoration: none;
 }
 
-button.back-link {
-  padding: 0;
-  border: 0;
-  background: none;
-  font: inherit;
-  cursor: pointer;
-  color: #1769aa;
+/* the Back link of a page header sits on its own line above the title */
+header .back-link {
+  display: inline-block;
 }
 
 .register-card h1 {

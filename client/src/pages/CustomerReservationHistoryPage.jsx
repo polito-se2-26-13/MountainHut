@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Alert, Button, DatePicker, InputNumber, Modal, Select } from 'antd';
 import dayjs from 'dayjs';
-import { Link, Navigate, useNavigate } from 'react-router';
+import { Link, Navigate } from 'react-router';
 import { apiRequest } from '../api/api.js';
 import { useAuth } from '../auth/AuthContext.jsx';
 import { useToast } from '../components/ToastProvider.jsx';
@@ -41,7 +41,6 @@ function CustomerReservationHistoryPage() {
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
   const notify = useToast();
-  const navigate = useNavigate();
 
   useEffect(() => {
     if (!session?.isAuthenticated || session.userProfile.role !== 'Hiker') return undefined;
@@ -198,13 +197,9 @@ function CustomerReservationHistoryPage() {
     <main className="page reservation-history-page">
       <header className="reservation-history-header">
         <div>
-          <button
-            className="back-link"
-            type="button"
-            onClick={() => (window.history.length > 1 ? navigate(-1) : navigate('/home/hiker'))}
-          >
+          <Link className="back-link" to="/home/hiker">
             ← Back
-          </button>
+          </Link>
           <p className="eyebrow">MOUNTAINHUT · YOUR BOOKINGS</p>
           <h1>Booking history</h1>
           <p className="form-intro">Review your reservations and assigned seating.</p>
