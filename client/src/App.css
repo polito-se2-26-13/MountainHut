@@ -156,12 +156,6 @@
   cursor: default;
 }
 
-/* Date and time popups render in a body portal; keep them above the modal backdrop. */
-.ant-picker-dropdown,
-.ant-select-dropdown {
-  z-index: 1301 !important;
-}
-
 .change-modal {
   position: relative;
   z-index: 1;

@@ -77,23 +77,8 @@ function isAtLeast48Hours(date, time) {
   return Number.isFinite(value) && value - Date.now() >= CHANGE_WINDOW_MS;
 }
 
-function requirementsFrom(value) {
-  if (Array.isArray(value))
-    return value.map((item, index) => ({
-      id: `${Date.now()}-${index}`,
-      has_allergy: Boolean(item?.has_allergy ?? item?.hasAllergy),
-      description: String(item?.description ?? ''),
-    }));
-  if (typeof value === 'string' && value.trim()) {
-    try {
-      const parsed = JSON.parse(value);
-      if (Array.isArray(parsed)) return requirementsFrom(parsed);
-    } catch {
-      /* Older reservations may store requirements as plain text. */
-    }
-    return [{ id: `${Date.now()}-0`, has_allergy: false, description: value }];
-  }
-  return [];
+function requirementsFrom(list = []) {
+  return list.map(({ has_allergy, description }) => ({ id: globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`, has_allergy, description }));
 }
 
 function getReservationDate(reservation) {
@@ -282,7 +267,7 @@ function CustomerReservationHistoryPage() {
         }
       );
       closeModal();
-      notify('Booking updated! A confirmation email has been sent.');
+      notify('Booking updated. A confirmation email is on its way.', 'success');
       await loadReservations();
     } catch (requestError) {
       if (requestError.status === 401) return;
@@ -628,7 +613,7 @@ function CustomerReservationHistoryPage() {
                         requirements: [
                           ...form.requirements,
                           {
-                            id: `${Date.now()}-${Math.random()}`,
+                            id: globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`,
                             has_allergy: false,
                             description: '',
                           },
@@ -644,7 +629,7 @@ function CustomerReservationHistoryPage() {
                       updateForm({
                         requirements: event.target.checked
                           ? []
-                          : [{ id: `${Date.now()}`, has_allergy: false, description: '' }],
+                          : [{ id: globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`, has_allergy: false, description: '' }],
                       })
                     }
                   >

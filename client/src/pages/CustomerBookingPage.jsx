@@ -336,14 +336,10 @@ function CustomerBookingPage() {
           <section className="booking-panel" aria-labelledby="requirements-title">
             <div className="booking-panel-heading">
               <span className="section-step">03</span>
-              <div><h2 id="requirements-title">Special requirements</h2><p>Share dietary needs or allergies for your group.</p></div>
+              <div><h2 id="requirements-title">Special requirements <span className="optional-mark">(optional)</span></h2><p>Share dietary needs or allergies for your group.</p></div>
             </div>
             <div className="booking-fields">
               <div className="form-field form-field-wide requirements-field">
-                <div className="requirements-intro">
-                  <span>Special requirements</span>
-                  <p>Let us know about dietary needs or allergies so we can prepare for your group.</p>
-                </div>
                 {hasSpecialRequirements && (
                   <div className="requirement-list">
                     {specialRequirements.map((requirement, index) => (
@@ -370,7 +366,7 @@ function CustomerBookingPage() {
                       </article>
                     ))}
                     <Button className="requirement-add" type="dashed" htmlType="button" onClick={() => {
-                      setSpecialRequirements((items) => [...items, { id: items.length + 1, description: '', hasAllergy: false }])
+                      setSpecialRequirements((items) => [...items, { id: globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`, description: '', hasAllergy: false }])
                       clearBookingConfirmation()
                     }}>＋ Add requirement</Button>
                   </div>
@@ -378,7 +374,7 @@ function CustomerBookingPage() {
                 <Checkbox checked={!hasSpecialRequirements} onChange={(event) => {
                   const noRequirements = event.target.checked
                   setHasSpecialRequirements(!noRequirements)
-                  setSpecialRequirements(noRequirements ? [] : [{ id: `${Date.now()}`, description: '', hasAllergy: false }])
+                  setSpecialRequirements(noRequirements ? [] : [{ id: globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`, description: '', hasAllergy: false }])
                   clearBookingConfirmation()
                 }}>
                   No dietary restrictions or allergies
