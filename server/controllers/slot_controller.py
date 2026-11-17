@@ -12,6 +12,7 @@ from server.models.DTO.table_dto import TableResponse
 from server.service.mapper_service import slots_deatils_to_response
 from datetime import date, datetime, time
 from typing import Optional
+from zoneinfo import ZoneInfo
 
 class SlotController():
     def __init__(self):
@@ -20,7 +21,9 @@ class SlotController():
     async def setUpSlot(self,slot: SlotCreation):
         if(slot.startTime>=slot.endTime):
             raise UnprocessableContent("start time must be less then end time")
-        if datetime.combine(slot.date,slot.startTime)<datetime.now():
+        # slot times are Italian, the server clock may not be (Docker runs in UTC)
+        italy_tz=ZoneInfo("Europe/Rome")
+        if datetime.combine(slot.date,slot.startTime,tzinfo=italy_tz)<datetime.now(italy_tz):
             raise UnprocessableContent("the slot is in the past")
         # checked before saving anything, so a refused request leaves no slot or table behind
         names=set()

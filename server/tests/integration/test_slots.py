@@ -1,6 +1,7 @@
 """Integration tests of the Define slot capacity story (MH-02): GET and POST /api/slots,
 with the same requests the pages send."""
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import text
 
@@ -164,6 +165,10 @@ def test_a_slot_in_the_past_is_refused(client, db):
     yesterday = (date.today() - timedelta(days=1)).isoformat()
 
     assert client.post("/api/slots", json=slot([("T1", 4)], day=yesterday), headers=employee).status_code == 422
+    # started half an hour ago in Italy: a server clock in UTC would still see it in the future
+    started = datetime.now(ZoneInfo("Europe/Rome")) - timedelta(minutes=30)
+    late = slot([("T1", 4)], day=started.date().isoformat(), start=started.strftime("%H:%M"), end="23:59")
+    assert client.post("/api/slots", json=late, headers=employee).status_code == 422
     assert db.query(TimeSlotDAO).count() == 0
 
 
