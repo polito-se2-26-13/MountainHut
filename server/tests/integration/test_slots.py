@@ -54,7 +54,6 @@ def test_slots_of_a_date_are_listed_as_the_pages_read_them(client, db):
     client.post("/api/slots", json=slot([("T1", 3)], day=OTHER_DAY), headers=employee)
 
     response = client.get(f"/api/slots?date={DAY}", headers=employee)
-    print(created)
     assert response.status_code == 200
     assert response.history == []
     assert response.json() == [{
