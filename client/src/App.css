@@ -2049,6 +2049,7 @@ header .back-link {
   }
 }
 
-:where(.css-dev-only-do-not-override-oc1rc0).ant-select-single:not(.ant-select-customize) .ant-select-content {
+/* not antd's hashed class: the hash of the development server is not the one of the production build */
+.mh-control.ant-select-single:not(.ant-select-customize) .ant-select-content {
   overflow: visible;
 }
