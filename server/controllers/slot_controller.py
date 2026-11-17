@@ -57,7 +57,6 @@ class SlotController():
         for t in slot.tables:
             table=await self.repo.find_table(t.tableNumber)
             if table is None:
-                print("table creato")
                 table=await self.repo.add_table(t.tableNumber,t.seats)
             tables.append((table,t.seats))
         #add table
