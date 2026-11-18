@@ -105,8 +105,8 @@ class ReservationController():
         return reservationDTO_to_response(res,tables,reservation.special_requirements)
 
     async def get_reservation_by_reference(self,reference:str,user_id:int,role:UserType):
-        res,tables= await self._own_reservation(reference,user_id,role)
-        return reservationDTO_to_response(res,tables)
+        res,tables,req= await self._own_reservation(reference,user_id,role)
+        return reservationDTO_to_response(res,tables,req)
 
     async def get_reservation_by_user_id(self,user_id:int):
             res= await self.repo.get_reservation_by_user_id(user_id)
@@ -118,7 +118,7 @@ class ReservationController():
     async def update_reservation(self,reference:str,user_id:int,changes:ReservationUpdate,background_tasks:BackgroundTasks|None=None)->ReservationResponse:
         """Change of a booking (MH-06): it is treated as a new booking, so the MH-01 rules hold (PO issues #38 and #48)"""
         async with booking_lock:
-            current,_= await self._own_reservation(reference,user_id,UserType.HIKER)
+            current,_,_= await self._own_reservation(reference,user_id,UserType.HIKER)
             if current.status!=ReservationStatus.CONFIRMED.value:
                 raise ConflictError("only confirmed bookings can be changed")
             # PO issue #43: until 48 hours before the old slot, and before the new one too
@@ -130,6 +130,6 @@ class ReservationController():
             await self.repo.transaction_update_reservation(current.id,changes.slot_id,changes.party_size,changes.special_requirements)
 
         # read again, so the answer and the email show the booking as it is now
-        res,tables= await self.repo.get_reservation_by_reference(reference)
-        confirm_by_mail(res,changes.special_requirements,background_tasks,changed=True)
-        return reservationDTO_to_response(res,tables,changes.special_requirements)
+        res,tables,req= await self.repo.get_reservation_by_reference(reference)
+        confirm_by_mail(res,req,background_tasks,changed=True)
+        return reservationDTO_to_response(res,tables,req)

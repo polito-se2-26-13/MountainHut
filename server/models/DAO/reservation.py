@@ -104,7 +104,7 @@ class ReservationDAO(Base):
                 else None
             ),
             "partySize": self.party_size,
-            "specialRequirements": self.special_requirements,
+            #"specialRequirements": self.special_requirements,
             "status": self.status,
             "assignedTables": assigned_tables,
             "createdAt": self.created_at.isoformat() if self.created_at else None,

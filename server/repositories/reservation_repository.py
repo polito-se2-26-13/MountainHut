@@ -194,32 +194,54 @@ class ReservationRepository:
                     reservation_id=reservation_id, slot_table_id=slot_table.id, assigned_seats=seats))
             await session.commit()
 
-    async def get_reservation_by_reference(self,reference:str)->tuple[ReservationDAO,list[AssignedTableInfo]]:
+    async def get_reservation_by_reference(self,reference:str)->tuple[ReservationDAO,list[AssignedTableInfo],list[SpecialRequirementDTO]]:
         async with await self._get_session() as session:
             result =await session.execute(select(
                 ReservationDAO,
                 ReservationTableAssignmentDAO.slot_table_id,
                 ReservationTableAssignmentDAO.assigned_seats,
                 TableDAO.table_number,
+                SpecialRequirementDAO.id,
+                SpecialRequirementDAO.description,
+                SpecialRequirementDAO.has_allergy
                 )
-                    .where(ReservationTableAssignmentDAO.reservation_id==ReservationDAO.id,
-                           SlotTableDAO.id==ReservationTableAssignmentDAO.slot_table_id,
-                           TableDAO.id==SlotTableDAO.table_id,
-                           ReservationDAO.booking_reference==reference))
+                .outerjoin(
+                    SpecialRequirementDAO,
+                    SpecialRequirementDAO.reservation_id == ReservationDAO.id
+                )
+                .where(ReservationTableAssignmentDAO.reservation_id==ReservationDAO.id,
+                        SlotTableDAO.id==ReservationTableAssignmentDAO.slot_table_id,
+                        TableDAO.id==SlotTableDAO.table_id,
+                        ReservationDAO.booking_reference==reference))
         rows = result.all()
         if not rows:
-            return None,[]
+            return None,[],[]
         
         res = rows[0][0]
         assignments:List[AssignedTableInfo]=[]
-        for reservation, slot_table_id, assigned_seats , table_number in rows:
-            info=AssignedTableInfo(
-                table_id=slot_table_id,
-                table_number=table_number,
-                assigned_seats=assigned_seats
-            )
-            assignments.append(info)
-        return res, assignments
+        req:list[SpecialRequirementDTO]=[]
+        seen_tables = set()
+        seen_requirements = set()
+
+        for _, slot_table_id, assigned_seats, table_number, req_id, sp_desc, sp_hasAllergy in rows:
+            if slot_table_id not in seen_tables:
+                assignments.append(
+                    AssignedTableInfo(
+                        table_id=slot_table_id,
+                        table_number=table_number,
+                        assigned_seats=assigned_seats
+                    )
+                )
+                seen_tables.add(slot_table_id)
+            if req_id is not None and req_id not in seen_requirements:
+                req.append(
+                    SpecialRequirementDTO(
+                        description=sp_desc,
+                        has_allergy=sp_hasAllergy
+                    )
+                )
+                seen_requirements.add(req_id)
+        return res, assignments, req
 
     async def get_reservation_by_user_id(self,user_id:int)->list[tuple[ReservationDAO,list[AssignedTableInfo],list[SpecialRequirementDTO]]]:
             async with await self._get_session() as session:
@@ -272,7 +294,7 @@ class ReservationRepository:
                         )
                     )
                     seen_table.add(table_key)
-                    
+
                 if req_id is not None and req_id not in seen_requirements:
                     reservations[res.id][2].append(
                         SpecialRequirementDTO(
