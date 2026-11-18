@@ -35,7 +35,7 @@ def send_confirmation_with_retry(mail, waits=(5, 10)):
         print(f"confirmation email not sent for {mail.booking_reference}: {result.get('error')}", flush=True)
 
 
-def confirm_by_mail(res,background_tasks:BackgroundTasks|None,changed:bool=False):
+def confirm_by_mail(res,spReq,background_tasks:BackgroundTasks|None,changed:bool=False):
     """Mail of a new or a changed booking, with its details as they are now (MH-03, PO issue #41)"""
     mail=reservationEmailDto_to_email(
             res.booking_reference,
@@ -43,7 +43,7 @@ def confirm_by_mail(res,background_tasks:BackgroundTasks|None,changed:bool=False
             res.slot.date.strftime("%d/%m/%Y"),
             f"{res.slot.start_time:%H:%M}-{res.slot.end_time:%H:%M}",
             res.party_size,
-            res.requirements,
+            spReq,
             res.hiker.full_name,
             changed
         )
@@ -100,9 +100,9 @@ class ReservationController():
                 )
             #allocation
             table_allocations = assign_tables_for_party(timeSlot, reservation.party_size)
-            res,tables= await self.repo.transaction_add_reservation(reservation,table_allocations)
-        confirm_by_mail(res,background_tasks)
-        return reservationDTO_to_response(res,tables)
+            res,tables= await self.repo.transaction_add_reservation(reservation,table_allocations,reservation.special_requirements)
+        confirm_by_mail(res,reservation.special_requirements,background_tasks)
+        return reservationDTO_to_response(res,tables,reservation.special_requirements)
 
     async def get_reservation_by_reference(self,reference:str,user_id:int,role:UserType):
         res,tables= await self._own_reservation(reference,user_id,role)
@@ -111,8 +111,8 @@ class ReservationController():
     async def get_reservation_by_user_id(self,user_id:int):
             res= await self.repo.get_reservation_by_user_id(user_id)
             listRes=[]
-            for r,a in res:
-                listRes.append(reservationDTO_to_response(r,a))
+            for r,a,req in res:
+                listRes.append(reservationDTO_to_response(r,a,req))
             return listRes
 
     async def update_reservation(self,reference:str,user_id:int,changes:ReservationUpdate,background_tasks:BackgroundTasks|None=None)->ReservationResponse:
@@ -131,5 +131,5 @@ class ReservationController():
 
         # read again, so the answer and the email show the booking as it is now
         res,tables= await self.repo.get_reservation_by_reference(reference)
-        confirm_by_mail(res,background_tasks,changed=True)
-        return reservationDTO_to_response(res,tables)
+        confirm_by_mail(res,changes.special_requirements,background_tasks,changed=True)
+        return reservationDTO_to_response(res,tables,changes.special_requirements)
