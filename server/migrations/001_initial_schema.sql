@@ -115,7 +115,6 @@ CREATE TABLE IF NOT EXISTS reservations (
     user_id INTEGER NOT NULL,
     slot_id INTEGER NOT NULL,
     party_size INTEGER NOT NULL CHECK (party_size > 0),
-    special_requirements TEXT,
     contact_name VARCHAR(200) NOT NULL,
     contact_email VARCHAR(255) NOT NULL,
     contact_phone VARCHAR(50),

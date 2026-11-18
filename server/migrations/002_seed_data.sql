@@ -146,7 +146,7 @@ INSERT OR IGNORE INTO slot_tables (id, slot_id, table_id, available_seats, is_av
 -- --------------------------------------------------------------------
 -- Res 1: Alex Smith, party of 4 in Slot 1
 INSERT OR IGNORE INTO reservations (
-    id, booking_reference, user_id, slot_id, party_size, special_requirements,
+    id, booking_reference, user_id, slot_id, party_size,
     contact_name, contact_email, contact_phone, status
 ) VALUES (
     1,
@@ -154,7 +154,6 @@ INSERT OR IGNORE INTO reservations (
     3,
     1,
     4,
-    '2 vegetarian meals, 1 gluten allergy',
     'Alex Smith',
     'hiker1@example.com',
     '+39 340 1234567',
@@ -163,7 +162,7 @@ INSERT OR IGNORE INTO reservations (
 
 -- Res 2: Elena Moretti, party of 2 in Slot 1 (sharing Table T1 with Alex Smith!)
 INSERT OR IGNORE INTO reservations (
-    id, booking_reference, user_id, slot_id, party_size, special_requirements,
+    id, booking_reference, user_id, slot_id, party_size,
     contact_name, contact_email, contact_phone, status
 ) VALUES (
     2,
@@ -171,7 +170,6 @@ INSERT OR IGNORE INTO reservations (
     4,
     1,
     2,
-    'High chair requested for toddler',
     'Elena Moretti',
     'hiker2@example.com',
     '+39 349 2345678',
@@ -180,7 +178,7 @@ INSERT OR IGNORE INTO reservations (
 
 -- Res 3: John Doe, party of 10 in Slot 2 (party size exceeds single table capacity -> split across T3 and T2!)
 INSERT OR IGNORE INTO reservations (
-    id, booking_reference, user_id, slot_id, party_size, special_requirements,
+    id, booking_reference, user_id, slot_id, party_size,
     contact_name, contact_email, contact_phone, status
 ) VALUES (
     3,
@@ -188,7 +186,6 @@ INSERT OR IGNORE INTO reservations (
     5,
     2,
     10,
-    'Mountain hiking club group',
     'John Doe',
     'hiker3@example.com',
     '+39 348 3456789',

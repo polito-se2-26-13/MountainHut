@@ -105,7 +105,6 @@ CREATE TABLE IF NOT EXISTS reservations (
     user_id INTEGER NOT NULL,
     slot_id INTEGER NOT NULL,
     party_size INTEGER NOT NULL CHECK (party_size > 0),
-    special_requirements TEXT,
     contact_name VARCHAR(200) NOT NULL,
     contact_email VARCHAR(255) NOT NULL,
     contact_phone VARCHAR(50),
@@ -260,7 +259,7 @@ INSERT OR IGNORE INTO slot_tables (id, slot_id, table_id, available_seats, is_av
 
 -- 6. Reservations
 INSERT OR IGNORE INTO reservations (
-    id, booking_reference, user_id, slot_id, party_size, special_requirements,
+    id, booking_reference, user_id, slot_id, party_size,
     contact_name, contact_email, contact_phone, status
 ) VALUES 
 (
@@ -269,7 +268,6 @@ INSERT OR IGNORE INTO reservations (
     3,
     1,
     4,
-    '2 vegetarian meals, 1 gluten allergy',
     'Alex Smith',
     'hiker1@example.com',
     '+39 340 1234567',
@@ -281,7 +279,6 @@ INSERT OR IGNORE INTO reservations (
     4,
     1,
     2,
-    'High chair requested for toddler',
     'Elena Moretti',
     'hiker2@example.com',
     '+39 349 2345678',
@@ -293,7 +290,6 @@ INSERT OR IGNORE INTO reservations (
     5,
     2,
     10,
-    'Mountain hiking club group',
     'John Doe',
     'hiker3@example.com',
     '+39 348 3456789',
