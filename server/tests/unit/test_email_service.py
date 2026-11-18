@@ -1,62 +1,30 @@
+"""Sending of the confirmation email, with a fake mail server.
 
+The text and HTML of the mail are tested in test_booking_service.py
+(test_confirmation_email_follows_the_product_owner and
+test_confirmation_email_without_requirements_says_so). Those tests replace the
+sending, so this file checks the sending itself.
+"""
 import pytest
-from types import SimpleNamespace
 from unittest.mock import MagicMock
 import server.service.email_service as email_service
-from server.service.email_service import (
-    format_booking_email_text,
-    format_booking_email_html,
-    send_booking_confirmation_email,
-)
+from server.models.DTO.reservation_dto import ReservationMailDTO
+from server.service.email_service import send_booking_confirmation_email
 
 
 @pytest.fixture
 def reservation():
     """Create a sample reservation for email tests."""
 
-    return SimpleNamespace(
+    return ReservationMailDTO(
         booking_reference="MH-20261104-ABC123",
         contact_email="hiker@test.com",
         date_str="2030-11-15",
         time_slot="12:00 - 13:00",
         hiker_name="Alice Walker",
         party_size=4,
-        special_reqs="Vegetarian meal",
-        tables=[
-            {
-                "tableNumber": "T1",
-                "tableLocation": "Indoor",
-                "assignedSeats": 4,
-            }
-        ],
+        special_reqs=[{"description": "Vegetarian meal"}],
     )
-
-def test_format_booking_email_text(reservation):
-    """Test that the plain text email contains booking details."""
-
-    email = format_booking_email_text(reservation)
-
-    assert "Alice Walker" in email
-    assert "MH-20261104-ABC123" in email
-    assert "2030-11-15" in email
-    assert "12:00 - 13:00" in email
-    assert "4 person(s)" in email
-    assert "Vegetarian meal" in email
-
-
-def test_format_booking_email_html(reservation):
-    """Test that the HTML email contains booking details."""
-
-    email = format_booking_email_html(reservation)
-
-    assert "<html" in email
-    assert "Alice Walker" in email
-    assert "MH-20261104-ABC123" in email
-    assert "2030-11-15" in email
-    assert "12:00 - 13:00" in email
-    assert "4 person(s)" in email
-    assert "Vegetarian meal" in email
-    
 
 
 def test_send_booking_confirmation_email_generates_payload(
@@ -77,44 +45,6 @@ def test_send_booking_confirmation_email_generates_payload(
 
     mock_smtp.send_message.assert_called_once()
 
-
-def test_email_with_no_special_requirements(reservation):
-    reservation.special_reqs = None
-    reservation.tables = []
-
-    text_email = format_booking_email_text(reservation)
-    html_email = format_booking_email_html(reservation)
-
-    assert "None specified" in text_email
-    assert "None specified" in html_email
-
-
-def test_email_with_missing_booking_information(reservation):
-    reservation.booking_reference = None
-    reservation.date_str = None
-    reservation.time_slot = None
-    reservation.party_size = None
-    reservation.special_reqs = None
-    reservation.tables = []
-
-    text = format_booking_email_text(reservation)
-    html = format_booking_email_html(reservation)
-
-    assert "Alice Walker" in text
-    assert "Alice Walker" in html
-    assert "None specified" in text
-
-def test_email_payload_contains_matching_recipient_and_bodies(
-    reservation, mock_smtp
-):
-    result = send_booking_confirmation_email(reservation)
-
-    assert result["to"] == reservation.contact_email
-    assert result["booking_reference"] == reservation.booking_reference
-    assert result["text_content"] == format_booking_email_text(reservation)
-    assert result["html_content"] == format_booking_email_html(reservation)
-
-    mock_smtp.send_message.assert_called_once()
 
 @pytest.fixture
 def mock_smtp(monkeypatch):
