@@ -88,21 +88,26 @@ async def init_db(target_engine=None):
 
 
 async def seed_db(target_engine=None):
-    """Seed the database using 002_seed_data.sql."""
+    """Seed the database using 002_seed_data.sql only once."""
     eng = target_engine or engine
     seed_file = MIGRATIONS_DIR / "002_seed_data.sql"
+
     if not seed_file.exists():
         print(f"[db_setup] Seed file '{seed_file}' not found.")
         return
 
     async with eng.begin() as conn:
         applied_versions = await get_applied_migrations(conn)
+
+        if seed_file.name in applied_versions:
+            print(f"[db_setup] Seed already applied: {seed_file.name}")
+            return
+
         print(f"[db_setup] Seeding database with {seed_file.name}...")
         await run_sql_script(conn, seed_file)
-        if seed_file.name not in applied_versions:
-            await record_migration(conn, seed_file.name)
-    print("[db_setup] Database seeded successfully.")
+        await record_migration(conn, seed_file.name)
 
+    print("[db_setup] Database seeded successfully.")
 
 async def reset_db(target_engine=None, seed: bool = True):
     """Drop all tables, re-run schema creation / migrations, and optionally seed."""
