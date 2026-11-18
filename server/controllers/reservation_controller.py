@@ -79,12 +79,12 @@ class ReservationController():
 
     async def _own_reservation(self,reference:str,user_id:int,role:UserType):
         """The booking with its tables: a hiker reaches only their own bookings, the hut staff all of them"""
-        res,tables= await self.repo.get_reservation_by_reference(reference)
+        res,tables,req= await self.repo.get_reservation_by_reference(reference)
         if not res :
             raise NotFoundError("booking reference not found")
         if res.user_id!=user_id and role==UserType.HIKER:
             raise ForbiddenError("you cannot see other reservation")
-        return res,tables
+        return res,tables,req
 
     async def create_reservation(self,reservation:ReservationCreate,background_tasks:BackgroundTasks|None=None)->ReservationResponse:
         """Creation reservation"""

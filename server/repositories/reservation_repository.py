@@ -200,7 +200,8 @@ class ReservationRepository:
                 ReservationDAO,
                 ReservationTableAssignmentDAO.slot_table_id,
                 ReservationTableAssignmentDAO.assigned_seats,
-                TableDAO.table_number)
+                TableDAO.table_number,
+                )
                     .where(ReservationTableAssignmentDAO.reservation_id==ReservationDAO.id,
                            SlotTableDAO.id==ReservationTableAssignmentDAO.slot_table_id,
                            TableDAO.id==SlotTableDAO.table_id,
@@ -255,17 +256,23 @@ class ReservationRepository:
             
             reservations = {}
             seen_requirements = set()
+            seen_table=set()
 
             for res, slot_table_id, assigned_seats, table_number, req_id, req_desc, req_has_allergy in rows:
                 if res.id not in reservations:
-                    reservations[res.id] = (res, [], [])              
-                reservations[res.id][1].append(
-                    AssignedTableInfo(
-                        table_id=slot_table_id,
-                        table_number=table_number,
-                        assigned_seats=assigned_seats
+                    reservations[res.id] = (res, [], [])
+
+                table_key=(res.id,table_number)
+                if table_key not in seen_table:
+                    reservations[res.id][1].append(
+                        AssignedTableInfo(
+                            table_id=slot_table_id,
+                            table_number=table_number,
+                            assigned_seats=assigned_seats
+                        )
                     )
-                )
+                    seen_table.add(table_key)
+                    
                 if req_id is not None and req_id not in seen_requirements:
                     reservations[res.id][2].append(
                         SpecialRequirementDTO(
