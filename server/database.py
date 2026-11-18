@@ -1,7 +1,6 @@
 """Database connection shared by the whole backend (Async SQLite with aiosqlite)."""
 from pathlib import Path
 from typing import AsyncGenerator
-
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
 from sqlalchemy.ext.asyncio import (
@@ -10,8 +9,12 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 from sqlalchemy.orm import DeclarativeBase
+import os
 
-DB_PATH = Path(__file__).parent / "mountainHut.sqlite"
+DB_PATH = Path(os.getenv(
+    "DB_PATH",
+    Path(__file__).parent / "mountainHut.sqlite"
+))
 DATABASE_URL = f"sqlite+aiosqlite:///{DB_PATH}"
 
 # Async engine with SQLite pragma support

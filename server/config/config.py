@@ -6,7 +6,6 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 BASEURL = "/api/"
-DATABASE_URL="sqlite+aiosqlite:///mountainHut.sqlite"
     #f"sqlite:///{Path(__file__).parent / 'mountainHut.sqlite'}"
 ORIGIN = [
     "http://localhost:3000",
