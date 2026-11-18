@@ -1,6 +1,6 @@
 """Integration tests of the Book a table story (MH-01): POST /api/reservations,
 GET /api/reservations/{reference} and GET /api/slots/{slot_id}/availability."""
-from datetime import datetime, timedelta
+from datetime import datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 from server.models.DAO.reservation import ReservationDAO
@@ -43,13 +43,14 @@ def add_slot(db, seats, hours_ahead=24, status="OPEN"):
     return slot.id
 
 
-def book(client, hiker, slot, party_size):
+def book(client, hiker, slot, party_size, **extra):
     return client.post("/api/reservations", json={
         "slot_id": slot,
         "party_size": party_size,
         "user_id": hiker,
         "contact_name": "Anna Rossi",
         "contact_email": "anna@example.com",
+        **extra,
     }, headers=TOKENS[hiker])
 
 
@@ -66,7 +67,8 @@ def test_party_gets_a_table_and_the_booking_is_saved(client, db):
     assert response.status_code == 201
     booking = response.json()
     assert booking["status"] == "CONFIRMED"
-    assert booking["booking_reference"]
+    # the date in the reference is the Italian one, as the slots
+    assert booking["booking_reference"].startswith(f"MH-{datetime.now(ZoneInfo('Europe/Rome')):%Y%m%d}-")
     assert seats_by_table(response) == {f"{slot}-1": 4}
     saved = db.get(ReservationDAO, booking["id"])
     assert saved.slot_id == slot
@@ -150,6 +152,7 @@ def test_party_larger_than_the_free_seats_is_refused(client, db):
     response = book(client, hiker, slot, 7)
 
     assert response.status_code == 409
+    assert response.json()["message"] == "Not enough seats available (requested 7, remaining 6)."
     assert db.query(ReservationDAO).count() == 0
 
 
@@ -188,6 +191,7 @@ def test_closed_slot_cannot_be_booked(client, db):
     slot = add_slot(db, [6], status="CLOSED")
 
     assert book(client, hiker, slot, 2).status_code == 409
+    assert not client.get(f"/api/slots/{slot}/availability").json()["is_available"]
 
 
 def test_availability_counts_the_booked_seats(client, db):
@@ -271,15 +275,14 @@ def test_booking_can_be_read_by_its_reference(client, db):
 
     assert response.status_code == 200
     assert response.json()["id"] == booking["id"]
-    assert response.json()["assigned_tables"][0]["table_number"] == f"{slot}-1"
-    assert client.get("/api/reservations/NOPE", headers=TOKENS[hiker]).status_code == 404
+    assert response.json()["assigned_tables"] == [{"table_id": booking["assigned_tables"][0]["table_id"], "table_number": f"{slot}-1", "assigned_seats": 2}]
+    assert client.get("/api/reservations/reference/NOPE", headers=TOKENS[hiker]).status_code == 404
 
 
 def test_bookings_are_read_only_with_the_login(client, db):
     anna = add_hiker(db)
     booking = book(client, anna, add_slot(db, [6]), 2).json()
-    
-    print(client.get(f"/api/reservations/user").request.headers)
+
     assert client.get(f"/api/reservations/user").status_code == 401
     assert client.get(f"/api/reservations/reference/{booking['booking_reference']}").status_code == 401
 
@@ -287,12 +290,14 @@ def test_bookings_are_read_only_with_the_login(client, db):
 def test_a_hiker_reads_only_their_own_bookings(client, db):
     anna = add_hiker(db)
     other = add_hiker(db, email="other@example.com")
-    booking = book(client, anna, add_slot(db, [6]), 2).json()
+    slot = add_slot(db, [6])
+    booking = book(client, anna, slot, 2).json()
+    # a booking of another hiker in the same slot, which anna must not see
+    assert book(client, other, slot, 2).status_code == 201
     employee = UserDAO(email="employee@example.com", password_hash="x", first_name="E", last_name="E", role="Employee")
     db.add(employee)
     db.commit()
 
-    #assert client.get(f"/api/reservations/user/", headers=TOKENS[other]).status_code == 403
     assert client.get(f"/api/reservations/reference/{booking['booking_reference']}", headers=TOKENS[other]).status_code == 403
     mine = client.get(f"/api/reservations/user/", headers=TOKENS[anna])
     assert mine.status_code == 200
@@ -356,3 +361,17 @@ def test_a_booking_that_is_no_longer_confirmed_gives_its_seats_back(client, db):
     db.commit()
 
     assert client.get(f"/api/slots/{slot}/availability").json()["remaining_seats"] == 6
+
+
+def test_availability_by_date_and_time_finds_the_slot_running_at_that_time(client, db):
+    # fixed times, so the slot never runs past midnight
+    slot = TimeSlotDAO(date=datetime.now().date() + timedelta(days=3), start_time=time(12, 0), end_time=time(13, 0), status="OPEN")
+    db.add(slot)
+    db.commit()
+    day = slot.date.isoformat()
+
+    for at in ("12:00", "12:30"):
+        found = client.get("/api/slots/availability", params={"date": day, "time": at})
+        assert found.status_code == 200
+        assert found.json()["slot_id"] == slot.id
+    assert client.get("/api/slots/availability", params={"date": day, "time": "13:00"}).status_code == 404

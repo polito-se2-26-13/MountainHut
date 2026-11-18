@@ -1,21 +1,21 @@
 from server.database import AsyncSessionLocal
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional, Tuple
-from sqlalchemy import select,func
+from sqlalchemy import select
 from server.models.DAO.user import UserDAO
 from server.models.DAO.table import TableDAO
 from server.models.DAO.time_slot import SlotTableDAO, TimeSlotDAO
 from server.models.DAO.reservation import ReservationDAO, ReservationTableAssignmentDAO
-from server.models.DTO.reservation_dto import AssignedTableInfo, ReservationCreate
+from server.models.DTO.reservation_dto import AssignedTableInfo, ReservationCreate, SpecialRequirementDTO
 from server.models.enum.reservation_status import ReservationStatus
 from server.models.enum.slot_status import SlotStatus
 from server.models.enum.user_type import UserType
 from server.models.error.notfound_error import NotFoundError
 from server.models.error.conflict_error import ConflictError
 from server.service.booking_service import assign_tables_for_party
-from datetime import datetime, date, time
+from datetime import date, time
 
-from server.service.mapper_service import reservationTableAssignmentDAO_to_AssignedTableInfo
+from server.service.mapper_service import reservationTableAssignmentDAO_to_AssignedTableInfo,specialRequirementDTO_to_DAO
 
 class ReservationRepository:
 
@@ -118,16 +118,6 @@ class ReservationRepository:
             )
             slot = result.scalar_one_or_none()
             if not slot:
-                # If exact time range doesn't match, check by start_time
-                res_start = await session.execute(
-                    select(TimeSlotDAO).where(
-                        TimeSlotDAO.date == slot_date,
-                        TimeSlotDAO.start_time == slot_time,
-                    )
-                )
-                slot = res_start.scalar_one_or_none()
-
-            if not slot:
                 raise NotFoundError(
                     f"Time slot not found for date '{slot_date.isoformat()}' and time '{slot_time.strftime('%H:%M')}'."
                 )
@@ -142,7 +132,7 @@ class ReservationRepository:
                     user_id=reservation.user_id,
                     slot_id=reservation.slot_id,
                     party_size=reservation.party_size,
-                    special_requirements=reservation.special_requirements,
+                    requirements=specialRequirementDTO_to_DAO(reservation.special_requirements),
                     contact_name=reservation.contact_name,
                     contact_email=reservation.contact_email,
                     contact_phone=reservation.contact_phone,
@@ -152,15 +142,13 @@ class ReservationRepository:
             await session.flush()
             assignments:List[AssignedTableInfo]=[]
             for slot_table, seats in table_allocations:
-                    table_numer=await session.execute(select(TableDAO.table_number).where(TableDAO.id==slot_table.table_id))
-                    number=str(table_numer.scalar_one())
                     assignment = ReservationTableAssignmentDAO(
                         reservation_id=res.id,
                         slot_table_id=slot_table.id,
                         assigned_seats=seats,
                     )
                     session.add(assignment)
-                    assignments.append(reservationTableAssignmentDAO_to_AssignedTableInfo(assignment,number))
+                    assignments.append(reservationTableAssignmentDAO_to_AssignedTableInfo(assignment,slot_table.table.table_number))
             
             try:
                 await session.commit()
@@ -169,6 +157,31 @@ class ReservationRepository:
                 await session.rollback()
                 raise ValueError(f"Failed to create reservation due to database constraint")
         return [res,assignments]
+
+    async def transaction_update_reservation(self, reservation_id: int, slot_id: int, party_size: int,
+                                             requirements: List[SpecialRequirementDTO]) -> None:
+        """Gives the booking's seats back and assigns its tables again, all in one commit (MH-06)."""
+        async with await self._get_session() as session:
+            reservation = await session.get(ReservationDAO, reservation_id)
+            # the booking gives its seats back: the slot stops counting them, and delete-orphan deletes them at the flush
+            reservation.table_assignments.clear()
+            await session.flush()
+            # load the slot again with all its bookings: after the flush they would be read one by one,
+            # which async SQLAlchemy cannot do (MissingGreenlet when other bookings share the slot)
+            slot = await session.get(TimeSlotDAO, slot_id, populate_existing=True)
+            # a ConflictError here closes the session without commit, so the booking stays as it was (PO issue #38)
+            remaining = sum(st.free_seats for st in slot.slot_tables if st.is_available)
+            if party_size > remaining:
+                # the same check and message as a new booking
+                raise ConflictError(f"Not enough seats available (requested {party_size}, remaining {remaining}).")
+            allocations = assign_tables_for_party(slot, party_size)
+            reservation.slot_id = slot_id
+            reservation.party_size = party_size
+            reservation.requirements = specialRequirementDTO_to_DAO(requirements)
+            for slot_table, seats in allocations:
+                session.add(ReservationTableAssignmentDAO(
+                    reservation_id=reservation_id, slot_table_id=slot_table.id, assigned_seats=seats))
+            await session.commit()
 
     async def get_reservation_by_reference(self,reference:str)->tuple[ReservationDAO,list[AssignedTableInfo]]:
         async with await self._get_session() as session:

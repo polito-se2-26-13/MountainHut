@@ -1,17 +1,13 @@
 """User / Hiker / Staff database model."""
 from datetime import datetime
-from typing import TYPE_CHECKING, Optional, List
+from typing import Optional
 
 from sqlalchemy import String, Text, Boolean, DateTime, func
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column
 
 from server.database import Base
 from server.models.enum.user_type import UserType
 from server.utils.security import hash_password, verify_password
-
-if TYPE_CHECKING:
-    from server.models.DAO.reservation import ReservationDAO
-    from server.models.DAO.time_slot import TimeSlotDAO
 
 
 class UserDAO(Base):
@@ -35,13 +31,8 @@ class UserDAO(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
 
-    # Relationships
-    reservations: Mapped[List["ReservationDAO"]] = relationship(
-        "ReservationDAO", back_populates="hiker", cascade="all, delete-orphan", lazy="selectin"
-    )
-    created_slots: Mapped[List["TimeSlotDAO"]] = relationship(
-        "TimeSlotDAO", back_populates="creator", lazy="selectin"
-    )
+    # no lists of the user's bookings or slots here: nothing reads them, and loaded with the user
+    # on every request with a token they brought along the bookings, slots and tables behind them
 
     @property
     def full_name(self) -> str:

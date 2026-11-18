@@ -1,50 +1,14 @@
 import { useEffect, useState } from 'react'
 import { Button, Checkbox, DatePicker, Form, Input, InputNumber, Select } from 'antd'
 import dayjs from 'dayjs'
-import { Link, Navigate, useLocation, useNavigate } from 'react-router'
+import { Link, Navigate, useLocation } from 'react-router'
 import { apiRequest } from '../api/api.js'
 import { useAuth } from '../auth/AuthContext.jsx'
 import { useToast } from '../components/ToastProvider.jsx'
+import RequirementsEditor, { newRequirement, requirementsBody } from '../components/RequirementsEditor.jsx'
+import { formatSlotLabel, getSlotEnd, getSlotId, getSlotStart, isAtLeast, localDateString, normalizeSlots } from '../utils/slots.js'
 
 const TWO_HOURS_MS = 2 * 60 * 60 * 1000
-
-function localDateString() {
-  const now = new Date()
-  return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10)
-}
-
-function normalizeSlots(response) {
-  if (Array.isArray(response)) return response
-  if (Array.isArray(response?.slots)) return response.slots
-  if (Array.isArray(response?.items)) return response.items
-  return []
-}
-
-function getSlotId(slot) {
-  return slot.slot_id ?? slot.slotId ?? slot.id
-}
-
-function getSlotStart(slot) {
-  return slot.start_time ?? slot.startTime ?? slot.time
-}
-
-function getSlotEnd(slot) {
-  return slot.end_time ?? slot.endTime ?? ''
-}
-
-function isMoreThanTwoHoursAway(date, time) {
-  if (!date || !time) return false
-  const slotTime = new Date(`${date}T${time}:00`).getTime()
-  return Number.isFinite(slotTime) && slotTime - Date.now() >= TWO_HOURS_MS
-}
-
-function formatAssignedTables(tables = []) {
-  return tables.map((table) => ({
-    tableNumber: table.table_number ?? table.tableNumber ?? '—',
-    seats: table.assigned_seats ?? table.assignedSeats ?? 0,
-    location: table.location ?? table.tableLocation,
-  }))
-}
 
 function CustomerBookingPage() {
   const { session } = useAuth()
@@ -62,24 +26,16 @@ function CustomerBookingPage() {
   const [alternativeEmail, setAlternativeEmail] = useState('')
   const contactEmail = useAlternativeEmail ? alternativeEmail : accountEmail
   const [contactPhone, setContactPhone] = useState('')
-  const [hasSpecialRequirements, setHasSpecialRequirements] = useState(true)
-  const [specialRequirements, setSpecialRequirements] = useState([{id: 0, description: '', hasAllergy: false}])
+  const [specialRequirements, setSpecialRequirements] = useState(() => [newRequirement()])
   const [isLoadingSlots, setIsLoadingSlots] = useState(true)
   const [isCheckingAvailability, setIsCheckingAvailability] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [bookingSuccessData, setBookingSuccessData] = useState(null)
   const [touched, setTouched] = useState({})
   const notify = useToast()
-  const navigate = useNavigate()
   const selectedSlot = slotOptionsDate === slotDate
     ? slotOptions.find((slot) => String(getSlotId(slot)) === String(slotId))
     : undefined
-
-  useEffect(() => {
-    if (!availabilitySearch?.time || availabilitySearch.date !== slotDate || slotOptionsDate !== slotDate) return
-    const matchingSlot = slotOptions.find((slot) => getSlotStart(slot)?.slice(0, 5) === availabilitySearch.time.slice(0, 5))
-    if (matchingSlot) setSlotId(String(getSlotId(matchingSlot)))
-  }, [availabilitySearch, slotDate, slotOptionsDate, slotOptions])
 
   useEffect(() => {
     if (!session?.isAuthenticated || session.userProfile.role !== 'Hiker') return undefined
@@ -89,7 +45,7 @@ function CustomerBookingPage() {
     })
       .then((response) => {
         const upcomingSlots = normalizeSlots(response)
-          .filter((slot) => getSlotId(slot) != null && isMoreThanTwoHoursAway(slotDate, getSlotStart(slot)))
+          .filter((slot) => isAtLeast(slotDate, getSlotStart(slot), TWO_HOURS_MS))
           .sort((a, b) => getSlotStart(a).localeCompare(getSlotStart(b)))
         if (active) {
           setSlotOptions(upcomingSlots)
@@ -108,7 +64,8 @@ function CustomerBookingPage() {
   }, [slotDate, session, notify])
 
   useEffect(() => {
-    if (!selectedSlot) return undefined
+    // after sign out the session is gone and the page is leaving, so nothing to ask
+    if (!selectedSlot || !session?.isAuthenticated) return undefined
     let active = true
     apiRequest(`/slots/${encodeURIComponent(getSlotId(selectedSlot))}/availability`, {
       headers: { Authorization: `Bearer ${session.token}` },
@@ -125,8 +82,8 @@ function CustomerBookingPage() {
     return () => { active = false }
   }, [selectedSlot, session, notify])
 
-  const remainingSeats = Number(availability?.remaining_seats ?? availability?.remainingSeats ?? 0)
-  const isSlotOpen = (availability?.status || '').toUpperCase() === 'OPEN'
+  const remainingSeats = availability?.remaining_seats ?? 0
+  const isSlotOpen = availability?.status === 'OPEN'
   const contactNameError = !contactName.trim() ? 'Contact name is required.' : ''
   const contactEmailError = !contactEmail.trim()
     ? 'Contact email is required.'
@@ -138,7 +95,7 @@ function CustomerBookingPage() {
     : availability && Number(partySize) > remainingSeats
       ? `Only ${remainingSeats} seat${remainingSeats === 1 ? '' : 's'} remain for this time.`
       : ''
-  const selectedTimeStillValid = selectedSlot && isMoreThanTwoHoursAway(slotDate, getSlotStart(selectedSlot))
+  const selectedTimeStillValid = selectedSlot && isAtLeast(slotDate, getSlotStart(selectedSlot), TWO_HOURS_MS)
   const canSubmit = Boolean(
     selectedSlot && selectedTimeStillValid && availability && isSlotOpen && !isCheckingAvailability
     && !partySizeError && !contactNameError && !contactEmailError,
@@ -189,6 +146,7 @@ function CustomerBookingPage() {
       return
     }
 
+    const specialRequirementsBody = requirementsBody(specialRequirements)
     setIsSubmitting(true)
     try {
       const result = await apiRequest('/reservations', {
@@ -204,12 +162,7 @@ function CustomerBookingPage() {
           contact_name: contactName.trim(),
           contact_email: contactEmail.trim(),
           ...(contactPhone.trim() ? { contact_phone: contactPhone.trim() } : {}),
-          ...(hasSpecialRequirements && specialRequirements.some((item) => item.description.trim())
-            ? { special_requirements: specialRequirements.filter((item) => item.description.trim()).map((item) => ({
-              has_allergy: item.hasAllergy,
-              description: item.description.trim(),
-            })) }
-            : {}),
+          ...(specialRequirementsBody.length ? { special_requirements: specialRequirementsBody } : {}),
         }),
       })
       setBookingSuccessData({
@@ -222,7 +175,6 @@ function CustomerBookingPage() {
       setSlotId('')
       setAvailability(null)
       setPartySize(2)
-      setHasSpecialRequirements(false)
       setSpecialRequirements([])
     } catch (error) {
       notify(error.message || 'Your booking could not be completed. Please try again.')
@@ -231,15 +183,11 @@ function CustomerBookingPage() {
     }
   }
 
-  const assignedTables = formatAssignedTables(bookingSuccessData?.assigned_tables || bookingSuccessData?.assignedTables || [])
-
   return (
     <main className="page booking-page">
       <header className="booking-header">
         <div>
-          <button className="back-link" type="button" onClick={() => window.history.length > 1 ? navigate(-1) : navigate('/home/hiker')}>
-            ← Back
-          </button>
+          <Link className="back-link" to="/home/hiker">← Back</Link>
           <p className="eyebrow">MOUNTAINHUT · GUEST BOOKING</p>
           <h1>Book a table</h1>
           <p className="form-intro">Choose a service time, tell us how many are joining, and we’ll take care of the seating.</p>
@@ -253,14 +201,14 @@ function CustomerBookingPage() {
           <div className="confirmation-content">
             <p className="eyebrow">BOOKING CONFIRMED</p>
             <h2 id="booking-confirmation-title">Your table is reserved</h2>
-            <p>Reference <strong>{bookingSuccessData.booking_reference || '—'}</strong></p>
-            <p>{bookingSuccessData.bookingDate} · {bookingSuccessData.bookingTime}{bookingSuccessData.bookingEndTime ? `–${bookingSuccessData.bookingEndTime}` : ''} · {bookingSuccessData.bookedPartySize} guest{bookingSuccessData.bookedPartySize === 1 ? '' : 's'}</p>
-            {assignedTables.length > 0 && (
+            <p>Reference <strong>{bookingSuccessData.booking_reference}</strong></p>
+            <p>{bookingSuccessData.bookingDate} · {bookingSuccessData.bookingTime}–{bookingSuccessData.bookingEndTime} · {bookingSuccessData.bookedPartySize} guest{bookingSuccessData.bookedPartySize === 1 ? '' : 's'}</p>
+            {bookingSuccessData.assigned_tables.length > 0 && (
               <div className="assigned-tables">
                 <strong>Assigned seating</strong>
-                {assignedTables.map((table, index) => (
-                  <span key={`${table.tableNumber}-${index}`}>
-                    Table {table.tableNumber} · {table.seats} seat{table.seats === 1 ? '' : 's'}{table.location ? ` · ${table.location}` : ''}
+                {bookingSuccessData.assigned_tables.map((table) => (
+                  <span key={table.table_id}>
+                    Table {table.table_number} · {table.assigned_seats} seat{table.assigned_seats === 1 ? '' : 's'}{table.location ? ` · ${table.location}` : ''}
                   </span>
                 ))}
               </div>
@@ -297,15 +245,7 @@ function CustomerBookingPage() {
                   loading={isLoadingSlots}
                   onChange={(value) => { setSlotId(value); setAvailability(null); setIsCheckingAvailability(Boolean(value)); clearBookingConfirmation() }}
                   disabled={isLoadingSlots || slotOptions.length === 0}
-                  options={slotOptions.map((slot) => {
-                    const start = getSlotStart(slot)
-                    const end = getSlotEnd(slot)
-                    const meal = slot.meal_type ?? slot.mealType
-                    return {
-                      value: String(getSlotId(slot)),
-                      label: `${start}${end ? ` – ${end}` : ''}${meal ? ` · ${meal}` : ''}`,
-                    }
-                  })}
+                  options={slotOptions.map((slot) => ({ value: String(getSlotId(slot)), label: formatSlotLabel(slot) }))}
                 />
               </label>
             </div>
@@ -336,53 +276,11 @@ function CustomerBookingPage() {
           <section className="booking-panel" aria-labelledby="requirements-title">
             <div className="booking-panel-heading">
               <span className="section-step">03</span>
-              <div><h2 id="requirements-title">Special requirements</h2><p>Share dietary needs or allergies for your group.</p></div>
+              <div><h2 id="requirements-title">Special requirements <span className="optional-mark">(optional)</span></h2><p>Share dietary needs or allergies for your group.</p></div>
             </div>
             <div className="booking-fields">
               <div className="form-field form-field-wide requirements-field">
-                <div className="requirements-intro">
-                  <span>Special requirements</span>
-                  <p>Let us know about dietary needs or allergies so we can prepare for your group.</p>
-                </div>
-                {hasSpecialRequirements && (
-                  <div className="requirement-list">
-                    {specialRequirements.map((requirement, index) => (
-                      <article className="requirement-card" key={requirement.id}>
-                        <strong className="requirement-index">{index + 1}</strong>
-                        <label className="form-field">
-                          <span className="sr-only">Requirement {index + 1} description</span>
-                          <Input className="mh-control" value={requirement.description} placeholder={index === 0 ? 'e.g. 1 vegan, peanut allergy' : 'e.g. 2 vegetarians'} onChange={(event) => {
-                            const description = event.target.value
-                            setSpecialRequirements((items) => items.map((item) => item.id === requirement.id ? { ...item, description } : item))
-                            clearBookingConfirmation()
-                          }} />
-                        </label>
-                        <Checkbox className="allergy-checkbox" checked={requirement.hasAllergy} onChange={(event) => {
-                          setSpecialRequirements((items) => items.map((item) => item.id === requirement.id ? { ...item, hasAllergy: event.target.checked } : item))
-                          clearBookingConfirmation()
-                        }}>
-                          <span aria-hidden="true">⚠️ </span>This requirement involves an allergy
-                        </Checkbox>
-                        {specialRequirements.length > 1 && <Button className="requirement-remove" type="text" htmlType="button" aria-label={`Remove requirement ${index + 1}`} onClick={() => {
-                          setSpecialRequirements((items) => items.filter((item) => item.id !== requirement.id))
-                          clearBookingConfirmation()
-                        }}>Remove</Button>}
-                      </article>
-                    ))}
-                    <Button className="requirement-add" type="dashed" htmlType="button" onClick={() => {
-                      setSpecialRequirements((items) => [...items, { id: items.length + 1, description: '', hasAllergy: false }])
-                      clearBookingConfirmation()
-                    }}>＋ Add requirement</Button>
-                  </div>
-                )}
-                <Checkbox checked={!hasSpecialRequirements} onChange={(event) => {
-                  const noRequirements = event.target.checked
-                  setHasSpecialRequirements(!noRequirements)
-                  setSpecialRequirements(noRequirements ? [] : [{ id: `${Date.now()}`, description: '', hasAllergy: false }])
-                  clearBookingConfirmation()
-                }}>
-                  No dietary restrictions or allergies
-                </Checkbox>
+                <RequirementsEditor requirements={specialRequirements} onChange={(requirements) => { setSpecialRequirements(requirements); clearBookingConfirmation() }} />
               </div>
             </div>
           </section>
@@ -429,7 +327,7 @@ function CustomerBookingPage() {
           <h2>Mountain Hut</h2>
           <div className="summary-divider" />
           <div className="summary-line"><span>Date</span><strong>{slotDate || 'Choose a date'}</strong></div>
-          <div className="summary-line"><span>Time</span><strong>{selectedSlot ? `${getSlotStart(selectedSlot)}${getSlotEnd(selectedSlot) ? ` – ${getSlotEnd(selectedSlot)}` : ''}` : 'Choose a time'}</strong></div>
+          <div className="summary-line"><span>Time</span><strong>{selectedSlot ? `${getSlotStart(selectedSlot)} – ${getSlotEnd(selectedSlot)}` : 'Choose a time'}</strong></div>
           <div className="summary-line"><span>Guests</span><strong>{partySize || 0}</strong></div>
           {availability && <div className="summary-line"><span>Seats left</span><strong>{remainingSeats}</strong></div>}
           <p className="summary-note">Reservations must be made at least 2 hours before the service time.</p>

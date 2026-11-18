@@ -1,18 +1,16 @@
 """Email Template & Formatting Service (MH-03: Receive Confirmation)."""
 from html import escape
-from typing import Dict, Any, Optional
-from server.models.DAO.reservation import ReservationDAO
+from typing import Dict, Any
 import os
 import smtplib
 from email.message import EmailMessage
 from dotenv import load_dotenv
 from server.models.DTO.reservation_dto import ReservationMailDTO
 from pathlib import Path
-from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parents[1]
 ENV_PATH = BASE_DIR / ".env"
-load_dotenv(ENV_PATH, override=True)
+load_dotenv(ENV_PATH)
 
 def format_booking_email_text(reservation: ReservationMailDTO) -> str:
     """
@@ -24,21 +22,22 @@ def format_booking_email_text(reservation: ReservationMailDTO) -> str:
     - possible party requirements (allergies)
     - name of the hiker who made the reservation
     """
-    """
-"""
     hiker_name=reservation.hiker_name
     ref= reservation.booking_reference
     date_str = reservation.date_str
     time_slot = reservation.time_slot
     party_size = reservation.party_size
-    special_reqs = reservation.special_reqs or "None specified"
+    # PO issues #4 and #29: one line per requirement, the allergies marked
+    special_reqs = "".join(
+        f"\n  - {'ALLERGY: ' if r.has_allergy else ''}{r.description}" for r in reservation.special_reqs
+    ) or "    None specified"
     text = f"""============================================================
-           MOUNTAIN HUT - RESERVATION CONFIRMATION
+           MOUNTAIN HUT - {'RESERVATION UPDATED' if reservation.changed else 'RESERVATION CONFIRMATION'}
 ============================================================
 
 Dear {hiker_name},
 
-Thank you for booking with Mountain Hut! Your reservation is confirmed.
+{'Your booking has been changed. Here are the new details.' if reservation.changed else 'Thank you for booking with Mountain Hut! Your reservation is confirmed.'}
 
 ------------------------------------------------------------
 BOOKING DETAILS (Reference: {ref})
@@ -48,7 +47,7 @@ BOOKING DETAILS (Reference: {ref})
 * Date:                {date_str}
 * Time Slot:           {time_slot}
 * Party Size:          {party_size} person(s)
-* Special Requests:    {special_reqs}
+* Special Requests:{special_reqs}
 
 We look forward to welcoming you to the hut!
 
@@ -69,7 +68,10 @@ def format_booking_email_html(reservation: ReservationMailDTO) -> str:
     date_str = reservation.date_str
     time_slot = reservation.time_slot
     party_size = reservation.party_size
-    special_reqs = escape(reservation.special_reqs or "None specified")
+    special_reqs = "<br>".join(
+        f'<strong style="color: #c2410c;">Allergy: {escape(r.description)}</strong>' if r.has_allergy else escape(r.description)
+        for r in reservation.special_reqs
+    ) or "None specified"
     html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -82,13 +84,13 @@ def format_booking_email_html(reservation: ReservationMailDTO) -> str:
     <!-- Header -->
     <div style="background-color: #0f172a; color: #ffffff; padding: 28px 24px; text-align: center;">
       <h1 style="margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.5px;">Mountain Hut</h1>
-      <p style="margin: 6px 0 0; color: #94a3b8; font-size: 14px;">Reservation Confirmation</p>
+      <p style="margin: 6px 0 0; color: #94a3b8; font-size: 14px;">{'Reservation Updated' if reservation.changed else 'Reservation Confirmation'}</p>
     </div>
 
     <!-- Body -->
     <div style="padding: 24px;">
       <p style="margin-top: 0; font-size: 16px;">Dear <strong>{hiker_name}</strong>,</p>
-      <p style="color: #475569; font-size: 15px; line-height: 1.5;">Your table reservation is confirmed. Here are the details of your booking:</p>
+      <p style="color: #475569; font-size: 15px; line-height: 1.5;">{'Your booking has been changed. Here are the new details:' if reservation.changed else 'Your table reservation is confirmed. Here are the details of your booking:'}</p>
 
       <!-- Reference Badge -->
       <div style="background-color: #f1f5f9; border-left: 4px solid #3b82f6; padding: 14px 18px; margin: 20px 0; border-radius: 0 8px 8px 0;">
@@ -135,8 +137,11 @@ def format_booking_email_html(reservation: ReservationMailDTO) -> str:
 </html>"""
     return html
 
+def email_subject(reservation: ReservationMailDTO) -> str:
+  return f"Mountain Hut Booking {'Updated' if reservation.changed else 'Confirmation'} [{reservation.booking_reference}]"
+
 def send_booking_confirmation_email(reservation: ReservationMailDTO) -> Dict[str, Any]:
-  subject = f"Mountain Hut Booking Confirmation [{reservation.booking_reference}]"
+  subject = email_subject(reservation)
   to_email = reservation.contact_email
   text_content = format_booking_email_text(reservation)
   html_content = format_booking_email_html(reservation)

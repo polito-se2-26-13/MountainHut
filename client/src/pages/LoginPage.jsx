@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Button, Form, Input } from 'antd'
-import { Link, useNavigate } from 'react-router'
+import { Link, useLocation, useNavigate } from 'react-router'
 import { useAuth } from '../auth/AuthContext.jsx'
 import { useToast } from '../components/ToastProvider.jsx'
 import { apiRequest } from '../api/api.js'
@@ -25,6 +25,8 @@ function LoginPage() {
   const { signIn } = useAuth()
   const notify = useToast()
   const navigate = useNavigate()
+  // a guest who pressed "Sign in to book" goes on to the booking with the search already filled in
+  const availabilitySearch = useLocation().state?.availabilitySearch
 
   const emailError = !username.trim()
     ? 'Email is required.'
@@ -58,7 +60,11 @@ function LoginPage() {
         throw new Error('Your account role is not supported by this application.')
       }
       signIn(result.token, result.user)
-      navigate(destination, { replace: true })
+      if (availabilitySearch && result.user.role === 'Hiker') {
+        navigate('/customer/book-table', { replace: true, state: { availabilitySearch } })
+      } else {
+        navigate(destination, { replace: true })
+      }
     } catch (error) {
       setFieldErrors(error.fieldErrors || {})
       notify(error.message || 'Invalid email or password.')
