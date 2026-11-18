@@ -93,7 +93,7 @@ INSERT OR IGNORE INTO slot_tables (id, slot_id, table_id, available_seats, is_av
 
 -- Res 4: party 4 on T10 (6 - 4 = 2 free seats left on T10)
 INSERT OR IGNORE INTO reservations (
-    id, booking_reference, user_id, slot_id, party_size,
+    id, booking_reference, user_id, slot_id, party_size, special_requirements,
     contact_name, contact_email, contact_phone, status
 ) VALUES (
     4,
@@ -101,6 +101,7 @@ INSERT OR IGNORE INTO reservations (
     3,
     6,
     4,
+    'None',
     'Sprint2 Guest A',
     'guestA@example.com',
     '+39 340 0000001',
@@ -109,7 +110,7 @@ INSERT OR IGNORE INTO reservations (
 
 -- Res 5: party 1 on T11 (4 - 1 = 3 free seats left on T11)
 INSERT OR IGNORE INTO reservations (
-    id, booking_reference, user_id, slot_id, party_size,
+    id, booking_reference, user_id, slot_id, party_size, special_requirements,
     contact_name, contact_email, contact_phone, status
 ) VALUES (
     5,
@@ -117,6 +118,7 @@ INSERT OR IGNORE INTO reservations (
     4,
     6,
     1,
+    'None',
     'Sprint2 Guest B',
     'guestB@example.com',
     '+39 340 0000002',
@@ -125,7 +127,7 @@ INSERT OR IGNORE INTO reservations (
 
 -- Res 6: party 1 on T12 (2 - 1 = 1 free seat left on T12)
 INSERT OR IGNORE INTO reservations (
-    id, booking_reference, user_id, slot_id, party_size,
+    id, booking_reference, user_id, slot_id, party_size, special_requirements,
     contact_name, contact_email, contact_phone, status
 ) VALUES (
     6,
@@ -133,6 +135,7 @@ INSERT OR IGNORE INTO reservations (
     5,
     6,
     1,
+    'None',
     'Sprint2 Guest C',
     'guestC@example.com',
     '+39 340 0000003',
@@ -150,11 +153,11 @@ INSERT OR IGNORE INTO reservation_table_assignments (id, reservation_id, slot_ta
 -- Confirmed Bookings for Slot 7 (Fully Booked)
 -- --------------------------------------------------------------------
 INSERT OR IGNORE INTO reservations (
-    id, booking_reference, user_id, slot_id, party_size,
+    id, booking_reference, user_id, slot_id, party_size, special_requirements,
     contact_name, contact_email, contact_phone, status
 ) VALUES 
-(7, 'MH-S2-SLOT7-RES01', 3, 7, 4, 'Full Party A', 'fullA@example.com', '+39 340 0000004', 'CONFIRMED'),
-(8, 'MH-S2-SLOT7-RES02', 4, 7, 4, 'Full Party B', 'fullB@example.com', '+39 340 0000005', 'CONFIRMED');
+(7, 'MH-S2-SLOT7-RES01', 3, 7, 4, 'None', 'Full Party A', 'fullA@example.com', '+39 340 0000004', 'CONFIRMED'),
+(8, 'MH-S2-SLOT7-RES02', 4, 7, 4, 'None', 'Full Party B', 'fullB@example.com', '+39 340 0000005', 'CONFIRMED');
 
 INSERT OR IGNORE INTO reservation_table_assignments (id, reservation_id, slot_table_id, assigned_seats) VALUES
 (8, 7, 23, 4), -- T13 100% full

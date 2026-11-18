@@ -36,3 +36,13 @@ FROM (SELECT 1 AS reservation_id, 0 AS has_allergy, '2 vegetarian meals' AS desc
       UNION ALL SELECT 3, 0, 'Mountain hiking club group') AS seed
 WHERE seed.reservation_id IN (SELECT id FROM reservations)
   AND seed.reservation_id NOT IN (SELECT reservation_id FROM special_requirements);
+
+-- --------------------------------------------------------------------
+-- 3. Bookings made before MH-05 keep their requirements: the old free text becomes one requirement
+-- ('None' is the text of the sample bookings of 003 without requirements)
+-- --------------------------------------------------------------------
+INSERT INTO special_requirements (reservation_id, has_allergy, description)
+SELECT id, 0, trim(special_requirements)
+FROM reservations
+WHERE trim(coalesce(special_requirements, '')) NOT IN ('', 'None')
+  AND id NOT IN (SELECT reservation_id FROM special_requirements);
