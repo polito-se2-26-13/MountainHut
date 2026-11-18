@@ -91,9 +91,120 @@
   color: #536174;
 }
 
-.reservation-history-list li strong {
+.reservation-history-list li.reservation-card-modifiable {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 1.5rem;
+}
+
+.reservation-card-details {
+  display: grid;
+  min-width: 0;
+  gap: 0.45rem;
+}
+
+.reservation-card-details strong {
   color: #173f58;
   font-size: 1.05rem;
+}
+
+.booking-change-action {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.35rem;
+}
+
+.booking-change-action small {
+  color: #6b7280;
+  text-align: right;
+}
+
+@media (max-width: 760px) {
+  .reservation-history-list li.reservation-card-modifiable {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+
+  .booking-change-action {
+    align-items: flex-start;
+    margin-top: 0.4rem;
+  }
+
+  .booking-change-action small {
+    text-align: left;
+  }
+}
+
+.change-booking-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin: 1.25rem 0;
+  padding: 1rem;
+  border-radius: 0.7rem;
+  background: #f3f8fb;
+  color: #536174;
+}
+
+.change-booking-summary span {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.change-booking-summary strong {
+  color: #173f58;
+}
+
+.change-capacity-hint {
+  display: block;
+  margin: 0;
+  color: #536174;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.change-modal-form {
+  display: grid;
+  gap: 1rem;
+}
+
+.change-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem 1.25rem;
+}
+
+.change-fields > .form-field {
+  display: grid;
+  align-content: start;
+  gap: 0.45rem;
+}
+
+.change-modal-form .party-size-field {
+  max-width: none;
+}
+
+.change-fields .change-requirements-field {
+  grid-column: 1 / -1;
+}
+
+.change-error-banner {
+  margin: 1rem 0;
+}
+
+@media (max-width: 600px) {
+  .change-booking-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .change-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .change-fields .change-requirements-field {
+    grid-column: auto;
+  }
 }
 
 .page a {
@@ -442,13 +553,9 @@
   text-decoration: none;
 }
 
-button.back-link {
-  padding: 0;
-  border: 0;
-  background: none;
-  font: inherit;
-  cursor: pointer;
-  color: #1769aa;
+/* the Back link of a page header sits on its own line above the title */
+header .back-link {
+  display: inline-block;
 }
 
 .register-card h1 {
@@ -459,38 +566,6 @@ button.back-link {
 .form-intro {
   margin-bottom: 1.75rem;
   color: #64748b;
-}
-
-.role-picker {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.5rem;
-  margin-bottom: 1.5rem;
-  padding: 0.3rem;
-  border-radius: 0.7rem;
-  background: #f1f5f9;
-}
-
-.role-option {
-  min-height: 2.7rem;
-  border: 0;
-  border-radius: 0.5rem;
-  background: transparent;
-  color: #475569;
-  cursor: pointer;
-  font: inherit;
-  font-size: 0.9rem;
-  font-weight: 600;
-}
-
-.role-option.selected {
-  background: #fff;
-  color: #1769aa;
-  box-shadow: 0 1px 3px rgb(15 23 42 / 12%);
-}
-
-.role-option:focus-visible {
-  outline: 3px solid rgb(23 105 170 / 30%);
 }
 
 .login-fields {
@@ -982,12 +1057,6 @@ button.back-link {
   background: #eff6ff;
 }
 
-.slot-validation-note {
-  margin-top: 0.7rem;
-  color: #b42318 !important;
-  font-size: 0.82rem;
-}
-
 .slot-form-footer {
   display: flex;
   align-items: center;
@@ -1158,12 +1227,6 @@ button.back-link {
   display: grid;
   gap: 0.75rem;
   margin-top: 0.2rem;
-}
-
-.requirement-example {
-  margin: 0;
-  color: #64748b;
-  font-size: 0.8rem;
 }
 
 .requirement-card {
@@ -1986,6 +2049,7 @@ button.back-link {
   }
 }
 
-:where(.css-dev-only-do-not-override-oc1rc0).ant-select-single:not(.ant-select-customize) .ant-select-content {
+/* not antd's hashed class: the hash of the development server is not the one of the production build */
+.mh-control.ant-select-single:not(.ant-select-customize) .ant-select-content {
   overflow: visible;
 }

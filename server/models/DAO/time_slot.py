@@ -46,7 +46,7 @@ class TimeSlotDAO(Base):
     )
 
     # Relationships with eager selectin loading for async operations
-    creator: Mapped[Optional["UserDAO"]] = relationship("UserDAO", back_populates="created_slots", lazy="selectin")
+    creator: Mapped[Optional["UserDAO"]] = relationship("UserDAO", lazy="selectin")
     slot_tables: Mapped[List["SlotTableDAO"]] = relationship(
         "SlotTableDAO", back_populates="slot", cascade="all, delete-orphan", lazy="selectin"
     )

@@ -1,9 +1,18 @@
 """DTOs for table reservation and slot availability (MH-44)."""
-from typing import Optional, List
+from typing import Annotated, Optional, List
 from pydantic import ConfigDict
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, StringConstraints
 from server.models.DTO.user_dto import Phone, Name
-from server.models.DTO.slot_dto import Table
+
+
+class SpecialRequirementDTO(BaseModel):
+    """One requirement for part of the party, with its own allergy flag (MH-05)."""
+    has_allergy: bool = False
+    # spaces are cut first, as in Name, so a description of only spaces is refused
+    description: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=500)]
+
+    model_config = ConfigDict(from_attributes=True)
+
 
 class ReservationCreate(BaseModel):
     """Payload to book a table for a party in a specific time slot."""
@@ -13,14 +22,20 @@ class ReservationCreate(BaseModel):
     contact_name: Name = Field(..., description="Full name of contact hiker")
     contact_email: EmailStr = Field(..., min_length=5, max_length=100, description="Email for booking confirmation")
     contact_phone: Optional[Phone] = Field(None, description="Mobile number")
-    special_requirements: Optional[str] = Field(None, description="Dietary requirements, allergies, notes")
+    special_requirements: List[SpecialRequirementDTO] = Field([], description="Dietary requirements and allergies")
+
+
+class ReservationUpdate(BaseModel):
+    """What a hiker can change in a booking (MH-06), sent whole as the change window of the history page does."""
+    slot_id: int = Field(..., description="ID of the selected time slot")
+    party_size: int = Field(..., ge=1, description="Number of people in the party")
+    special_requirements: List[SpecialRequirementDTO] = Field(..., description="Dietary requirements and allergies")
 
 
 class AssignedTableInfo(BaseModel):
     """Details of a table assigned to a reservation."""
     table_id: int
     table_number: str
-    location: Optional[str] = None
     assigned_seats: int
 
 
@@ -34,13 +49,12 @@ class ReservationResponse(BaseModel):
     start_time: Optional[str] = None
     end_time: Optional[str] = None
     party_size: int
-    special_requirements: Optional[str] = None
+    special_requirements: List[SpecialRequirementDTO] = []
     contact_name: str
     contact_email: str
     contact_phone: Optional[str] = None
     status: str
     assigned_tables: List[AssignedTableInfo] = []
-    #created_at: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -85,4 +99,6 @@ class ReservationMailDTO(BaseModel):
     date_str: str
     time_slot: str
     party_size: int
-    special_reqs: Optional[str]= "None specified"
+    special_reqs: List[SpecialRequirementDTO] = []
+    # true for the mail of a change (MH-06), so the hiker sees that the booking was changed
+    changed: bool = False

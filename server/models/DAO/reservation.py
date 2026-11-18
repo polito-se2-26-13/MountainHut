@@ -1,11 +1,13 @@
 """Reservation and Table Assignment database models (MH-01 & MH-03)."""
 import uuid
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from typing import TYPE_CHECKING, Optional, List
 
 from sqlalchemy import (
     String,
     Integer,
+    Boolean,
     Text,
     DateTime,
     ForeignKey,
@@ -24,7 +26,8 @@ if TYPE_CHECKING:
 
 def generate_booking_reference() -> str:
     """Generate a readable, unique booking reference code (MH-03)."""
-    return f"MH-{datetime.now().strftime('%Y%m%d')}-{uuid.uuid4().hex[:6].upper()}"
+    # the date of the hut, also on a server clock in UTC
+    return f"MH-{datetime.now(ZoneInfo('Europe/Rome')).strftime('%Y%m%d')}-{uuid.uuid4().hex[:6].upper()}"
 
 
 class ReservationDAO(Base):
@@ -48,7 +51,7 @@ class ReservationDAO(Base):
     party_size: Mapped[int] = mapped_column(Integer, nullable=False)
     special_requirements: Mapped[Optional[str]] = mapped_column(
         Text, nullable=True
-    )  # e.g., allergies, guide notes, high chairs (MH-03)
+    )  # free text of sprint 1, no longer written: from MH-05 the requirements are in `requirements`
     contact_name: Mapped[str] = mapped_column(String(200), nullable=False)
     contact_email: Mapped[str] = mapped_column(String(255), nullable=False)
     contact_phone: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
@@ -63,11 +66,17 @@ class ReservationDAO(Base):
     )
 
     # Relationships with eager selectin loading for async operations
-    hiker: Mapped["UserDAO"] = relationship("UserDAO", back_populates="reservations", lazy="selectin")
+    hiker: Mapped["UserDAO"] = relationship("UserDAO", lazy="selectin")
     slot: Mapped["TimeSlotDAO"] = relationship("TimeSlotDAO", back_populates="reservations", lazy="selectin")
     table_assignments: Mapped[List["ReservationTableAssignmentDAO"]] = relationship(
         "ReservationTableAssignmentDAO",
         back_populates="reservation",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+    # delete-orphan: the change of a booking (MH-06) replaces the whole list
+    requirements: Mapped[List["SpecialRequirementDAO"]] = relationship(
+        "SpecialRequirementDAO",
         cascade="all, delete-orphan",
         lazy="selectin",
     )
@@ -158,3 +167,15 @@ class ReservationTableAssignmentDAO(Base):
             f"<ReservationTableAssignmentDAO(id={self.id}, res_id={self.reservation_id}, "
             f"slot_table_id={self.slot_table_id}, seats={self.assigned_seats})>"
         )
+
+
+class SpecialRequirementDAO(Base):
+    """One requirement of a booking for part of the party, e.g. "1 vegan, peanut allergy" (MH-05)."""
+    __tablename__ = "special_requirements"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    reservation_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("reservations.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    has_allergy: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
