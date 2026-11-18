@@ -35,7 +35,7 @@ def send_confirmation_with_retry(mail, waits=(5, 10)):
         print(f"confirmation email not sent for {mail.booking_reference}: {result.get('error')}", flush=True)
 
 
-def confirm_by_mail(res,spReq,background_tasks:BackgroundTasks|None,changed:bool=False):
+def confirm_by_mail(res,background_tasks:BackgroundTasks|None,changed:bool=False):
     """Mail of a new or a changed booking, with its details as they are now (MH-03, PO issue #41)"""
     mail=reservationEmailDto_to_email(
             res.booking_reference,
@@ -43,7 +43,7 @@ def confirm_by_mail(res,spReq,background_tasks:BackgroundTasks|None,changed:bool
             res.slot.date.strftime("%d/%m/%Y"),
             f"{res.slot.start_time:%H:%M}-{res.slot.end_time:%H:%M}",
             res.party_size,
-            spReq,
+            res.requirements,
             res.hiker.full_name,
             changed
         )
@@ -79,12 +79,12 @@ class ReservationController():
 
     async def _own_reservation(self,reference:str,user_id:int,role:UserType):
         """The booking with its tables: a hiker reaches only their own bookings, the hut staff all of them"""
-        res,tables,req= await self.repo.get_reservation_by_reference(reference)
+        res,tables= await self.repo.get_reservation_by_reference(reference)
         if not res :
             raise NotFoundError("booking reference not found")
         if res.user_id!=user_id and role==UserType.HIKER:
             raise ForbiddenError("you cannot see other reservation")
-        return res,tables,req
+        return res,tables
 
     async def create_reservation(self,reservation:ReservationCreate,background_tasks:BackgroundTasks|None=None)->ReservationResponse:
         """Creation reservation"""
@@ -100,25 +100,25 @@ class ReservationController():
                 )
             #allocation
             table_allocations = assign_tables_for_party(timeSlot, reservation.party_size)
-            res,tables= await self.repo.transaction_add_reservation(reservation,table_allocations,reservation.special_requirements)
-        confirm_by_mail(res,reservation.special_requirements,background_tasks)
-        return reservationDTO_to_response(res,tables,reservation.special_requirements)
+            res,tables= await self.repo.transaction_add_reservation(reservation,table_allocations)
+        confirm_by_mail(res,background_tasks)
+        return reservationDTO_to_response(res,tables)
 
     async def get_reservation_by_reference(self,reference:str,user_id:int,role:UserType):
-        res,tables,req= await self._own_reservation(reference,user_id,role)
-        return reservationDTO_to_response(res,tables,req)
+        res,tables= await self._own_reservation(reference,user_id,role)
+        return reservationDTO_to_response(res,tables)
 
     async def get_reservation_by_user_id(self,user_id:int):
             res= await self.repo.get_reservation_by_user_id(user_id)
             listRes=[]
-            for r,a,req in res:
-                listRes.append(reservationDTO_to_response(r,a,req))
+            for r,a in res:
+                listRes.append(reservationDTO_to_response(r,a))
             return listRes
 
     async def update_reservation(self,reference:str,user_id:int,changes:ReservationUpdate,background_tasks:BackgroundTasks|None=None)->ReservationResponse:
         """Change of a booking (MH-06): it is treated as a new booking, so the MH-01 rules hold (PO issues #38 and #48)"""
         async with booking_lock:
-            current,_,_= await self._own_reservation(reference,user_id,UserType.HIKER)
+            current,_= await self._own_reservation(reference,user_id,UserType.HIKER)
             if current.status!=ReservationStatus.CONFIRMED.value:
                 raise ConflictError("only confirmed bookings can be changed")
             # PO issue #43: until 48 hours before the old slot, and before the new one too
@@ -130,6 +130,6 @@ class ReservationController():
             await self.repo.transaction_update_reservation(current.id,changes.slot_id,changes.party_size,changes.special_requirements)
 
         # read again, so the answer and the email show the booking as it is now
-        res,tables,req= await self.repo.get_reservation_by_reference(reference)
-        confirm_by_mail(res,req,background_tasks,changed=True)
-        return reservationDTO_to_response(res,tables,req)
+        res,tables= await self.repo.get_reservation_by_reference(reference)
+        confirm_by_mail(res,background_tasks,changed=True)
+        return reservationDTO_to_response(res,tables)

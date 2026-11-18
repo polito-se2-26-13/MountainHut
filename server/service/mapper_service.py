@@ -41,7 +41,7 @@ def userdao_to_userdto_detail(user:UserDAO)->UserDetailDTO:
         lastName=user.last_name,
         phone=user.phone
     )
-def reservationDTO_to_response(reservation:ReservationDAO, assigments: List[AssignedTableInfo],requirements:list[SpecialRequirementDTO]):
+def reservationDTO_to_response(reservation:ReservationDAO, assigments: List[AssignedTableInfo]):
     return ReservationResponse(
         id=reservation.id,
         booking_reference=reservation.booking_reference,
@@ -51,7 +51,7 @@ def reservationDTO_to_response(reservation:ReservationDAO, assigments: List[Assi
         start_time=reservation.slot.start_time.strftime("%H:%M"),
         end_time=reservation.slot.end_time.strftime("%H:%M"),
         party_size=reservation.party_size,
-        special_requirements=requirements,
+        special_requirements=reservation.requirements,
         contact_email=reservation.contact_email,
         contact_name=reservation.contact_name,
         contact_phone=reservation.contact_phone,
