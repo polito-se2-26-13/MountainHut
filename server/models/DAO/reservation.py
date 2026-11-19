@@ -49,9 +49,6 @@ class ReservationDAO(Base):
         Integer, ForeignKey("time_slots.id", ondelete="CASCADE"), nullable=False, index=True
     )
     party_size: Mapped[int] = mapped_column(Integer, nullable=False)
-    special_requirements: Mapped[Optional[str]] = mapped_column(
-        Text, nullable=True
-    )  # free text of sprint 1, no longer written: from MH-05 the requirements are in `requirements`
     contact_name: Mapped[str] = mapped_column(String(200), nullable=False)
     contact_email: Mapped[str] = mapped_column(String(255), nullable=False)
     contact_phone: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
@@ -104,7 +101,6 @@ class ReservationDAO(Base):
                 else None
             ),
             "partySize": self.party_size,
-            "specialRequirements": self.special_requirements,
             "status": self.status,
             "assignedTables": assigned_tables,
             "createdAt": self.created_at.isoformat() if self.created_at else None,

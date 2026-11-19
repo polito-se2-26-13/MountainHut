@@ -1,0 +1,36 @@
+
+# Git
+.git
+.gitignore
+
+# Environment files
+.env
+.env.*
+**/.env
+**/.env.*
+!.env.example
+
+# Python
+**/__pycache__/
+**/*.py[cod]
+**/.venv/
+**/venv/
+.pytest_cache/
+.coverage
+./server/tests
+
+# Local databases
+**/*.sqlite
+**/*.sqlite3
+**/*.db
+
+# Node
+**/node_modules/
+**/dist/
+
+# IDE
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db

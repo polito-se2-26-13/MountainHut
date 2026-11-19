@@ -1,0 +1,37 @@
+
+services:
+  app:
+    image: ghcr.io/polito-se2-26-13/mountainhut:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    restart: unless-stopped
+
+    env_file:
+      - ./server/.env
+
+    environment:
+      DB_PATH: /data/mountainHut.sqlite
+
+    volumes:
+      - mountainhut-data:/data
+
+    ports:
+      - "3000:8080"
+
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8080/api/health', timeout=5)"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  mountainhut-data:
+    # the same name whatever the folder, as the README says
+    name: mountainhut-data
