@@ -1,6 +1,7 @@
 services:
   app:
     image: kio2701/polito-se2-26-13:latest
+
     restart: unless-stopped
 
     env_file:
@@ -13,14 +14,14 @@ services:
       - mountainhut-data:/data
 
     ports:
-      - "3000:80"
+      - "3000:8080"
 
     healthcheck:
       test:
         - CMD
         - python
         - -c
-        - "import urllib.request; urllib.request.urlopen('http://localhost/api/health', timeout=5)"
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8080/api/health', timeout=5)"
       interval: 10s
       timeout: 5s
       retries: 5
