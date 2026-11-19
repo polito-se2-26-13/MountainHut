@@ -7,7 +7,7 @@ WORKDIR /app/client
 
 # Install frontend dependencies
 COPY client/package*.json ./
-RUN npm ci
+RUN npm ci --ignore-scripts
 
 # Copy frontend source and build
 COPY client/ ./
@@ -43,14 +43,20 @@ COPY client/nginx/default.conf /etc/nginx/conf.d/default.conf
 # Configure Supervisor
 COPY deploy/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
-# Create persistent database directory
-RUN mkdir -p /data
+# The app runs as an unprivileged user: nginx keeps its pid, temporary files and logs
+# in folders of that user, and the database folder belongs to it
+RUN useradd --system --no-create-home --uid 10001 mountainhut \
+    && sed -i -e '/^user /d' -e 's#^pid .*#pid /tmp/nginx.pid;#' /etc/nginx/nginx.conf \
+    && mkdir -p /data \
+    && chown -R mountainhut:mountainhut /data /var/lib/nginx /var/log/nginx
 
 # Database location
 ENV DB_PATH=/data/mountainHut.sqlite
 
-# Nginx listens on port 80
+# Nginx listens on port 80 (Docker lets a normal user open ports below 1024 inside a container)
 EXPOSE 80
 
+USER mountainhut
+
 # Apply database migrations and start both services
-CMD ["sh", "-c", "python -m server.scripts.db_setup migrate && exec supervisord -n"]
+CMD ["sh", "-c", "python -m server.scripts.db_setup migrate && exec supervisord -n -c /etc/supervisor/conf.d/supervisord.conf"]
