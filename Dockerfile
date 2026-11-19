@@ -29,7 +29,7 @@ RUN apt-get update \
 
 # Install backend dependencies
 COPY server/requirements.txt ./server/requirements.txt
-RUN pip install --no-cache-dir -r server/requirements.txt
+RUN pip install --no-cache-dir --only-binary :all: -r server/requirements.txt
 
 # Copy backend source code
 COPY server/ ./server/

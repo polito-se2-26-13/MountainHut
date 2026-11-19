@@ -17,6 +17,7 @@
 **/venv/
 .pytest_cache/
 .coverage
+./server/tests
 
 # Local databases
 **/*.sqlite
