@@ -74,10 +74,10 @@ The app runs on http://localhost:5173. Calls to `/api/...` are forwarded to the 
 
 ## Run with Docker
 
-The whole app runs in one container. Nginx serves the pages and passes `/api` to the backend, and the database is kept in the Docker volume `mountainhut-data`. A GitHub Action builds the image and publishes it as `ghcr.io/polito-se2-26-13/mountainhut`: the release of each sprint, from `main`, is tagged `latest`, the latest work, from `dev`, is tagged `dev`, and every image is also tagged with its commit id.
+The whole app runs in one container. Nginx serves the pages and passes `/api` to the backend, and the database is kept in the Docker volume `mountainhut-data`. A GitHub Action builds the image and publishes it as `ghcr.io/polito-se2-26-13/mountainhut` and, the same image, on Docker Hub as `mountainhutteam13/mountainhut`. The release of each sprint, from `main`, is tagged `latest`, the latest work, from `dev`, is tagged `dev`, and every image is also tagged with its commit id.
 
-1. Install Docker Desktop, which includes Docker Compose, and start it.
-2. Put the secrets in `server/.env`. They are not on GitHub: the teachers find the file in `Team13-secrets.zip`, in the "Elaborati" section of the portal, and extract it into the project root so that it becomes `server/.env`. Anyone else copies `server/.env.example` to `server/.env` and sets `SECRET_KEY` to a long random text, because without it the logins end at every restart of the container. `SMTP_EMAIL` and `SMTP_PASSWORD` are the account that sends the confirmation emails; without them the bookings work but no email is sent.
+1. Install Docker Desktop, start it and clone this repository.
+2. Put the secrets in `server/.env`. The teachers take this file from `Team13-secrets.zip`, in the "Elaborati" section of the portal, and copy it into the `server` folder. Everyone else copies `server/.env.example` to `server/.env` and writes a long random text in `SECRET_KEY`, otherwise you have to log in again after every restart. The Gmail account in `SMTP_EMAIL` and `SMTP_PASSWORD` sends the confirmation emails. Without it the bookings still work, but no email is sent.
 3. From the project root, start the published image:
 
    ```
