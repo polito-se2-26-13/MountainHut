@@ -1,48 +1,71 @@
-import { useState } from 'react'
-import { Button, DatePicker, InputNumber, TimePicker } from 'antd'
+import { useEffect, useState } from 'react'
+import { DatePicker, InputNumber } from 'antd'
 import dayjs from 'dayjs'
 import { Link } from 'react-router'
 import { apiRequest } from '../api/api.js'
 import { useAuth } from '../auth/AuthContext.jsx'
-import { isAtLeast, localDateString } from '../utils/slots.js'
+import { localDateString, normalizeSlots } from '../utils/slots.js'
 
 const TWO_HOURS_MS = 2 * 60 * 60 * 1000
 
 function AvailabilityPage() {
   const { session } = useAuth()
   const [date, setDate] = useState(localDateString())
-  const [time, setTime] = useState('')
   const [partySize, setPartySize] = useState(2)
-  const [searching, setSearching] = useState(false)
-  const [hasSearched, setHasSearched] = useState(false)
-  const [result, setResult] = useState(null)
-  const [error, setError] = useState('')
-
-  async function searchAvailability(event) {
-    event.preventDefault()
-    setHasSearched(true)
-    setResult(null)
-    setError('')
-    if (!date) { setError('Choose a date to continue.'); return }
-    if (!time) { setError('Choose a service time to continue.'); return }
-    if (!Number.isInteger(Number(partySize)) || Number(partySize) < 1) { setError('Party size must be at least 1.'); return }
-    setSearching(true)
-    try {
-      const query = new URLSearchParams({ date, time, party_size: String(partySize) })
-      const response = await apiRequest(`/slots/availability?${query.toString()}`)
-      setResult(response)
-    } catch (requestError) {
-      setError(requestError.status === 404 ? 'That service time could not be found. Choose another time and try again.' : requestError.message || 'Availability could not be checked. Please try again.')
-    } finally {
-      setSearching(false)
-    }
-  }
-
-  // bookings close 2 hours before the service (PO #7), so a closer time is not offered as available
-  const bookingClosed = Boolean(result) && !isAtLeast(result.date, result.start_time, TWO_HOURS_MS)
-  const isAvailable = !bookingClosed && Boolean(result?.is_available)
-  const layout = result?.layout ?? []
+  const [availabilityResult, setAvailabilityResult] = useState(null)
+  const [selected, setSelected] = useState(null)
+  const requestKey = `${date}:${partySize}`
+  const isCurrentResult = availabilityResult?.key === requestKey
+  const slots = isCurrentResult ? availabilityResult.slots : []
+  const loading = !isCurrentResult
+  const error = isCurrentResult ? availabilityResult.error : ''
+  const selectedSlot = selected?.key === requestKey ? selected.slot : null
   const bookingPath = session?.isAuthenticated && session.userProfile.role === 'Hiker' ? '/customer/book-table' : '/login'
+
+  useEffect(() => {
+    let active = true
+    const query = new URLSearchParams({ date, party_size: String(partySize) })
+    async function loadAvailability() {
+      try {
+        const response = await apiRequest(`/slots/availability?${query.toString()}`)
+        const availabilityList = normalizeSlots(response)
+        const available = availabilityList
+          .filter((slot) => slot.is_available && isAtLeast(slot.date, slot.start_time, TWO_HOURS_MS))
+          .sort((a, b) => a.start_time.localeCompare(b.start_time))
+        if (active) setAvailabilityResult({ key: requestKey, slots: available, error: '' })
+      } catch (requestError) {
+        if (active) setAvailabilityResult({
+          key: requestKey,
+          slots: [],
+          error: requestError.message || 'Service times could not be loaded. Please try again.',
+        })
+      }
+    }
+    void loadAvailability()
+    return () => { active = false }
+  }, [date, partySize, requestKey])
+
+  let slotContent
+  if (loading) {
+    slotContent = <output className="availability-empty">Loading available times…</output>
+  } else if (slots.length === 0) {
+    slotContent = <output className="availability-empty">No available service times for {date}. Choose another date or group size.</output>
+  } else {
+    slotContent = (
+      <ul className="availability-slot-list">
+        {slots.map((slot) => {
+          const active = selectedSlot && slot.slot_id === selectedSlot.slot_id
+          return <li key={slot.slot_id}>
+            <button className={`availability-slot${active ? ' selected' : ''}`} type="button"
+              aria-pressed={Boolean(active)} onClick={() => setSelected({ key: requestKey, slot })}>
+              <span><strong>{slot.start_time}–{slot.end_time}</strong>{slot.meal_type && <small>{slot.meal_type}</small>}</span>
+              <span className="availability-slot-seats">{slot.remaining_seats} seats left <span aria-hidden="true">→</span></span>
+            </button>
+          </li>
+        })}
+      </ul>
+    )
+  }
 
   return (
     <main className="page availability-page">
@@ -51,71 +74,51 @@ function AvailabilityPage() {
           <Link className="back-link" to={session?.isAuthenticated ? `/home/${session.userProfile.role.toLowerCase()}` : '/'}>← Back</Link>
           <p className="eyebrow">MOUNTAINHUT · PLAN YOUR VISIT</p>
           <h1>Check availability</h1>
-          <p className="form-intro">Choose a date, service time, and group size to see whether we can seat your party.</p>
+          <p className="form-intro">Choose a date and group size to see available service times.</p>
         </div>
         <div className="booking-header-mark" aria-hidden="true">MH</div>
       </header>
 
-      <form className="availability-search booking-panel" onSubmit={searchAvailability} noValidate>
+      <section className="availability-search booking-panel" aria-labelledby="availability-slots-title">
         <div className="booking-panel-heading">
           <span className="section-step">01</span>
-          <div><h2>Find a service time</h2><p>Availability is checked live and is open to everyone.</p></div>
+          <div><h2 id="availability-slots-title">Available service times</h2><p>Select a time to see seating details and continue to booking.</p></div>
         </div>
-        <div className="booking-fields availability-fields">
+        <div className="booking-fields availability-fields availability-filter-fields">
           <label className="form-field">
-            <span>Date <span className="required-mark" aria-hidden="true">*</span></span>
+            <span>Date</span>
             <DatePicker className="mh-control" format="YYYY-MM-DD" value={date ? dayjs(date) : null}
               disabledDate={(value) => value.isBefore(dayjs(localDateString()), 'day')}
-              onChange={(value) => { setDate(value?.format('YYYY-MM-DD') || ''); setResult(null); setError('') }} allowClear={false} />
+              onChange={(value) => setDate(value?.format('YYYY-MM-DD') || localDateString())} allowClear={false} />
           </label>
           <label className="form-field">
-            <span>Service time <span className="required-mark" aria-hidden="true">*</span></span>
-            <TimePicker className="mh-control" format="HH:mm" minuteStep={15}
-              value={time ? dayjs(`2000-01-01T${time}`) : null}
-              onChange={(value) => { setTime(value?.format('HH:mm') || ''); setResult(null); setError('') }} />
-          </label>
-          <label className="form-field">
-            <span>Party size <span className="required-mark" aria-hidden="true">*</span></span>
-            <InputNumber className="mh-control" min={1} step={1} value={partySize} onChange={(value) => { setPartySize(value ?? ''); setResult(null); setError('') }} />
+            <span>Party size</span>
+            <InputNumber className="mh-control" min={1} step={1} value={partySize} onChange={(value) => setPartySize(value ?? 1)} />
           </label>
         </div>
         {error && <p className="field-error availability-error" role="alert">{error}</p>}
-        <Button className="submit-button availability-submit" htmlType="submit" loading={searching}>Check availability</Button>
-      </form>
+        {slotContent}
+      </section>
 
-      {result && (
-        <section className={`availability-result${isAvailable ? '' : ' unavailable'}`} role="status" aria-live="polite">
-          <span className="availability-result-icon" aria-hidden="true">{isAvailable ? '✓' : '!'}</span>
-          <div className="availability-result-content">
-            <p className="eyebrow">{isAvailable ? 'GOOD NEWS' : bookingClosed ? 'BOOKINGS CLOSED' : 'NO SPACE FOR THIS PARTY'}</p>
-            <h2>{isAvailable ? 'There is availability' : bookingClosed ? 'This service can no longer be booked' : 'Not enough seats available'}</h2>
-            <p>{bookingClosed
-              ? 'Bookings close 2 hours before the service. You can try another date or time.'
-              : isAvailable
-              ? `Your party of ${result.party_size} can be seated for ${result.start_time}–${result.end_time}. ${result.remaining_seats} seat${result.remaining_seats === 1 ? '' : 's'} remain.`
-              : `There are ${result.remaining_seats} seat${result.remaining_seats === 1 ? '' : 's'} remaining for this service, which is not enough for ${result.party_size}. You can try another date or time.`}</p>
-            {isAvailable && result.layout_summary && <p className="layout-summary"><strong>Seating preview:</strong> {result.layout_summary}</p>}
-            {isAvailable && layout.length > 0 && <ul className="availability-layout">
-              {layout.map((table) => <li key={table.table_number}>
-                <strong>Table {table.table_number}</strong>
-                <span>{table.assigned_seats} seat{table.assigned_seats === 1 ? '' : 's'}{table.location ? ` · ${table.location}` : ''}</span>
-              </li>)}
-            </ul>}
-            {isAvailable && <Link className="submit-button availability-book"
-              to={bookingPath}
-              state={{ availabilitySearch: {
-                date: result.date,
-                partySize: result.party_size,
-                slotId: result.slot_id,
-              } }}>
-              {bookingPath === '/login' ? 'Sign in to book' : 'Book now'} <span aria-hidden="true">→</span>
-            </Link>}
-          </div>
-        </section>
-      )}
-      {!hasSearched && <p className="availability-footnote">Checking availability does not reserve seats. Complete a booking to secure your table.</p>}
+      {selectedSlot && <section className="availability-result" aria-live="polite">
+        <span className="availability-result-icon" aria-hidden="true">✓</span>
+        <div className="availability-result-content">
+          <p className="eyebrow">GOOD NEWS</p>
+          <h2>There is availability</h2>
+          <p>Your party of {partySize} can be seated for {selectedSlot.start_time}–{selectedSlot.end_time}. {selectedSlot.remaining_seats} seats remain.</p>
+          {selectedSlot.layout_summary && <p className="layout-summary"><strong>Seating preview:</strong> {selectedSlot.layout_summary}</p>}
+          <Link className="submit-button availability-book" to={bookingPath} state={{ availabilitySearch: {
+            date, partySize, slotId: selectedSlot.slot_id,
+          } }}>{bookingPath === '/login' ? 'Sign in to book' : 'Book now'} <span aria-hidden="true">→</span></Link>
+        </div>
+      </section>}
+      <p className="availability-footnote">Checking availability does not reserve seats. Complete a booking to secure your table.</p>
     </main>
   )
+}
+
+function isAtLeast(date, time, ms) {
+  return Date.parse(`${date}T${time}`) - Date.now() >= ms
 }
 
 export default AvailabilityPage

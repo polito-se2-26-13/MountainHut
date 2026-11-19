@@ -1529,6 +1529,34 @@ header .back-link {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.availability-filter-fields {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  max-width: 42rem;
+}
+
+.availability-empty {
+  display: block;
+  margin: 1rem 0 0;
+  padding: 1rem;
+  border: 1px dashed #cbd5e1;
+  border-radius: 0.65rem;
+  color: #64748b;
+}
+
+.availability-slot-list {
+  display: grid;
+  gap: 0.6rem;
+  margin: 1.2rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.availability-slot { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.95rem 1rem; border: 1px solid #dbe3ec; border-radius: 0.7rem; background: #fff; color: #18212f; text-align: left; cursor: pointer; transition: border-color 140ms ease, background 140ms ease, box-shadow 140ms ease; }
+.availability-slot:hover, .availability-slot.selected { border-color: #1769aa; background: #f0f7fc; box-shadow: 0 0 0 2px #dceefa; }
+.availability-slot > span:first-child { display: flex; flex-wrap: wrap; gap: 0.3rem 0.65rem; align-items: baseline; }
+.availability-slot small { color: #64748b; }
+.availability-slot-seats { color: #166534; font-size: 0.88rem; font-weight: 650; white-space: nowrap; }
+
 .availability-submit {
   min-width: 12rem;
   margin-top: 1.25rem;
@@ -1606,7 +1634,9 @@ header .back-link {
 @media (max-width: 680px) {
   .availability-page { width: min(100% - 1.25rem, 58rem); padding-top: 5rem; }
   .availability-fields { grid-template-columns: 1fr; }
+  .availability-filter-fields { grid-template-columns: 1fr; }
   .availability-result { padding: 1rem; }
+  .availability-slot { align-items: flex-start; flex-direction: column; gap: 0.45rem; }
 }
 
 .confirmation-icon {
