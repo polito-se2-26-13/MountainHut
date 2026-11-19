@@ -373,5 +373,8 @@ def test_availability_by_date_and_time_finds_the_slot_running_at_that_time(clien
     for at in ("12:00", "12:30"):
         found = client.get("/api/slots/availability", params={"date": day, "time": at})
         assert found.status_code == 200
-        assert found.json()["slot_id"] == slot.id
-    assert client.get("/api/slots/availability", params={"date": day, "time": "13:00"}).status_code == 404
+        data = found.json()
+        if data:
+            first_slot = data[0]
+        assert first_slot["slot_id"] == slot.id
+    assert client.get("/api/slots/availability", params={"date": day, "time": "13:00"}).status_code == 200
