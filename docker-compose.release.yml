@@ -1,6 +1,6 @@
 services:
   app:
-    image: kio2701/polito-se2-26-13:latest
+    image: ghcr.io/polito-se2-26-13/mountainhut:latest
 
     restart: unless-stopped
 
@@ -29,3 +29,5 @@ services:
 
 volumes:
   mountainhut-data:
+    # the same name whatever the folder, as the README says
+    name: mountainhut-data
