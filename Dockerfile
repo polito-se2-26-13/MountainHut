@@ -56,8 +56,6 @@ COPY client/nginx/default.conf /etc/nginx/conf.d/default.conf
 COPY deploy/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
 # Configure Nginx for non-root execution
-
-# Configure Nginx for non-root execution
 RUN sed -i 's#^[[:space:]]*pid .*;#pid /tmp/nginx.pid;#' /etc/nginx/nginx.conf \
     && sed -i '/^[[:space:]]*user[[:space:]]/d' /etc/nginx/nginx.conf \
     && sed -i 's#^[[:space:]]*error_log .*;#error_log /dev/stderr;#' /etc/nginx/nginx.conf \
