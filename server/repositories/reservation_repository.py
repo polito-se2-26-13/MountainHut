@@ -105,24 +105,27 @@ class ReservationRepository:
         }
 
     async def get_slot_availability_by_date_time(
-        self, slot_date: date, slot_time: time, party_size: Optional[int] = None
-    ) -> dict:
+        self, slot_date: Optional[date]= None, slot_time: Optional[time]= None, party_size: Optional[int]= None
+    ) -> list[dict]:
         """Find slot by date and time, then compute real-time availability (MH-04)."""
         async with await self._get_session() as session:
-            result = await session.execute(
-                select(TimeSlotDAO).where(
-                    TimeSlotDAO.date == slot_date,
-                    TimeSlotDAO.start_time <= slot_time,
-                    TimeSlotDAO.end_time > slot_time,
-                )
-            )
-            slot = result.scalar_one_or_none()
-            if not slot:
-                raise NotFoundError(
-                    f"Time slot not found for date '{slot_date.isoformat()}' and time '{slot_time.strftime('%H:%M')}'."
-                )
+            
+            query=select(TimeSlotDAO)
+            if slot_date is not None:
+                query=query.where(TimeSlotDAO.date == slot_date) 
+            if slot_time is not None:
+                query=query.where(TimeSlotDAO.start_time>=slot_time)
+            result = await session.execute(query)
 
-        return await self.get_slot_availability(slot.id, party_size)
+            slot = result.scalars().all()
+            if not slot:
+                return []
+            slotList=[]
+            for s in slot:
+                slotResp=await self.get_slot_availability(s.id, party_size);
+                if party_size is None or slotResp["remaining_seats"] >= party_size:
+                    slotList.append(slotResp)
+        return slotList
 
 
     async def transaction_add_reservation(self, 

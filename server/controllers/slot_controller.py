@@ -80,7 +80,7 @@ class SlotController():
         return await ReservationRepository().get_slot_availability(slot_id, party_size)
 
     async def getSlotAvailabilityByDateTime(
-        self, slot_date: date, slot_time: time, party_size: Optional[int] = None
+        self, slot_date: Optional[date], slot_time: Optional[time], party_size: Optional[int] = None
     ) -> dict:
         return await ReservationRepository().get_slot_availability_by_date_time(slot_date, slot_time, party_size)
 
