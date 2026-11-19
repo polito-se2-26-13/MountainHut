@@ -1,7 +1,8 @@
 # Builds the Docker image of the whole app at every merge into dev or main and publishes it on the
-# GitHub registry of the organization, as ghcr.io/polito-se2-26-13/mountainhut. main, the release of
-# each sprint, is tagged latest and dev is tagged dev, both also with the commit id. It signs in with
-# the token GitHub gives to every run, so no personal account is needed.
+# GitHub registry of the organization, as ghcr.io/polito-se2-26-13/mountainhut, and on the Docker Hub
+# account of the team. main, the release of each sprint, is tagged latest and dev is tagged dev, both
+# also with the commit id. GitHub is signed in with the token of the run, Docker Hub with the team's
+# access token (secret DOCKERHUB_TOKEN) and user name (variable DOCKERHUB_USERNAME).
 name: docker image
 
 on:
@@ -25,6 +26,10 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
       - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
@@ -32,4 +37,6 @@ jobs:
           tags: |
             ghcr.io/polito-se2-26-13/mountainhut:${{ github.ref_name == 'main' && 'latest' || 'dev' }}
             ghcr.io/polito-se2-26-13/mountainhut:${{ github.sha }}
+            ${{ vars.DOCKERHUB_USERNAME }}/mountainhut:${{ github.ref_name == 'main' && 'latest' || 'dev' }}
+            ${{ vars.DOCKERHUB_USERNAME }}/mountainhut:${{ github.sha }}
           labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
