@@ -29,17 +29,15 @@ async def getSlotTime(date:Optional[date]=None):
     return await controller.getSlotTime(date)
 
 @router.get("/availability",
-            response_model=SlotAvailabilityResponse,
+            response_model=list[SlotAvailabilityResponse],
             status_code=status.HTTP_200_OK)
 async def getSlotAvailabilityByDateTime(
     date: date,
-    time: time,
+    time: Optional[time]=Query(None),
     party_size: Optional[int] = Query(None, ge=1, description="Party size to check availability and table layout for"),
-    partySize: Optional[int] = Query(None, ge=1, description="Party size alias (camelCase)"),
 ):
     """Check table availability by date, time, and party size without login (MH-04)."""
-    p_size = party_size if party_size is not None else partySize
-    return await controller.getSlotAvailabilityByDateTime(date, time, p_size)
+    return await controller.getSlotAvailabilityByDateTime(date, time, party_size)
 
 @router.get("/{slot_id}/availability",
             response_model=SlotAvailabilityResponse,

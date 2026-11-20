@@ -373,5 +373,32 @@ def test_availability_by_date_and_time_finds_the_slot_running_at_that_time(clien
     for at in ("12:00", "12:30"):
         found = client.get("/api/slots/availability", params={"date": day, "time": at})
         assert found.status_code == 200
-        assert found.json()["slot_id"] == slot.id
-    assert client.get("/api/slots/availability", params={"date": day, "time": "13:00"}).status_code == 404
+        assert [s["slot_id"] for s in found.json()] == [slot.id]
+    # at 13:00 the slot is over, so no slot runs at that time
+    assert client.get("/api/slots/availability", params={"date": day, "time": "13:00"}).json() == []
+
+
+def test_availability_by_date_lists_every_slot_of_that_day_in_time_order(client, db):
+    day = datetime.now().date() + timedelta(days=3)
+
+    def slot_with_table(on, start, seats):
+        slot = TimeSlotDAO(date=on, start_time=start, end_time=time(start.hour + 1), status="OPEN")
+        db.add(slot)
+        db.flush()
+        table = TableDAO(table_number=f"T{slot.id}", capacity=seats)
+        db.add(table)
+        db.flush()
+        db.add(SlotTableDAO(slot_id=slot.id, table_id=table.id, available_seats=seats))
+        db.commit()
+        return slot.id
+
+    dinner = slot_with_table(day, time(19, 0), 2)
+    lunch = slot_with_table(day, time(12, 0), 4)
+    slot_with_table(day + timedelta(days=1), time(12, 0), 4)
+
+    listed = client.get("/api/slots/availability", params={"date": day.isoformat(), "party_size": 3})
+
+    assert listed.status_code == 200
+    # only that day, in time order, and the dinner with 2 seats says it has no room for 3
+    assert [(s["slot_id"], s["is_available"]) for s in listed.json()] == [(lunch, True), (dinner, False)]
+    assert client.get("/api/slots/availability", params={"party_size": 3}).status_code == 422
