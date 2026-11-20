@@ -4,7 +4,7 @@ import dayjs from 'dayjs'
 import { Link } from 'react-router'
 import { apiRequest } from '../api/api.js'
 import { useAuth } from '../auth/AuthContext.jsx'
-import { localDateString, normalizeSlots } from '../utils/slots.js'
+import { isAtLeast, localDateString, normalizeSlots } from '../utils/slots.js'
 
 const TWO_HOURS_MS = 2 * 60 * 60 * 1000
 
@@ -115,10 +115,6 @@ function AvailabilityPage() {
       <p className="availability-footnote">Checking availability does not reserve seats. Complete a booking to secure your table.</p>
     </main>
   )
-}
-
-function isAtLeast(date, time, ms) {
-  return Date.parse(`${date}T${time}`) - Date.now() >= ms
 }
 
 export default AvailabilityPage
