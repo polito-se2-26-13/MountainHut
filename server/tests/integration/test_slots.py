@@ -51,7 +51,7 @@ def test_employee_creates_a_new_slot_with_new_tables(client, db):
 def test_slots_of_a_date_are_listed_as_the_pages_read_them(client, db):
     employee = login_as(db, "Employee")
     created = client.post("/api/slots", json=slot([("T1", 4), ("T2", 2)]), headers=employee).json()
-    client.post("/api/slots", json=slot([("T1", 3)], day=OTHER_DAY), headers=employee)
+    client.post("/api/slots", json=slot([("T1", 4)], day=OTHER_DAY), headers=employee)
 
     response = client.get(f"/api/slots?date={DAY}", headers=employee)
     assert response.status_code == 200
@@ -84,17 +84,19 @@ def test_hiker_and_warden_can_list_the_slots(client, db):
     assert client.get(f"/api/slots?date={DAY}", headers=warden).status_code == 200
 
 
-def test_same_table_on_another_date_has_its_own_seats(client, db):
+def test_same_table_on_another_date_keeps_its_seats(client, db):
     employee = login_as(db, "Employee")
     client.post("/api/slots", json=slot([("T1", 6)]), headers=employee)
 
-    # more seats than the first time too: the PO in #17 lets the seats change from slot to slot
-    response = client.post("/api/slots", json=slot([("T1", 8)], day=OTHER_DAY), headers=employee)
+    # PO issue 47: a table always has the same seats, a slot only chooses which tables it uses
+    assert client.post("/api/slots", json=slot([("T1", 6)], day=OTHER_DAY), headers=employee).status_code == 201
+    refused = client.post("/api/slots", json=slot([("T1", 8)], day=OTHER_DAY, start="19:00", end="20:00"), headers=employee)
 
-    assert response.status_code == 201
+    assert refused.status_code == 409
+    assert refused.json()["message"] == "table T1 has 6 seats"
     assert db.query(TableDAO).count() == 1
-    assert client.get(f"/api/slots?date={DAY}", headers=employee).json()[0]["tables"][0]["seats"] == 6
-    assert client.get(f"/api/slots?date={OTHER_DAY}", headers=employee).json()[0]["tables"][0]["seats"] == 8
+    # the refused slot of 19:00 was not saved
+    assert [s["startTime"] for s in client.get(f"/api/slots?date={OTHER_DAY}", headers=employee).json()] == ["12:00"]
 
 
 def test_saving_the_same_times_again_does_not_create_a_second_slot(client, db):
@@ -107,13 +109,13 @@ def test_saving_the_same_times_again_does_not_create_a_second_slot(client, db):
     assert db.query(TimeSlotDAO).count() == 1
 
 
-def test_saving_a_table_again_changes_its_seats(client, db):
+def test_saving_a_slot_again_cannot_change_the_seats_of_a_table(client, db):
     employee = login_as(db, "Employee")
     client.post("/api/slots", json=slot([("T1", 6)]), headers=employee)
 
-    client.post("/api/slots", json=slot([("T1", 4)]), headers=employee)
+    assert client.post("/api/slots", json=slot([("T1", 4)]), headers=employee).status_code == 409
 
-    assert client.get(f"/api/slots?date={DAY}", headers=employee).json()[0]["tables"] == [{"tableNumber": "T1", "seats": 4}]
+    assert client.get(f"/api/slots?date={DAY}", headers=employee).json()[0]["tables"] == [{"tableNumber": "T1", "seats": 6}]
 
 
 def test_refused_request_leaves_nothing_behind(client, db):
@@ -229,7 +231,7 @@ def test_hiker_books_a_slot_created_by_the_employee(client, db):
     assert client.get(f"/api/slots/{listed['slotId']}/availability").json()["remaining_seats"] == 0
 
 
-def test_saving_again_keeps_the_seats_already_booked(client, db):
+def test_saving_a_slot_again_keeps_its_bookings(client, db):
     employee = login_as(db, "Employee")
     hiker = login_as(db, "Hiker")
     created = client.post("/api/slots", json=slot([("T1", 6)]), headers=employee).json()
@@ -239,9 +241,7 @@ def test_saving_again_keeps_the_seats_already_booked(client, db):
         "contact_name": "Anna Rossi", "contact_email": "anna@example.com",
     }, headers=hiker)
 
-    refused = client.post("/api/slots", json=slot([("T1", 1)]), headers=employee)
+    assert client.post("/api/slots", json=slot([("T1", 6)], mealType="Lunch"), headers=employee).status_code == 201
 
-    assert refused.status_code == 409
-    assert "5 seats booked" in refused.json()["message"]
-    assert client.get(f"/api/slots/{created['slotId']}/availability").json()["total_capacity"] == 6
-    assert client.post("/api/slots", json=slot([("T1", 5)]), headers=employee).status_code == 201
+    availability = client.get(f"/api/slots/{created['slotId']}/availability").json()
+    assert (availability["total_capacity"], availability["reserved_seats"]) == (6, 5)

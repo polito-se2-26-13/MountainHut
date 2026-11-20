@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { signIn, daysFromToday, typeInPicker, choose } from './helpers.js'
 
-// MH-02: an employee defines the tables and seats of a slot, and hikers can book only those seats
+// MH-02: an employee chooses the tables of a slot, each with its own seats, and hikers can book only those seats
 test('an employee creates a slot with its tables and a hiker sees its free seats', async ({ page, browser }) => {
   // the sample data has no slots two weeks from today
   const day = daysFromToday(14)
@@ -15,10 +15,10 @@ test('an employee creates a slot with its tables and a hiker sees its free seats
   await choose(page, 'Meal type', 'Lunch')
   await page.getByRole('button', { name: '+ Add a table' }).click()
   await page.getByLabel('Table number 1').fill('T1')
-  await page.getByLabel('Seats at table 1').fill('4')
+  await page.getByLabel('Seats at table 1').fill('6')
   await page.getByRole('button', { name: '+ Add a table' }).click()
   await page.getByLabel('Table number 2').fill('T2')
-  await page.getByLabel('Seats at table 2').fill('6')
+  await page.getByLabel('Seats at table 2').fill('4')
   await page.getByRole('button', { name: 'Save time slot' }).click()
   await expect(page.getByText('Time slot and table configuration saved.')).toBeVisible()
   // Back goes to the home of the role, not to the page before in the browser history
