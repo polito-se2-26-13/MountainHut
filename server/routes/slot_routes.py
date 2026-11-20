@@ -32,7 +32,7 @@ async def getSlotTime(date:Optional[date]=None):
             response_model=list[SlotAvailabilityResponse],
             status_code=status.HTTP_200_OK)
 async def getSlotAvailabilityByDateTime(
-    date: Optional[date]=Query(None),
+    date: date,
     time: Optional[time]=Query(None),
     party_size: Optional[int] = Query(None, ge=1, description="Party size to check availability and table layout for"),
 ):

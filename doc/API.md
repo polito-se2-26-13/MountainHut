@@ -131,11 +131,11 @@ JSON response:
 name: `/api/slots/availability`<br>
 parameters:
 - `date` (query, date string `YYYY-MM-DD`, required)
-- `time` (query, time string `HH:MM`, required)
-- `party_size` or `partySize` (query, integer >= 1, optional)<br>
+- `time` (query, time string `HH:MM`, optional): only the slot running at that time
+- `party_size` (query, integer >= 1, optional)<br>
 authentication: public (no login required)<br>
-HTTP Status: 200 ok, 404 not found, 500 ISE<br>
-JSON response: identical to `/api/slots/{slot_id}/availability`
+HTTP Status: 200 ok, 422 missing or invalid date, 500 ISE<br>
+JSON response: a list, in time order, of the slots of that date (with `time`, only the one running at that time, or an empty list), each one as `/api/slots/{slot_id}/availability` answers. A slot where the party does not fit is listed too, with `is_available` false
 ```
 
 **get reservation by reference**
