@@ -1,7 +1,7 @@
 from server.database import AsyncSessionLocal
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional, Tuple
-from sqlalchemy import select
+from sqlalchemy import func, select
 from server.models.DAO.user import UserDAO
 from server.models.DAO.table import TableDAO
 from server.models.DAO.time_slot import SlotTableDAO, TimeSlotDAO
@@ -105,24 +105,17 @@ class ReservationRepository:
         }
 
     async def get_slot_availability_by_date_time(
-        self, slot_date: date, slot_time: time, party_size: Optional[int] = None
-    ) -> dict:
-        """Find slot by date and time, then compute real-time availability (MH-04)."""
+        self, slot_date: date, slot_time: Optional[time]= None, party_size: Optional[int]= None
+    ) -> list[dict]:
+        """The slots of a date with their availability (MH-04): with a time only the slot running at that time,
+        without it every slot of the day in time order, so the page can offer them to choose from"""
         async with await self._get_session() as session:
-            result = await session.execute(
-                select(TimeSlotDAO).where(
-                    TimeSlotDAO.date == slot_date,
-                    TimeSlotDAO.start_time <= slot_time,
-                    TimeSlotDAO.end_time > slot_time,
-                )
-            )
-            slot = result.scalar_one_or_none()
-            if not slot:
-                raise NotFoundError(
-                    f"Time slot not found for date '{slot_date.isoformat()}' and time '{slot_time.strftime('%H:%M')}'."
-                )
-
-        return await self.get_slot_availability(slot.id, party_size)
+            query=select(TimeSlotDAO).where(TimeSlotDAO.date == slot_date).order_by(func.time(TimeSlotDAO.start_time))
+            if slot_time is not None:
+                query=query.where(TimeSlotDAO.start_time <= slot_time, TimeSlotDAO.end_time > slot_time)
+            slots = (await session.execute(query)).scalars().all()
+        # is_available says if the party fits, so a full slot is still listed and the page decides what to show
+        return [await self.get_slot_availability(s.id, party_size) for s in slots]
 
 
     async def transaction_add_reservation(self, 
