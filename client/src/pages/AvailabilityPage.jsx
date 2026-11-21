@@ -1,18 +1,15 @@
 import { useState } from 'react'
 import { Button, DatePicker, InputNumber, TimePicker } from 'antd'
 import dayjs from 'dayjs'
-import { Link, useNavigate } from 'react-router'
+import { Link } from 'react-router'
 import { apiRequest } from '../api/api.js'
 import { useAuth } from '../auth/AuthContext.jsx'
+import { isAtLeast, localDateString } from '../utils/slots.js'
 
-function localDateString() {
-  const now = new Date()
-  return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10)
-}
+const TWO_HOURS_MS = 2 * 60 * 60 * 1000
 
 function AvailabilityPage() {
   const { session } = useAuth()
-  const navigate = useNavigate()
   const [date, setDate] = useState(localDateString())
   const [time, setTime] = useState('')
   const [partySize, setPartySize] = useState(2)
@@ -41,21 +38,17 @@ function AvailabilityPage() {
     }
   }
 
-  const seatedPartySize = Number(result?.party_size ?? result?.partySize ?? partySize)
-  const remaining = Number(result?.remaining_seats ?? result?.remainingSeats ?? 0)
-  const isAvailable = Boolean(result?.is_available ?? (String(result?.status || '').toUpperCase() === 'OPEN' && remaining >= Number(partySize)))
-  const resultStartTime = result?.start_time ?? result?.startTime ?? time
-  const resultEndTime = result?.end_time ?? result?.endTime
-  const layout = result?.layout ?? result?.layout_details ?? result?.layoutDetails ?? []
-  const layoutSummary = result?.layout_summary ?? result?.layoutSummary
-    ?? (Array.isArray(layout) ? layout.map((item) => item.assigned_seats ?? item.assignedSeats ?? item.seats ?? 0).join(' + ') : '')
+  // bookings close 2 hours before the service (PO #7), so a closer time is not offered as available
+  const bookingClosed = Boolean(result) && !isAtLeast(result.date, result.start_time, TWO_HOURS_MS)
+  const isAvailable = !bookingClosed && Boolean(result?.is_available)
+  const layout = result?.layout ?? []
   const bookingPath = session?.isAuthenticated && session.userProfile.role === 'Hiker' ? '/customer/book-table' : '/login'
 
   return (
     <main className="page availability-page">
       <header className="booking-header">
         <div>
-          <button className="back-link" type="button" onClick={() => navigate(-1)}>← Back</button>
+          <Link className="back-link" to={session?.isAuthenticated ? `/home/${session.userProfile.role.toLowerCase()}` : '/'}>← Back</Link>
           <p className="eyebrow">MOUNTAINHUT · PLAN YOUR VISIT</p>
           <h1>Check availability</h1>
           <p className="form-intro">Choose a date, service time, and group size to see whether we can seat your party.</p>
@@ -83,7 +76,7 @@ function AvailabilityPage() {
           </label>
           <label className="form-field">
             <span>Party size <span className="required-mark" aria-hidden="true">*</span></span>
-            <InputNumber className="mh-control" min={1} step={1} value={partySize} onChange={(value) => setPartySize(value ?? '')} />
+            <InputNumber className="mh-control" min={1} step={1} value={partySize} onChange={(value) => { setPartySize(value ?? ''); setResult(null); setError('') }} />
           </label>
         </div>
         {error && <p className="field-error availability-error" role="alert">{error}</p>}
@@ -94,25 +87,26 @@ function AvailabilityPage() {
         <section className={`availability-result${isAvailable ? '' : ' unavailable'}`} role="status" aria-live="polite">
           <span className="availability-result-icon" aria-hidden="true">{isAvailable ? '✓' : '!'}</span>
           <div className="availability-result-content">
-            <p className="eyebrow">{isAvailable ? 'GOOD NEWS' : 'NO SPACE FOR THIS PARTY'}</p>
-            <h2>{isAvailable ? 'There is availability' : 'Not enough seats available'}</h2>
-            <p>{isAvailable
-              ? `Your party of ${seatedPartySize} can be seated for ${resultStartTime}${resultEndTime ? `–${resultEndTime}` : ''}. ${remaining} seat${remaining === 1 ? '' : 's'} remain.`
-              : `There are ${remaining} seat${remaining === 1 ? '' : 's'} remaining for this service, which is not enough for ${seatedPartySize}. You can try another date or time.`}</p>
-            {isAvailable && layoutSummary && <p className="layout-summary"><strong>Seating preview:</strong> {layoutSummary}{/\bseats?\b/i.test(layoutSummary) ? '' : ' seats'}</p>}
-            {isAvailable && Array.isArray(layout) && layout.length > 0 && <ul className="availability-layout">
-              {layout.map((table, index) => <li key={`${table.table_number ?? table.tableNumber ?? index}-${index}`}>
-                <strong>Table {table.table_number ?? table.tableNumber ?? index + 1}</strong>
-                <span>{table.assigned_seats ?? table.assignedSeats ?? table.seats} seat{Number(table.assigned_seats ?? table.assignedSeats ?? table.seats) === 1 ? '' : 's'}{(table.location ?? table.tableLocation) ? ` · ${table.location ?? table.tableLocation}` : ''}</span>
+            <p className="eyebrow">{isAvailable ? 'GOOD NEWS' : bookingClosed ? 'BOOKINGS CLOSED' : 'NO SPACE FOR THIS PARTY'}</p>
+            <h2>{isAvailable ? 'There is availability' : bookingClosed ? 'This service can no longer be booked' : 'Not enough seats available'}</h2>
+            <p>{bookingClosed
+              ? 'Bookings close 2 hours before the service. You can try another date or time.'
+              : isAvailable
+              ? `Your party of ${result.party_size} can be seated for ${result.start_time}–${result.end_time}. ${result.remaining_seats} seat${result.remaining_seats === 1 ? '' : 's'} remain.`
+              : `There are ${result.remaining_seats} seat${result.remaining_seats === 1 ? '' : 's'} remaining for this service, which is not enough for ${result.party_size}. You can try another date or time.`}</p>
+            {isAvailable && result.layout_summary && <p className="layout-summary"><strong>Seating preview:</strong> {result.layout_summary}</p>}
+            {isAvailable && layout.length > 0 && <ul className="availability-layout">
+              {layout.map((table) => <li key={table.table_number}>
+                <strong>Table {table.table_number}</strong>
+                <span>{table.assigned_seats} seat{table.assigned_seats === 1 ? '' : 's'}{table.location ? ` · ${table.location}` : ''}</span>
               </li>)}
             </ul>}
             {isAvailable && <Link className="submit-button availability-book"
               to={bookingPath}
               state={{ availabilitySearch: {
-                date: result?.date ?? date,
-                time: resultStartTime,
-                partySize: seatedPartySize,
-                slotId: result?.slot_id ?? result?.slotId,
+                date: result.date,
+                partySize: result.party_size,
+                slotId: result.slot_id,
               } }}>
               {bookingPath === '/login' ? 'Sign in to book' : 'Book now'} <span aria-hidden="true">→</span>
             </Link>}

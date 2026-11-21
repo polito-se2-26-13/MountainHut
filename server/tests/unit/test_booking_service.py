@@ -92,7 +92,7 @@ async def test_core_booking_and_capacity_deduction(test_db):
         contact_name="Alice Walker",
         contact_email="hiker@test.com",
         contact_phone="+39 340 1112233",
-        special_requirements="No peanuts",
+        special_requirements=[{"description": "No peanuts"}],
     )
     res = await ReservationController().create_reservation(payload)
 
@@ -174,7 +174,7 @@ async def test_api_booking_endpoint_flow(client):
             "contact_name": "Alice Walker",
             "contact_email": "hiker@test.com",
             "contact_phone": "+39 340 1112233",
-            "special_requirements": "Gluten-free bread",
+            "special_requirements": [{"has_allergy": False, "description": "Gluten-free bread"}],
         },
         headers={"Authorization": f"Bearer {generate_token(UserDAO(email='hiker@test.com', role=UserType.HIKER.value))}"},
     )
@@ -197,7 +197,7 @@ async def test_api_booking_endpoint_flow(client):
     )
     assert get_res.status_code == 200
     assert get_res.json()["booking_reference"] == ref
-    assert get_res.json()["special_requirements"] == "Gluten-free bread"
+    assert get_res.json()["special_requirements"] == [{"has_allergy": False, "description": "Gluten-free bread"}]
 
 
 async def test_confirmation_email_follows_the_product_owner(test_db, monkeypatch):
@@ -213,7 +213,7 @@ async def test_confirmation_email_follows_the_product_owner(test_db, monkeypatch
         user_id=1,
         contact_name="Somebody Else",
         contact_email="other@example.com",
-        special_requirements="Gluten-free bread",
+        special_requirements=[{"has_allergy": True, "description": "1 peanut allergy"}, {"description": "Gluten-free bread"}],
     )
 
     res = await ReservationController().create_reservation(payload)
@@ -229,6 +229,9 @@ async def test_confirmation_email_follows_the_product_owner(test_db, monkeypatch
         assert "Gluten-free bread" in body
         assert "T1" not in body and "T2" not in body
         assert "Assigned" not in body and "adjacent" not in body and "2 hours" not in body
+    # MH-05: only the allergy is marked
+    assert "ALLERGY: 1 peanut allergy" in format_booking_email_text(sent[0])
+    assert format_booking_email_html(sent[0]).count("Allergy:") == 1
 
 
 def test_confirmation_email_without_requirements_says_so():
@@ -239,7 +242,6 @@ def test_confirmation_email_without_requirements_says_so():
         date_str="01/12/2026",
         time_slot="12:30-13:30",
         party_size=2,
-        special_reqs=None,
     )
 
     assert "None specified" in format_booking_email_text(mail)
@@ -266,7 +268,7 @@ def test_html_typed_by_the_user_reaches_the_mail_as_text():
         date_str="01/12/2026",
         time_slot="12:30-13:30",
         party_size=2,
-        special_reqs="<a href='http://evil.example'>win</a>",
+        special_reqs=[{"description": "<a href='http://evil.example'>win</a>"}],
     )
 
     html = format_booking_email_html(mail)

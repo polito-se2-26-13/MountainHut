@@ -1,6 +1,7 @@
 """Integration tests of the Define slot capacity story (MH-02): GET and POST /api/slots,
 with the same requests the pages send."""
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import text
 
@@ -53,7 +54,6 @@ def test_slots_of_a_date_are_listed_as_the_pages_read_them(client, db):
     client.post("/api/slots", json=slot([("T1", 3)], day=OTHER_DAY), headers=employee)
 
     response = client.get(f"/api/slots?date={DAY}", headers=employee)
-    print(created)
     assert response.status_code == 200
     assert response.history == []
     assert response.json() == [{
@@ -137,6 +137,19 @@ def test_a_slot_cannot_overlap_another_of_the_same_day(client, db):
     assert client.post("/api/slots", json=slot([("T2", 4)], day=OTHER_DAY, start="12:30", end="13:30"), headers=employee).status_code == 201
 
 
+def test_saving_the_same_times_with_another_meal_keeps_one_slot(client, db):
+    employee = login_as(db, "Employee")
+    client.post("/api/slots", json=slot([("T1", 4)], mealType="Lunch"), headers=employee)
+
+    # PO issue 31: the same times again are the same slot, whatever the meal, or a hiker could book both
+    assert client.post("/api/slots", json=slot([("T1", 4)], mealType="Dinner"), headers=employee).status_code == 201
+    assert client.post("/api/slots", json=slot([("T1", 4)]), headers=employee).status_code == 201
+
+    assert db.query(TimeSlotDAO).count() == 1
+    # the meal chosen the second time is kept, and a save without a meal leaves it as it is
+    assert db.query(TimeSlotDAO).one().meal_type == "Dinner"
+
+
 def test_overlap_is_found_also_with_the_times_of_the_sample_data(client, db):
     employee = login_as(db, "Employee")
     # the sample data writes 12:00:00, while the server writes 12:00:00.000000
@@ -151,7 +164,30 @@ def test_a_slot_in_the_past_is_refused(client, db):
     yesterday = (date.today() - timedelta(days=1)).isoformat()
 
     assert client.post("/api/slots", json=slot([("T1", 4)], day=yesterday), headers=employee).status_code == 422
+    # started half an hour ago in Italy: a server clock in UTC would still see it in the future
+    started = datetime.now(ZoneInfo("Europe/Rome")) - timedelta(minutes=30)
+    late = slot([("T1", 4)], day=started.date().isoformat(), start=started.strftime("%H:%M"), end="23:59")
+    assert client.post("/api/slots", json=late, headers=employee).status_code == 422
     assert db.query(TimeSlotDAO).count() == 0
+
+
+def test_a_time_with_a_utc_offset_is_refused(client, db):
+    employee = login_as(db, "Employee")
+
+    assert client.post("/api/slots", json=slot([("T1", 4)], start="12:00+01:00"), headers=employee).status_code == 422
+    assert client.post("/api/slots", json=slot([("T1", 4)], start="12:00+01:00", end="13:00+01:00"), headers=employee).status_code == 422
+    assert db.query(TimeSlotDAO).count() == 0
+
+
+def test_slots_are_listed_by_date_and_time(client, db):
+    employee = login_as(db, "Employee")
+    client.post("/api/slots", json=slot([("T1", 4)], day=OTHER_DAY, start="08:00", end="09:00"), headers=employee)
+    client.post("/api/slots", json=slot([("T1", 4)], start="19:00", end="20:00"), headers=employee)
+    client.post("/api/slots", json=slot([("T1", 4)], start="12:00", end="13:00"), headers=employee)
+
+    listed = client.get("/api/slots", headers=employee).json()
+
+    assert [(s["date"], s["startTime"]) for s in listed] == [(DAY, "12:00"), (DAY, "19:00"), (OTHER_DAY, "08:00")]
 
 
 def test_tables_need_a_name_written_once(client, db):

@@ -6,7 +6,6 @@ from server.models.DAO.table import TableDAO
 from server.models.DAO.time_slot import TimeSlotDAO, SlotTableDAO
 from server.models.DTO.slot_dto import SlotCreation, Table
 from datetime import date, time, datetime
-from server.models.enum.meal_type import MealType
 
 class SlotRepository:
 
@@ -16,7 +15,7 @@ class SlotRepository:
     async def _get_session(self) -> AsyncSession:
         return self._session or AsyncSessionLocal()
 
-    async def find_slot_time(self, date:date,startTime:time,endTime:time,mealType:MealType)->TimeSlotDAO|None:
+    async def find_slot_time(self, date:date,startTime:time,endTime:time)->TimeSlotDAO|None:
         # the meal is not part of the search: a second slot at the same time could be booked twice by a hiker
         async with await self._get_session() as session:
             result = await session.execute(
@@ -24,7 +23,6 @@ class SlotRepository:
                     TimeSlotDAO.date == date,
                     func.time(TimeSlotDAO.start_time) == startTime.strftime("%H:%M:%S"),
                     func.time(TimeSlotDAO.end_time) == endTime.strftime("%H:%M:%S"),
-                    TimeSlotDAO.meal_type == mealType,
                 )
             )
 
@@ -78,6 +76,8 @@ class SlotRepository:
         table_list = []
         async with await self._get_session() as session:
             try:
+                # the slot was read in another session, so its meal is written here with the tables
+                (await session.get(TimeSlotDAO,slotTime.id)).meal_type=slotTime.meal_type
                 for t,seat in tables:
                     slotTable=await session.execute(select(SlotTableDAO).where(
                         SlotTableDAO.table_id==t.id,
@@ -114,6 +114,8 @@ class SlotRepository:
                 select(TimeSlotDAO, TableDAO.table_number,SlotTableDAO.available_seats)
                 .outerjoin(SlotTableDAO, SlotTableDAO.slot_id == TimeSlotDAO.id)
                 .outerjoin(TableDAO, TableDAO.id == SlotTableDAO.table_id)
+                # by time, and the tables of a slot in the order they were added
+                .order_by(TimeSlotDAO.date, func.time(TimeSlotDAO.start_time), SlotTableDAO.id)
             )
             if date is not None:
                 query = query.where(TimeSlotDAO.date==date)

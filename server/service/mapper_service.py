@@ -3,8 +3,8 @@ from server.models.DAO.time_slot import TimeSlotDAO
 from server.models.DTO.error_dto import ErrorDTO
 from server.models.DTO.user_dto import UserResponseDTO,UserLoginResponse,UserDTO, UserDetailDTO
 from server.models.DAO.user import UserDAO
-from server.models.DTO.reservation_dto import ReservationResponse, AssignedTableInfo,ReservationMailDTO
-from server.models.DAO.reservation import ReservationDAO,ReservationTableAssignmentDAO
+from server.models.DTO.reservation_dto import ReservationResponse, AssignedTableInfo,ReservationMailDTO,SpecialRequirementDTO
+from server.models.DAO.reservation import ReservationDAO,ReservationTableAssignmentDAO,SpecialRequirementDAO
 from server.models.DTO.slot_dto import SlotResponse,Table,SlotDetail
 from server.models.DTO.table_dto import TableResponse
 from server.models.DTO.time_dto import TimeResponse
@@ -51,14 +51,14 @@ def reservationDTO_to_response(reservation:ReservationDAO, assigments: List[Assi
         start_time=reservation.slot.start_time.strftime("%H:%M"),
         end_time=reservation.slot.end_time.strftime("%H:%M"),
         party_size=reservation.party_size,
-        special_requirements=reservation.special_requirements,
+        special_requirements=reservation.requirements,
         contact_email=reservation.contact_email,
         contact_name=reservation.contact_name,
         contact_phone=reservation.contact_phone,
         status=reservation.status,
         assigned_tables=assigments
         )
-def slotTableDto_to_response(slotTime:TimeSlotDAO,table_list:Table)->SlotResponse:
+def slotTableDto_to_response(slotTime:TimeSlotDAO,table_list:list[Table])->SlotResponse:
     return SlotResponse(
         slotId=slotTime.id,
         date=slotTime.date,
@@ -69,7 +69,7 @@ def slotTableDto_to_response(slotTime:TimeSlotDAO,table_list:Table)->SlotRespons
         message="Slot created successfully"
     ) 
 
-def slots_deatils_to_response(slots:list[tuple[TimeSlotDAO, list[Table]]])->SlotDetail:
+def slots_deatils_to_response(slots:list[tuple[TimeSlotDAO, list[Table]]])->list[SlotDetail]:
     results:list[SlotDetail]=[]
     for slot,tables in slots:
         results.append(SlotDetail(
@@ -82,27 +82,15 @@ def slots_deatils_to_response(slots:list[tuple[TimeSlotDAO, list[Table]]])->Slot
         ))
     return results
 
-def tableList(tables: list[dict]):
-    tablesDto = []
-
-    for table in tables:
-        tablesDto.append(
-            Table(
-                tableNumber=table["table_number"],
-                seats=table["available_seats"]
-            )
-        )
-
-    return tablesDto
-
 def reservationEmailDto_to_email(
         ref:str,
         email:str,
         date:str,
         timeSlot:str,
         partySize:int,
-        spReq:str,
-        hikerName:str):
+        spReq:list,
+        hikerName:str,
+        changed:bool=False):
     
     return ReservationMailDTO(
         booking_reference=ref,
@@ -111,15 +99,18 @@ def reservationEmailDto_to_email(
         time_slot=timeSlot,
         party_size=partySize,
         special_reqs=spReq,
-        hiker_name=hikerName
+        hiker_name=hikerName,
+        changed=changed
     )
+
+def specialRequirementDTO_to_DAO(requirements:list[SpecialRequirementDTO])->list[SpecialRequirementDAO]:
+    return [SpecialRequirementDAO(has_allergy=r.has_allergy,description=r.description) for r in requirements]
 
 def reservationTableAssignmentDAO_to_AssignedTableInfo(assigned:ReservationTableAssignmentDAO,number:str)->AssignedTableInfo:
     return AssignedTableInfo(
                     table_id=assigned.slot_table_id,
                     table_number=number,
                     assigned_seats=assigned.assigned_seats,
-                    location=None
                 )
 def timeSlotDAO_to_response(timeDao:TimeSlotDAO)->TimeResponse:
     return TimeResponse(

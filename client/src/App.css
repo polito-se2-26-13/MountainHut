@@ -136,78 +136,6 @@
   }
 }
 
-.change-modal-backdrop {
-  position: fixed;
-  z-index: 1200;
-  inset: 0;
-  display: grid;
-  overflow-y: auto;
-  place-items: center;
-  padding: 1.25rem;
-  background: rgb(13 27 39 / 62%);
-}
-
-.change-modal-backdrop-dismiss {
-  position: absolute;
-  z-index: 0;
-  inset: 0;
-  border: 0;
-  background: transparent;
-  cursor: default;
-}
-
-/* Date and time popups render in a body portal; keep them above the modal backdrop. */
-.ant-picker-dropdown,
-.ant-select-dropdown {
-  z-index: 1301 !important;
-}
-
-.change-modal {
-  position: relative;
-  z-index: 1;
-  inset: auto;
-  width: min(100%, 44rem);
-  max-height: min(92vh, 56rem);
-  overflow-y: auto;
-  margin: 0;
-  padding: clamp(1.25rem, 4vw, 2rem);
-  border: 1px solid #d8e5ed;
-  border-radius: 1rem;
-  background: #fff;
-  box-shadow: 0 1.5rem 5rem rgb(0 0 0 / 28%);
-  color: inherit;
-  font: inherit;
-}
-
-.change-modal-heading,
-.change-modal-actions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-}
-
-.change-modal-heading h2 {
-  margin: 0;
-  color: #173f58;
-  font-size: 1.8rem;
-}
-
-.change-modal-heading .eyebrow {
-  margin: 0 0 0.35rem;
-}
-
-.change-modal-close {
-  width: 2.5rem;
-  height: 2.5rem;
-  border: 0;
-  border-radius: 50%;
-  background: #f1f5f9;
-  color: #334155;
-  font-size: 1.6rem;
-  cursor: pointer;
-}
-
 .change-booking-summary {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -263,13 +191,6 @@
 
 .change-error-banner {
   margin: 1rem 0;
-}
-
-.change-modal-actions {
-  justify-content: flex-end;
-  margin-top: 1.5rem;
-  padding-top: 1rem;
-  border-top: 1px solid #e2e8f0;
 }
 
 @media (max-width: 600px) {
@@ -632,13 +553,9 @@
   text-decoration: none;
 }
 
-button.back-link {
-  padding: 0;
-  border: 0;
-  background: none;
-  font: inherit;
-  cursor: pointer;
-  color: #1769aa;
+/* the Back link of a page header sits on its own line above the title */
+header .back-link {
+  display: inline-block;
 }
 
 .register-card h1 {
@@ -649,38 +566,6 @@ button.back-link {
 .form-intro {
   margin-bottom: 1.75rem;
   color: #64748b;
-}
-
-.role-picker {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.5rem;
-  margin-bottom: 1.5rem;
-  padding: 0.3rem;
-  border-radius: 0.7rem;
-  background: #f1f5f9;
-}
-
-.role-option {
-  min-height: 2.7rem;
-  border: 0;
-  border-radius: 0.5rem;
-  background: transparent;
-  color: #475569;
-  cursor: pointer;
-  font: inherit;
-  font-size: 0.9rem;
-  font-weight: 600;
-}
-
-.role-option.selected {
-  background: #fff;
-  color: #1769aa;
-  box-shadow: 0 1px 3px rgb(15 23 42 / 12%);
-}
-
-.role-option:focus-visible {
-  outline: 3px solid rgb(23 105 170 / 30%);
 }
 
 .login-fields {
@@ -1172,12 +1057,6 @@ button.back-link {
   background: #eff6ff;
 }
 
-.slot-validation-note {
-  margin-top: 0.7rem;
-  color: #b42318 !important;
-  font-size: 0.82rem;
-}
-
 .slot-form-footer {
   display: flex;
   align-items: center;
@@ -1348,12 +1227,6 @@ button.back-link {
   display: grid;
   gap: 0.75rem;
   margin-top: 0.2rem;
-}
-
-.requirement-example {
-  margin: 0;
-  color: #64748b;
-  font-size: 0.8rem;
 }
 
 .requirement-card {
@@ -2176,6 +2049,7 @@ button.back-link {
   }
 }
 
-:where(.css-dev-only-do-not-override-oc1rc0).ant-select-single:not(.ant-select-customize) .ant-select-content {
+/* not antd's hashed class: the hash of the development server is not the one of the production build */
+.mh-control.ant-select-single:not(.ant-select-customize) .ant-select-content {
   overflow: visible;
 }
