@@ -198,48 +198,26 @@ def test_slot_availability_returns_layout_for_party_size(client, db):
 
 
 def test_booking_updates_slot_availability_until_full(client, db, monkeypatch):
-    """A successful booking deducts the remaining seats from availability."""
+    """A successful booking deducts seats from slot availability."""
     alice, _, _, _ = seed_availability_data(db)
-    # 1. Check availability before booking
-    initial_availability = client.get("/api/slots/1/availability")
-
-    assert initial_availability.status_code == 200
-    initial_body = initial_availability.json()
-
-    assert initial_body["total_capacity"] == 12
-    assert initial_body["reserved_seats"] == 6
-    assert initial_body["remaining_seats"] == 6
-    assert initial_body["is_available"] is True
-
-    # 2. Check booking was successful
-    assert booking.status_code == 201
-    booking_data = booking.json()
-
-    assert booking_data["status"] == "CONFIRMED"
-    assert booking_data["party_size"] == 6
-    assert booking_data["booking_reference"]
-
-    # 3. Check availability after booking
-    availability = client.get("/api/slots/1/availability")
-
-    assert availability.status_code == 200
-    body = availability.json()
-
-    assert body["total_capacity"] == 12
-    assert body["reserved_seats"] == 12
-    assert body["remaining_seats"] == 0
-    assert body["is_available"] is False
-
 
     monkeypatch.setattr(
         "server.controllers.reservation_controller.send_booking_confirmation_email",
         lambda mail: {"status": "SENT"},
     )
 
-    token = generate_token(alice)
-    headers = {"Authorization": f"Bearer {token}"}
+    # 1. Check availability before booking.
+    initial_response = client.get("/api/slots/1/availability")
 
-    booking = client.post(
+    assert initial_response.status_code == 200
+    initial_body = initial_response.json()
+    assert initial_body["remaining_seats"] == 6
+    assert initial_body["is_available"] is True
+
+    # 2. Create a reservation.
+    headers = {"Authorization": f"Bearer {generate_token(alice)}"}
+
+    booking_response = client.post(
         "/api/reservations",
         json={
             "slot_id": 1,
@@ -247,12 +225,26 @@ def test_booking_updates_slot_availability_until_full(client, db, monkeypatch):
             "user_id": alice.id,
             "contact_name": "Alice Walker",
             "contact_email": "alice@test.com",
-            "contact_phone": "+39 340 1112233",
+            "contact_phone": " +39 340 1112233",
         },
         headers=headers,
     )
 
-    assert booking.status_code == 201
+    assert booking_response.status_code == 201, booking_response.text
+    booking_data = booking_response.json()
+    assert booking_data["status"] == "CONFIRMED"
+    assert booking_data["party_size"] == 6
+    assert booking_data["booking_reference"]
+
+    # 3. Check availability after booking.
+    final_response = client.get("/api/slots/1/availability")
+
+    assert final_response.status_code == 200
+    final_body = final_response.json()
+    assert final_body["total_capacity"] == 12
+    assert final_body["reserved_seats"] == 12
+    assert final_body["remaining_seats"] == 0
+    assert final_body["is_available"] is False
 
     availability = client.get("/api/slots/1/availability")
 
