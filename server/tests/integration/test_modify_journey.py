@@ -92,3 +92,62 @@ def test_modify_journey_lifecycle(client, db, monkeypatch):
     assert final_booking["slot_id"] == new_slot
     assert final_booking["party_size"] == 3
     assert final_booking["special_requirements"] == updated_requirements
+
+def test_modify_journey_rejected_within_48_hours(client, db, monkeypatch):
+    """Modification should be rejected when the original slot is within 48 hours."""
+
+    monkeypatch.setattr(
+        "server.controllers.reservation_controller.send_booking_confirmation_email",
+        lambda mail: {"status": "SENT"},
+    )
+
+    # 1. Create a hiker and slots.
+    hiker = add_hiker(db)
+    original_slot = add_slot(db, [6], hours_ahead=24)
+    new_slot = add_slot(db, [6], hours_ahead=96)
+
+    headers = TOKENS[hiker]
+
+    # 2. Create the original reservation.
+    create_response = book(client, hiker, original_slot, 2)
+
+    assert create_response.status_code == 201, create_response.text
+
+    original_booking = create_response.json()
+    reference = original_booking["booking_reference"]
+
+    # 3. Attempt to modify the reservation within 48 hours.
+    update_payload = {
+        "slot_id": new_slot,
+        "party_size": 3,
+        "special_requirements": [
+            {
+                "has_allergy": True,
+                "description": "Peanut allergy",
+            }
+        ],
+    }
+
+    update_response = client.put(
+        f"/api/reservations/reference/{reference}/change",
+        json=update_payload,
+        headers=headers,
+    )
+
+    # 4. Modification should be rejected.
+    assert update_response.status_code == 409, update_response.text
+
+    # 5. Verify that the original reservation remains unchanged.
+    final_response = client.get(
+        f"/api/reservations/reference/{reference}",
+        headers=headers,
+    )
+
+    assert final_response.status_code == 200, final_response.text
+
+    final_booking = final_response.json()
+
+    assert final_booking["booking_reference"] == reference
+    assert final_booking["slot_id"] == original_slot
+    assert final_booking["party_size"] == 2
+    assert final_booking["special_requirements"] == original_booking["special_requirements"]
