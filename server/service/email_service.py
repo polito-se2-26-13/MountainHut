@@ -1,17 +1,16 @@
 """Email Template & Formatting Service (MH-03: Receive Confirmation)."""
-from typing import Dict, Any, Optional
-from server.models.DAO.reservation import ReservationDAO
+from html import escape
+from typing import Dict, Any
 import os
 import smtplib
 from email.message import EmailMessage
 from dotenv import load_dotenv
 from server.models.DTO.reservation_dto import ReservationMailDTO
 from pathlib import Path
-from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parents[1]
 ENV_PATH = BASE_DIR / ".env"
-load_dotenv(ENV_PATH, override=True)
+load_dotenv(ENV_PATH)
 
 def format_booking_email_text(reservation: ReservationMailDTO) -> str:
     """
@@ -22,39 +21,23 @@ def format_booking_email_text(reservation: ReservationMailDTO) -> str:
     - party size
     - possible party requirements (allergies)
     - name of the hiker who made the reservation
-    - assigned tables
     """
-    """
-    conf = reservation.to_confirmation_dict()
-    hiker_name = conf.get("hikerName") or "Valued Guest"
-    ref = conf.get("bookingReference") or "N/A"
-    date_str = conf.get("date") or "N/A"
-    time_slot = conf.get("timeSlot") or "N/A"
-    party_size = conf.get("partySize") or 1
-    special_reqs = conf.get("specialRequirements") or "None specified"
-    tables = conf.get("assignedTables") or []
-"""
-    hiker_name="Valued Guest"
+    hiker_name=reservation.hiker_name
     ref= reservation.booking_reference
     date_str = reservation.date_str
     time_slot = reservation.time_slot
     party_size = reservation.party_size
-    special_reqs = reservation.special_reqs
-    tables = reservation.tables
-    
-    table_lines = []
-    for t in tables:
-        loc = f" ({t['tableLocation']})" if t.get("tableLocation") else ""
-        table_lines.append(f"  - Table {t['tableNumber']}{loc}: {t['assignedSeats']} seat(s)")
-    tables_formatted = "\n".join(table_lines) if table_lines else "  - Assigned upon arrival"
-
+    # PO issues #4 and #29: one line per requirement, the allergies marked
+    special_reqs = "".join(
+        f"\n  - {'ALLERGY: ' if r.has_allergy else ''}{r.description}" for r in reservation.special_reqs
+    ) or "    None specified"
     text = f"""============================================================
-           MOUNTAIN HUT - RESERVATION CONFIRMATION
+           MOUNTAIN HUT - {'RESERVATION UPDATED' if reservation.changed else 'RESERVATION CONFIRMATION'}
 ============================================================
 
 Dear {hiker_name},
 
-Thank you for booking with Mountain Hut! Your reservation is confirmed.
+{'Your booking has been changed. Here are the new details.' if reservation.changed else 'Thank you for booking with Mountain Hut! Your reservation is confirmed.'}
 
 ------------------------------------------------------------
 BOOKING DETAILS (Reference: {ref})
@@ -64,24 +47,7 @@ BOOKING DETAILS (Reference: {ref})
 * Date:                {date_str}
 * Time Slot:           {time_slot}
 * Party Size:          {party_size} person(s)
-* Special Requests:    {special_reqs}
-
-------------------------------------------------------------
-TABLE ASSIGNMENT
-------------------------------------------------------------
-{tables_formatted}
-
-Note: Sharing tables is standard practice in alpine huts.
-If your party exceeds a single table's capacity, you may be
-seated across adjacent tables.
-
-------------------------------------------------------------
-IMPORTANT INFORMATION FOR YOUR VISIT
-------------------------------------------------------------
-* Arrival: Please arrive 10 minutes prior to your time slot.
-* Modifications: Changes can be made up to 2 hours before the due time.
-* Mountain Safety: Mountain weather changes quickly. If your party
-  encounters unexpected delays on the trail, please contact the hut team.
+* Special Requests:{special_reqs}
 
 We look forward to welcoming you to the hut!
 
@@ -96,31 +62,16 @@ def format_booking_email_html(reservation: ReservationMailDTO) -> str:
     """
     Generate a clean, responsive HTML email template for booking confirmation (MH-03).
     """
-    '''conf = reservation.to_confirmation_dict()
-    hiker_name = conf.get("hikerName") or "Valued Guest"
-    ref = conf.get("bookingReference") or "N/A"
-    date_str = conf.get("date") or "N/A"
-    time_slot = conf.get("timeSlot") or "N/A"
-    party_size = conf.get("partySize") or 1
-    special_reqs = conf.get("specialRequirements") or "None specified"
-    tables = conf.get("assignedTables") or []'''
-    hiker_name="Valued Guest"
+    # name and requests are typed by the user: escaped, so they reach the mail as text and not as HTML or links
+    hiker_name=escape(reservation.hiker_name)
     ref= reservation.booking_reference
     date_str = reservation.date_str
     time_slot = reservation.time_slot
     party_size = reservation.party_size
-    special_reqs = reservation.special_reqs
-    tables = reservation.tables
-
-    table_rows = "".join(
-        f"<tr><td style='padding: 8px 12px; border-bottom: 1px solid #e2e8f0; font-weight: 600;'>Table {t['tableNumber']}</td>"
-        f"<td style='padding: 8px 12px; border-bottom: 1px solid #e2e8f0; color: #64748b;'>{t.get('tableLocation', 'Main Hall')}</td>"
-        f"<td style='padding: 8px 12px; border-bottom: 1px solid #e2e8f0; text-align: right;'>{t['assignedSeats']} seat(s)</td></tr>"
-        for t in tables
-    )
-    if not table_rows:
-        table_rows = "<tr><td colspan='3' style='padding: 8px 12px; text-align: center; color: #64748b;'>Assigned upon arrival</td></tr>"
-
+    special_reqs = "<br>".join(
+        f'<strong style="color: #c2410c;">Allergy: {escape(r.description)}</strong>' if r.has_allergy else escape(r.description)
+        for r in reservation.special_reqs
+    ) or "None specified"
     html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -133,13 +84,13 @@ def format_booking_email_html(reservation: ReservationMailDTO) -> str:
     <!-- Header -->
     <div style="background-color: #0f172a; color: #ffffff; padding: 28px 24px; text-align: center;">
       <h1 style="margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.5px;">Mountain Hut</h1>
-      <p style="margin: 6px 0 0; color: #94a3b8; font-size: 14px;">Reservation Confirmation</p>
+      <p style="margin: 6px 0 0; color: #94a3b8; font-size: 14px;">{'Reservation Updated' if reservation.changed else 'Reservation Confirmation'}</p>
     </div>
 
     <!-- Body -->
     <div style="padding: 24px;">
       <p style="margin-top: 0; font-size: 16px;">Dear <strong>{hiker_name}</strong>,</p>
-      <p style="color: #475569; font-size: 15px; line-height: 1.5;">Your table reservation is confirmed. Here are the details of your booking:</p>
+      <p style="color: #475569; font-size: 15px; line-height: 1.5;">{'Your booking has been changed. Here are the new details:' if reservation.changed else 'Your table reservation is confirmed. Here are the details of your booking:'}</p>
 
       <!-- Reference Badge -->
       <div style="background-color: #f1f5f9; border-left: 4px solid #3b82f6; padding: 14px 18px; margin: 20px 0; border-radius: 0 8px 8px 0;">
@@ -171,26 +122,6 @@ def format_booking_email_html(reservation: ReservationMailDTO) -> str:
         </tr>
       </table>
 
-      <!-- Table Assignment Sub-table -->
-      <h3 style="font-size: 15px; margin: 18px 0 10px; color: #0f172a;">Assigned Tables</h3>
-      <table style="width: 100%; border-collapse: collapse; background-color: #f8fafc; border-radius: 8px; font-size: 13px; margin-bottom: 24px;">
-        <thead>
-          <tr style="background-color: #f1f5f9; text-align: left; color: #64748b;">
-            <th style="padding: 8px 12px;">Table</th>
-            <th style="padding: 8px 12px;">Location</th>
-            <th style="padding: 8px 12px; text-align: right;">Seats</th>
-          </tr>
-        </thead>
-        <tbody>
-          {table_rows}
-        </tbody>
-      </table>
-
-      <!-- Note / Guidance -->
-      <div style="background-color: #fffbeb; border: 1px solid #fef3c7; border-radius: 8px; padding: 12px 16px; margin-bottom: 24px; font-size: 13px; color: #92400e;">
-        <strong>Alpine Hospitality Note:</strong> Table sharing is common at mountain huts. Please arrive 10 minutes prior to your time slot. Changes can be requested up to 2 hours before the slot.
-      </div>
-
       <p style="margin-bottom: 0; font-size: 14px; color: #475569;">
         We look forward to seeing you at the hut!<br>
         <strong>The Mountain Hut Team</strong>
@@ -206,17 +137,21 @@ def format_booking_email_html(reservation: ReservationMailDTO) -> str:
 </html>"""
     return html
 
+def email_subject(reservation: ReservationMailDTO) -> str:
+  return f"Mountain Hut Booking {'Updated' if reservation.changed else 'Confirmation'} [{reservation.booking_reference}]"
 
 def send_booking_confirmation_email(reservation: ReservationMailDTO) -> Dict[str, Any]:
+  subject = email_subject(reservation)
+  to_email = reservation.contact_email
+  text_content = format_booking_email_text(reservation)
+  html_content = format_booking_email_html(reservation)
+  return sender_email(subject,to_email,text_content,html_content,reservation.booking_reference)
+
+def sender_email(subject:str,to_email:str,text_content:str,html_content:str,booking_ref:str) -> Dict[str, Any]:
   """
   Format and dispatch the booking confirmation email to the hiker (MH-03).
   Returns delivery metadata including recipient, subject, text, and html body.
   """
-  subject = f"Mountain Hut Booking Confirmation [{reservation.booking_reference}]"
-  to_email = reservation.contact_email
-  text_content = format_booking_email_text(reservation)
-  html_content = format_booking_email_html(reservation)
-
   message=EmailMessage()
   message["Subject"]=subject
   message["From"]=os.getenv("SMTP_EMAIL")
@@ -245,7 +180,7 @@ def send_booking_confirmation_email(reservation: ReservationMailDTO) -> Dict[str
         "status": "SENT",
         "to": to_email,
         "subject": subject,
-        "booking_reference": reservation.booking_reference,
+        "booking_reference": booking_ref,
         "text_content": text_content,
         "html_content": html_content,
     }
@@ -254,7 +189,7 @@ def send_booking_confirmation_email(reservation: ReservationMailDTO) -> Dict[str
             "status": "FAILED",
             "to": to_email,
             "subject": subject,
-            "booking_reference": reservation.booking_reference,
+            "booking_reference": booking_ref,
             "error": str(e)
         }  
 

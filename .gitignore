@@ -31,3 +31,9 @@ npm-debug.log*
 .idea/
 .DS_Store
 .env
+.env.*
+!.env.example
+
+# Playwright
+test-results/
+playwright-report/

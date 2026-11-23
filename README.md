@@ -17,6 +17,7 @@ python -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 cd ..
+python -m server.scripts.db_setup migrate
 uvicorn server.main:app --reload
 ```
 
@@ -30,10 +31,11 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 cd ..
+python -m server.scripts.db_setup migrate
 uvicorn server.main:app --reload
 ```
 
-The API runs on http://localhost:8000 and its documentation on http://localhost:8000/docs.
+The first `migrate` creates the database with the sample data. The server does not create the tables by itself, so run it again after pulling new migrations. The API runs on http://localhost:8000 and its documentation on http://localhost:8000/docs.
 
 ## Database setup & migrations
 
@@ -45,7 +47,7 @@ Run commands from the project root (with Python virtual environment active):
   ```powershell
   python -m server.scripts.db_setup migrate
   ```
-- **Seed sample data (users, tables, slots, bookings):**
+- **Seed sample data (users, tables, slots, bookings):** `migrate` already loads it, because `002_seed_data.sql` is one of the migrations. `seed` loads it only into a database that has the tables but not the data yet.
   ```powershell
   python -m server.scripts.db_setup seed
   ```
@@ -70,6 +72,36 @@ npm run dev
 
 The app runs on http://localhost:5173. Calls to `/api/...` are forwarded to the backend, so start both.
 
+## Run with Docker
+
+The whole app runs in one container. Nginx serves the pages and passes `/api` to the backend, and the database is kept in the Docker volume `mountainhut-data`. A GitHub Action builds the image and publishes it as `ghcr.io/polito-se2-26-13/mountainhut` and, the same image, on Docker Hub as `mountainhutteam13/mountainhut`. The release of each sprint, from `main`, is tagged `latest`, the latest work, from `dev`, is tagged `dev`, and every image is also tagged with its commit id.
+
+1. Install Docker Desktop, start it and clone this repository.
+2. Put the secrets in `server/.env`. The teachers take this file from `Team13-secrets.zip`, in the "Elaborati" section of the portal, and copy it into the `server` folder. Everyone else copies `server/.env.example` to `server/.env` and writes a long random text in `SECRET_KEY`, otherwise you have to log in again after every restart. The Gmail account in `SMTP_EMAIL` and `SMTP_PASSWORD` sends the confirmation emails. Without it the bookings still work, but no email is sent.
+3. From the project root, start the published image:
+
+   ```
+   docker compose -f docker-compose.release.yml pull
+   docker compose -f docker-compose.release.yml up -d
+   ```
+
+   To build the image from this code instead, run `docker compose up --build -d`.
+4. Open http://localhost:3000. http://localhost:3000/api/health answers `{"status":"ok"}`.
+
+At every start the container applies the migrations it has not applied yet, so a new image keeps the data of the volume. To update, run `pull` and `up -d` again. `docker compose -f docker-compose.release.yml down` stops the app and keeps the data, while `down -v` also deletes the database.
+
+## Test users
+
+The sample data has one user for each role, all with the password `Password123!`.
+
+| Role | Email |
+|---|---|
+| Warden | warden@mountainhut.com |
+| Employee | employee@mountainhut.com |
+| Hiker | hiker1@example.com |
+| Hiker | hiker2@example.com |
+| Hiker | hiker3@example.com |
+
 ## Tests
 
 With the virtual environment active:
@@ -78,6 +110,16 @@ With the virtual environment active:
 cd server
 pytest
 ```
+
+The end-to-end tests are in `client/e2e` and use Playwright. They start the backend and the frontend by themselves, on the ports 8100 and 5199, and every run puts the sample data back in `server/mountainHut.sqlite`. They need `server/.venv`, created as written above.
+
+```
+cd client
+npx playwright install chromium
+npm run e2e
+```
+
+`npx playwright install chromium` is needed only the first time.
 
 ## Branches
 

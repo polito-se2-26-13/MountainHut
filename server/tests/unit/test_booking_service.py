@@ -1,4 +1,6 @@
 """Tests for MH-44 Core Booking and Capacity Deduction, through the controller and the API."""
+import asyncio
+
 import pytest
 from datetime import date, time, timedelta
 from httpx import ASGITransport, AsyncClient
@@ -6,14 +8,18 @@ from sqlalchemy import event, select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
-from server.controllers.reservation_controller import ReservationController
+from server.controllers.reservation_controller import ReservationController, send_confirmation_with_retry
 from server.database import AsyncSessionLocal, Base, engine as real_engine, set_sqlite_pragma
 from server.main import app
-from server.const import SlotStatus, ReservationStatus, UserRole
+from server.models.enum.slot_status import SlotStatus
+from server.models.enum.reservation_status import ReservationStatus
+from server.models.enum.user_type import UserType
 from server.models.DAO import UserDAO, TableDAO, TimeSlotDAO, SlotTableDAO, ReservationDAO
-from server.models.DTO.reservation_dto import ReservationCreate
+from server.models.DTO.reservation_dto import ReservationCreate, ReservationMailDTO
 from server.models.error.conflict_error import ConflictError
-from server.service.booking_service import get_slot_availability
+from server.repositories.reservation_repository import ReservationRepository
+from server.service.auth_service import generate_token
+from server.service.email_service import format_booking_email_html, format_booking_email_text
 
 
 @pytest.fixture
@@ -33,7 +39,7 @@ async def test_db():
         first_name="Alice",
         last_name="Walker",
         phone="+39 340 1112233",
-        role=UserRole.HIKER.value,
+        role=UserType.HIKER.value,
     )
     # Create tables
     t1 = TableDAO(id=1, table_number="T1", capacity=6, location="Indoor")
@@ -73,7 +79,7 @@ async def client(test_db):
 async def test_core_booking_and_capacity_deduction(test_db):
     """Test successful booking and automatic capacity deduction (MH-44)."""
     # Check initial availability
-    avail_before = await get_slot_availability(test_db, slot_id=1)
+    avail_before = await ReservationRepository().get_slot_availability(1)
     assert avail_before["total_capacity"] == 10
     assert avail_before["reserved_seats"] == 0
     assert avail_before["remaining_seats"] == 10
@@ -86,7 +92,7 @@ async def test_core_booking_and_capacity_deduction(test_db):
         contact_name="Alice Walker",
         contact_email="hiker@test.com",
         contact_phone="+39 340 1112233",
-        special_requirements="No peanuts",
+        special_requirements=[{"description": "No peanuts"}],
     )
     res = await ReservationController().create_reservation(payload)
 
@@ -98,7 +104,7 @@ async def test_core_booking_and_capacity_deduction(test_db):
     assert res.assigned_tables[0].assigned_seats == 4
 
     # Check capacity after deduction
-    avail_after = await get_slot_availability(test_db, slot_id=1)
+    avail_after = await ReservationRepository().get_slot_availability(1)
     assert avail_after["reserved_seats"] == 4
     assert avail_after["remaining_seats"] == 6
 
@@ -168,8 +174,9 @@ async def test_api_booking_endpoint_flow(client):
             "contact_name": "Alice Walker",
             "contact_email": "hiker@test.com",
             "contact_phone": "+39 340 1112233",
-            "special_requirements": "Gluten-free bread",
+            "special_requirements": [{"has_allergy": False, "description": "Gluten-free bread"}],
         },
+        headers={"Authorization": f"Bearer {generate_token(UserDAO(email='hiker@test.com', role=UserType.HIKER.value))}"},
     )
     assert response.status_code == 201
     data = response.json()
@@ -184,7 +191,111 @@ async def test_api_booking_endpoint_flow(client):
     assert avail_res.json()["remaining_seats"] == 7
 
     # 3. Retrieve reservation by reference
-    get_res = await client.get(f"/api/reservations/{ref}")
+    get_res = await client.get(
+        f"/api/reservations/reference/{ref}",
+        headers={"Authorization": f"Bearer {generate_token(UserDAO(email='hiker@test.com', role=UserType.HIKER.value))}"},
+    )
     assert get_res.status_code == 200
     assert get_res.json()["booking_reference"] == ref
-    assert get_res.json()["special_requirements"] == "Gluten-free bread"
+    assert get_res.json()["special_requirements"] == [{"has_allergy": False, "description": "Gluten-free bread"}]
+
+
+async def test_confirmation_email_follows_the_product_owner(test_db, monkeypatch):
+    """MH-03 and issue #24: the name of the hiker who booked and the details, no table numbers."""
+    sent = []
+    monkeypatch.setattr(
+        "server.controllers.reservation_controller.send_booking_confirmation_email",
+        lambda mail: sent.append(mail) or {"status": "SENT"},
+    )
+    payload = ReservationCreate(
+        slot_id=1,
+        party_size=4,
+        user_id=1,
+        contact_name="Somebody Else",
+        contact_email="other@example.com",
+        special_requirements=[{"has_allergy": True, "description": "1 peanut allergy"}, {"description": "Gluten-free bread"}],
+    )
+
+    res = await ReservationController().create_reservation(payload)
+
+    assert sent[0].contact_email == "other@example.com"
+    for body in (format_booking_email_text(sent[0]), format_booking_email_html(sent[0])):
+        assert "Alice Walker" in body
+        assert "Somebody Else" not in body
+        assert res.booking_reference in body
+        assert (date.today() + timedelta(days=7)).strftime("%d/%m/%Y") in body
+        assert "12:30-13:30" in body
+        assert "4 person(s)" in body
+        assert "Gluten-free bread" in body
+        assert "T1" not in body and "T2" not in body
+        assert "Assigned" not in body and "adjacent" not in body and "2 hours" not in body
+    # MH-05: only the allergy is marked
+    assert "ALLERGY: 1 peanut allergy" in format_booking_email_text(sent[0])
+    assert format_booking_email_html(sent[0]).count("Allergy:") == 1
+
+
+def test_confirmation_email_without_requirements_says_so():
+    mail = ReservationMailDTO(
+        hiker_name="Alice Walker",
+        booking_reference="MH-1",
+        contact_email="alice@example.com",
+        date_str="01/12/2026",
+        time_slot="12:30-13:30",
+        party_size=2,
+    )
+
+    assert "None specified" in format_booking_email_text(mail)
+    assert "None specified" in format_booking_email_html(mail)
+
+
+async def test_two_bookings_at_the_same_moment_cannot_take_more_seats_than_the_slot_has(test_db):
+    test_db.add(UserDAO(id=2, email="bob@test.com", password_hash="dummy", first_name="Bob", last_name="Brown", role=UserType.HIKER.value))
+    await test_db.commit()
+    # two groups of 6 on a slot with 10 seats, sent together
+    payloads = [ReservationCreate(slot_id=1, party_size=6, user_id=user, contact_name="Group", contact_email=f"g{user}@test.com") for user in (1, 2)]
+
+    results = await asyncio.gather(*(ReservationController().create_reservation(p) for p in payloads), return_exceptions=True)
+
+    assert sum(isinstance(r, ConflictError) for r in results) == 1
+    assert (await ReservationRepository().get_slot_availability(1))["reserved_seats"] == 6
+
+
+def test_html_typed_by_the_user_reaches_the_mail_as_text():
+    mail = ReservationMailDTO(
+        hiker_name="<b>Alice</b>",
+        booking_reference="MH-1",
+        contact_email="alice@example.com",
+        date_str="01/12/2026",
+        time_slot="12:30-13:30",
+        party_size=2,
+        special_reqs=[{"description": "<a href='http://evil.example'>win</a>"}],
+    )
+
+    html = format_booking_email_html(mail)
+
+    assert "<b>Alice</b>" not in html and "&lt;b&gt;Alice&lt;/b&gt;" in html
+    assert "<a href" not in html and "&lt;a href" in html
+
+
+def test_confirmation_is_tried_again_and_then_only_logged(monkeypatch, capsys):
+    mail = ReservationMailDTO(
+        hiker_name="Alice Walker", booking_reference="MH-1", contact_email="alice@example.com",
+        date_str="01/12/2026", time_slot="12:30-13:30", party_size=2,
+    )
+    answers = [{"status": "FAILED", "error": "down"}, {"status": "FAILED", "error": "down"}, {"status": "SENT"}]
+    calls = []
+    monkeypatch.setattr(
+        "server.controllers.reservation_controller.send_booking_confirmation_email",
+        lambda m: calls.append(m) or answers[len(calls) - 1],
+    )
+
+    send_confirmation_with_retry(mail, waits=(0, 0))
+    assert len(calls) == 3
+    assert "not sent" not in capsys.readouterr().out
+
+    # a mail server that never answers: three tries, then the error in the log
+    calls.clear()
+    answers[2] = {"status": "FAILED", "error": "down"}
+    send_confirmation_with_retry(mail, waits=(0, 0))
+    assert len(calls) == 3
+    assert "confirmation email not sent for MH-1: down" in capsys.readouterr().out

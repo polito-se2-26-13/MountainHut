@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select,func
 from server.models.DAO.table import TableDAO
 from server.models.DAO.time_slot import TimeSlotDAO, SlotTableDAO
-from server.models.DTO.slot_dto import SlotCreation
+from server.models.DTO.slot_dto import SlotCreation, Table
 from datetime import date, time, datetime
 
 class SlotRepository:
@@ -27,8 +27,24 @@ class SlotRepository:
             )
 
             return result.scalar_one_or_none()
-    
-        
+
+    async def find_overlapping_slot(self, date:date,startTime:time,endTime:time)->TimeSlotDAO|None:
+        """Another slot of the same day that starts before this one ends and ends after it starts.
+        The slot with exactly the same times is the one being saved again, so it does not count."""
+        start,end=startTime.strftime("%H:%M:%S"),endTime.strftime("%H:%M:%S")
+        # func.time reads both formats the database holds, 12:00:00 and 12:00:00.000000
+        slot_start,slot_end=func.time(TimeSlotDAO.start_time),func.time(TimeSlotDAO.end_time)
+        async with await self._get_session() as session:
+            result = await session.execute(
+                select(TimeSlotDAO).where(
+                    TimeSlotDAO.date == date,
+                    slot_start < end,
+                    slot_end > start,
+                    ~((slot_start == start) & (slot_end == end)),
+                )
+            )
+            return result.scalars().first()
+
     async def add_slot_time(self,slot:SlotCreation)->TimeSlotDAO:
         async with await self._get_session() as session:
             slotTime=TimeSlotDAO(
@@ -56,10 +72,12 @@ class SlotRepository:
             await session.refresh(table)
             return table
 
-    async def transaction_add_table(self,slotTime:TimeSlotDAO,tables:list[tuple[TableDAO,int]])->list:
+    async def transaction_add_table(self,slotTime:TimeSlotDAO,tables:list[tuple[TableDAO,int]])->list[Table]:
         table_list = []
         async with await self._get_session() as session:
             try:
+                # the slot was read in another session, so its meal is written here with the tables
+                (await session.get(TimeSlotDAO,slotTime.id)).meal_type=slotTime.meal_type
                 for t,seat in tables:
                     slotTable=await session.execute(select(SlotTableDAO).where(
                         SlotTableDAO.table_id==t.id,
@@ -76,10 +94,10 @@ class SlotRepository:
                     else:
                         result.available_seats = seat
                         result.is_available = True
-                    table_list.append({
-                        "tableNumber": t.table_number,
-                        "seats": seat
-                    })
+                    table_list.append(Table(
+                        tableNumber=t.table_number,
+                        seats=seat
+                    ))
                     await session.flush()
 
             except :
@@ -91,10 +109,13 @@ class SlotRepository:
 
     async def get_slot_time(self, date: Optional[date] = None):
         async with await self._get_session() as session:
+            # outer joins, so a slot without tables is listed too, with no tables (PO issue 17: it exists with 0 seats)
             query = (
-                select(TimeSlotDAO, TableDAO.table_number,SlotTableDAO.available_seats
-                )
-                .where(TimeSlotDAO.id == SlotTableDAO.slot_id, TableDAO.id == SlotTableDAO.table_id)
+                select(TimeSlotDAO, TableDAO.table_number,SlotTableDAO.available_seats)
+                .outerjoin(SlotTableDAO, SlotTableDAO.slot_id == TimeSlotDAO.id)
+                .outerjoin(TableDAO, TableDAO.id == SlotTableDAO.table_id)
+                # by time, and the tables of a slot in the order they were added
+                .order_by(TimeSlotDAO.date, func.time(TimeSlotDAO.start_time), SlotTableDAO.id)
             )
             if date is not None:
                 query = query.where(TimeSlotDAO.date==date)
@@ -106,11 +127,24 @@ class SlotRepository:
             for slot, table_number, available_seats in rows:
                 if slot.id not in slots:
                     slots[slot.id] = [slot, []]
-                slots[slot.id][1].append({
-                    "table_number": table_number,
-                    "available_seats": available_seats
-                })
+                if table_number is None:
+                    continue
+                slots[slot.id][1].append(Table(
+                        tableNumber=table_number,
+                        seats=available_seats
+                    ))
             return [
                 (slot, tables)
                 for slot, tables in slots.values()
             ]
+
+    async def get_time(self)->list[TimeSlotDAO]:
+        async with await self._get_session() as session:
+            result=await session.execute(select(TimeSlotDAO))
+            return result.scalars().all()
+
+    async def get_table(self)->list[TableDAO]:
+            async with await self._get_session() as session:
+                result=await session.execute(select(TableDAO))
+                return result.scalars().all()
+    

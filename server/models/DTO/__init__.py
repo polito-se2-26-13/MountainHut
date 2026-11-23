@@ -4,6 +4,8 @@ from server.models.DTO.reservation_dto import (
     ReservationResponse,
     AssignedTableInfo,
     SlotAvailabilityResponse,
+    TableLayoutAssignment,
+    TableCapacityInfo,
 )
 
 __all__ = [
@@ -11,5 +13,7 @@ __all__ = [
     "ReservationResponse",
     "AssignedTableInfo",
     "SlotAvailabilityResponse",
+    "TableLayoutAssignment",
+    "TableCapacityInfo",
 ]
 

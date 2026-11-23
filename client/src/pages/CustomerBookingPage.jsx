@@ -1,61 +1,32 @@
 import { useEffect, useState } from 'react'
-import { Link, Navigate } from 'react-router'
+import { Button, Checkbox, DatePicker, Form, Input, InputNumber, Select } from 'antd'
+import dayjs from 'dayjs'
+import { Link, Navigate, useLocation } from 'react-router'
 import { apiRequest } from '../api/api.js'
 import { useAuth } from '../auth/AuthContext.jsx'
 import { useToast } from '../components/ToastProvider.jsx'
+import RequirementsEditor, { newRequirement, requirementsBody } from '../components/RequirementsEditor.jsx'
+import { formatSlotLabel, getSlotEnd, getSlotId, getSlotStart, isAtLeast, localDateString, normalizeSlots } from '../utils/slots.js'
 
 const TWO_HOURS_MS = 2 * 60 * 60 * 1000
 
-function localDateString() {
-  const now = new Date()
-  return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10)
-}
-
-function normalizeSlots(response) {
-  if (Array.isArray(response)) return response
-  if (Array.isArray(response?.slots)) return response.slots
-  if (Array.isArray(response?.items)) return response.items
-  return []
-}
-
-function getSlotId(slot) {
-  return slot.slot_id ?? slot.slotId ?? slot.id
-}
-
-function getSlotStart(slot) {
-  return slot.start_time ?? slot.startTime ?? slot.time
-}
-
-function getSlotEnd(slot) {
-  return slot.end_time ?? slot.endTime ?? ''
-}
-
-function isMoreThanTwoHoursAway(date, time) {
-  if (!date || !time) return false
-  const slotTime = new Date(`${date}T${time}:00`).getTime()
-  return Number.isFinite(slotTime) && slotTime - Date.now() >= TWO_HOURS_MS
-}
-
-function formatAssignedTables(tables = []) {
-  return tables.map((table) => ({
-    tableNumber: table.table_number ?? table.tableNumber ?? '—',
-    seats: table.assigned_seats ?? table.assignedSeats ?? 0,
-    location: table.location ?? table.tableLocation,
-  }))
-}
-
 function CustomerBookingPage() {
   const { session } = useAuth()
-  const [slotDate, setSlotDate] = useState(localDateString())
+  const location = useLocation()
+  const availabilitySearch = location.state?.availabilitySearch
+  const [slotDate, setSlotDate] = useState(availabilitySearch?.date || localDateString())
   const [slotOptions, setSlotOptions] = useState([])
   const [slotOptionsDate, setSlotOptionsDate] = useState('')
-  const [slotId, setSlotId] = useState('')
+  const [slotId, setSlotId] = useState(availabilitySearch?.slotId != null ? String(availabilitySearch.slotId) : '')
   const [availability, setAvailability] = useState(null)
-  const [partySize, setPartySize] = useState(2)
+  const [partySize, setPartySize] = useState(availabilitySearch?.partySize ?? 2)
   const [contactName, setContactName] = useState(session?.userProfile?.fullName || '')
-  const [contactEmail, setContactEmail] = useState(session?.userProfile?.email || '')
+  const accountEmail = session?.userProfile?.email || ''
+  const [useAlternativeEmail, setUseAlternativeEmail] = useState(false)
+  const [alternativeEmail, setAlternativeEmail] = useState('')
+  const contactEmail = useAlternativeEmail ? alternativeEmail : accountEmail
   const [contactPhone, setContactPhone] = useState('')
-  const [specialReqs, setSpecialReqs] = useState('')
+  const [specialRequirements, setSpecialRequirements] = useState(() => [newRequirement()])
   const [isLoadingSlots, setIsLoadingSlots] = useState(true)
   const [isCheckingAvailability, setIsCheckingAvailability] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -74,7 +45,7 @@ function CustomerBookingPage() {
     })
       .then((response) => {
         const upcomingSlots = normalizeSlots(response)
-          .filter((slot) => getSlotId(slot) != null && isMoreThanTwoHoursAway(slotDate, getSlotStart(slot)))
+          .filter((slot) => isAtLeast(slotDate, getSlotStart(slot), TWO_HOURS_MS))
           .sort((a, b) => getSlotStart(a).localeCompare(getSlotStart(b)))
         if (active) {
           setSlotOptions(upcomingSlots)
@@ -93,7 +64,8 @@ function CustomerBookingPage() {
   }, [slotDate, session, notify])
 
   useEffect(() => {
-    if (!selectedSlot) return undefined
+    // after sign out the session is gone and the page is leaving, so nothing to ask
+    if (!selectedSlot || !session?.isAuthenticated) return undefined
     let active = true
     apiRequest(`/slots/${encodeURIComponent(getSlotId(selectedSlot))}/availability`, {
       headers: { Authorization: `Bearer ${session.token}` },
@@ -110,8 +82,8 @@ function CustomerBookingPage() {
     return () => { active = false }
   }, [selectedSlot, session, notify])
 
-  const remainingSeats = Number(availability?.remaining_seats ?? availability?.remainingSeats ?? 0)
-  const isSlotOpen = (availability?.status || '').toUpperCase() === 'OPEN'
+  const remainingSeats = availability?.remaining_seats ?? 0
+  const isSlotOpen = availability?.status === 'OPEN'
   const contactNameError = !contactName.trim() ? 'Contact name is required.' : ''
   const contactEmailError = !contactEmail.trim()
     ? 'Contact email is required.'
@@ -123,7 +95,7 @@ function CustomerBookingPage() {
     : availability && Number(partySize) > remainingSeats
       ? `Only ${remainingSeats} seat${remainingSeats === 1 ? '' : 's'} remain for this time.`
       : ''
-  const selectedTimeStillValid = selectedSlot && isMoreThanTwoHoursAway(slotDate, getSlotStart(selectedSlot))
+  const selectedTimeStillValid = selectedSlot && isAtLeast(slotDate, getSlotStart(selectedSlot), TWO_HOURS_MS)
   const canSubmit = Boolean(
     selectedSlot && selectedTimeStillValid && availability && isSlotOpen && !isCheckingAvailability
     && !partySizeError && !contactNameError && !contactEmailError,
@@ -148,8 +120,7 @@ function CustomerBookingPage() {
     setBookingSuccessData(null)
   }
 
-  async function handleSubmit(event) {
-    event.preventDefault()
+  async function handleSubmit() {
     setTouched({ partySize: true, contactName: true, contactEmail: true })
     setBookingSuccessData(null)
 
@@ -175,6 +146,7 @@ function CustomerBookingPage() {
       return
     }
 
+    const specialRequirementsBody = requirementsBody(specialRequirements)
     setIsSubmitting(true)
     try {
       const result = await apiRequest('/reservations', {
@@ -190,7 +162,7 @@ function CustomerBookingPage() {
           contact_name: contactName.trim(),
           contact_email: contactEmail.trim(),
           ...(contactPhone.trim() ? { contact_phone: contactPhone.trim() } : {}),
-          ...(specialReqs.trim() ? { special_requirements: specialReqs.trim() } : {}),
+          ...(specialRequirementsBody.length ? { special_requirements: specialRequirementsBody } : {}),
         }),
       })
       setBookingSuccessData({
@@ -203,7 +175,7 @@ function CustomerBookingPage() {
       setSlotId('')
       setAvailability(null)
       setPartySize(2)
-      setSpecialReqs('')
+      setSpecialRequirements([])
     } catch (error) {
       notify(error.message || 'Your booking could not be completed. Please try again.')
     } finally {
@@ -211,13 +183,11 @@ function CustomerBookingPage() {
     }
   }
 
-  const assignedTables = formatAssignedTables(bookingSuccessData?.assigned_tables || bookingSuccessData?.assignedTables || [])
-
   return (
     <main className="page booking-page">
       <header className="booking-header">
         <div>
-          {/* <Link className="back-link" to="/home/hiker">Hiker home</Link> */}
+          <Link className="back-link" to="/home/hiker">← Back</Link>
           <p className="eyebrow">MOUNTAINHUT · GUEST BOOKING</p>
           <h1>Book a table</h1>
           <p className="form-intro">Choose a service time, tell us how many are joining, and we’ll take care of the seating.</p>
@@ -231,14 +201,14 @@ function CustomerBookingPage() {
           <div className="confirmation-content">
             <p className="eyebrow">BOOKING CONFIRMED</p>
             <h2 id="booking-confirmation-title">Your table is reserved</h2>
-            <p>Reference <strong>{bookingSuccessData.booking_reference || '—'}</strong></p>
-            <p>{bookingSuccessData.bookingDate} · {bookingSuccessData.bookingTime}{bookingSuccessData.bookingEndTime ? `–${bookingSuccessData.bookingEndTime}` : ''} · {bookingSuccessData.bookedPartySize} guest{bookingSuccessData.bookedPartySize === 1 ? '' : 's'}</p>
-            {assignedTables.length > 0 && (
+            <p>Reference <strong>{bookingSuccessData.booking_reference}</strong></p>
+            <p>{bookingSuccessData.bookingDate} · {bookingSuccessData.bookingTime}–{bookingSuccessData.bookingEndTime} · {bookingSuccessData.bookedPartySize} guest{bookingSuccessData.bookedPartySize === 1 ? '' : 's'}</p>
+            {bookingSuccessData.assigned_tables.length > 0 && (
               <div className="assigned-tables">
                 <strong>Assigned seating</strong>
-                {assignedTables.map((table, index) => (
-                  <span key={`${table.tableNumber}-${index}`}>
-                    Table {table.tableNumber} · {table.seats} seat{table.seats === 1 ? '' : 's'}{table.location ? ` · ${table.location}` : ''}
+                {bookingSuccessData.assigned_tables.map((table) => (
+                  <span key={table.table_id}>
+                    Table {table.table_number} · {table.assigned_seats} seat{table.assigned_seats === 1 ? '' : 's'}{table.location ? ` · ${table.location}` : ''}
                   </span>
                 ))}
               </div>
@@ -247,7 +217,7 @@ function CustomerBookingPage() {
         </section>
       )}
 
-      <form className="booking-layout" onSubmit={handleSubmit} noValidate>
+      <Form className="booking-layout mh-form" onFinish={handleSubmit} noValidate>
         <div className="booking-main-column">
           <section className="booking-panel" aria-labelledby="choose-time-title">
             <div className="booking-panel-heading">
@@ -257,19 +227,26 @@ function CustomerBookingPage() {
             <div className="booking-fields booking-time-fields">
               <label className="form-field">
                 <span>Date <span className="required-mark" aria-hidden="true">*</span></span>
-                <input type="date" min={localDateString()} required value={slotDate} onChange={(event) => handleDateChange(event.target.value)} />
+                <DatePicker
+                  className="mh-control"
+                  format="YYYY-MM-DD"
+                  value={slotDate ? dayjs(slotDate) : null}
+                  disabledDate={date => date.isBefore(dayjs(localDateString()), 'day')}
+                  onChange={date => handleDateChange(date ? date.format('YYYY-MM-DD') : '')}
+                  allowClear={false}
+                />
               </label>
               <label className="form-field">
                 <span>Service time <span className="required-mark" aria-hidden="true">*</span></span>
-                <select value={slotId} required onChange={(event) => { setSlotId(event.target.value); setAvailability(null); setIsCheckingAvailability(Boolean(event.target.value)); clearBookingConfirmation() }} disabled={isLoadingSlots || slotOptions.length === 0}>
-                  <option value="">{isLoadingSlots ? 'Loading service times…' : slotOptions.length ? 'Select a time' : 'No bookable times for this date'}</option>
-                  {slotOptions.map((slot) => {
-                    const start = getSlotStart(slot)
-                    const end = getSlotEnd(slot)
-                    const meal = slot.meal_type ?? slot.mealType
-                    return <option key={getSlotId(slot)} value={getSlotId(slot)}>{start}{end ? ` – ${end}` : ''}{meal ? ` · ${meal}` : ''}</option>
-                  })}
-                </select>
+                <Select
+                  className="mh-control"
+                  value={slotId || undefined}
+                  placeholder={isLoadingSlots ? 'Loading service times…' : slotOptions.length ? 'Select a time' : 'No bookable times for this date'}
+                  loading={isLoadingSlots}
+                  onChange={(value) => { setSlotId(value); setAvailability(null); setIsCheckingAvailability(Boolean(value)); clearBookingConfirmation() }}
+                  disabled={isLoadingSlots || slotOptions.length === 0}
+                  options={slotOptions.map((slot) => ({ value: String(getSlotId(slot)), label: formatSlotLabel(slot) }))}
+                />
               </label>
             </div>
             {isLoadingSlots && <p className="availability-hint">Finding service times for your selected date…</p>}
@@ -290,35 +267,56 @@ function CustomerBookingPage() {
             </div>
             <label className="form-field party-size-field">
               <span>Number of guests <span className="required-mark" aria-hidden="true">*</span></span>
-              <input type="number" min="1" max={availability ? remainingSeats : undefined} step="1" value={partySize} onChange={(event) => { setPartySize(event.target.value); clearBookingConfirmation() }} onBlur={() => setTouched((current) => ({ ...current, partySize: true }))} aria-invalid={Boolean(touched.partySize && partySizeError)} />
+              <InputNumber className="mh-control" min={1} step={1} value={partySize} onChange={(value) => { setPartySize(value ?? ''); clearBookingConfirmation() }} onBlur={() => setTouched((current) => ({ ...current, partySize: true }))} aria-invalid={Boolean(touched.partySize && partySizeError)} />
               {touched.partySize && partySizeError && <small className="field-error">{partySizeError}</small>}
               {availability && !partySizeError && <small className="field-hint">Up to {remainingSeats} guests can be booked for this time.</small>}
             </label>
           </section>
 
-          <section className="booking-panel" aria-labelledby="contact-title">
+          <section className="booking-panel" aria-labelledby="requirements-title">
             <div className="booking-panel-heading">
               <span className="section-step">03</span>
+              <div><h2 id="requirements-title">Special requirements <span className="optional-mark">(optional)</span></h2><p>Share dietary needs or allergies for your group.</p></div>
+            </div>
+            <div className="booking-fields">
+              <div className="form-field form-field-wide requirements-field">
+                <RequirementsEditor requirements={specialRequirements} onChange={(requirements) => { setSpecialRequirements(requirements); clearBookingConfirmation() }} />
+              </div>
+            </div>
+          </section>
+
+          <section className="booking-panel" aria-labelledby="contact-title">
+            <div className="booking-panel-heading">
+              <span className="section-step">04</span>
               <div><h2 id="contact-title">Contact details</h2><p>We’ll send your booking confirmation to this email.</p></div>
             </div>
             <div className="booking-fields">
               <label className="form-field">
                 <span>Contact name <span className="required-mark" aria-hidden="true">*</span></span>
-                <input value={contactName} autoComplete="name" onChange={(event) => { setContactName(event.target.value); clearBookingConfirmation() }} onBlur={() => setTouched((current) => ({ ...current, contactName: true }))} aria-invalid={Boolean(touched.contactName && contactNameError)} />
+                <Input className="mh-control" value={contactName} autoComplete="name" onChange={(event) => { setContactName(event.target.value); clearBookingConfirmation() }} onBlur={() => setTouched((current) => ({ ...current, contactName: true }))} aria-invalid={Boolean(touched.contactName && contactNameError)} />
                 {touched.contactName && contactNameError && <small className="field-error">{contactNameError}</small>}
               </label>
-              <label className="form-field">
-                <span>Email <span className="required-mark" aria-hidden="true">*</span></span>
-                <input type="email" value={contactEmail} autoComplete="email" onChange={(event) => { setContactEmail(event.target.value); clearBookingConfirmation() }} onBlur={() => setTouched((current) => ({ ...current, contactEmail: true }))} aria-invalid={Boolean(touched.contactEmail && contactEmailError)} />
-                {touched.contactEmail && contactEmailError && <small className="field-error">{contactEmailError}</small>}
-              </label>
+              <div className="form-field form-field-wide">
+                <span>Confirmation email</span>
+                <p className="field-hint">By default, we’ll send the confirmation to your account email: <strong>{accountEmail || 'No account email available'}</strong></p>
+                <Checkbox checked={useAlternativeEmail} onChange={(event) => {
+                  setUseAlternativeEmail(event.target.checked)
+                  setTouched((current) => ({ ...current, contactEmail: false }))
+                  clearBookingConfirmation()
+                }}>
+                  I want to send the confirmation to a different email address.
+                </Checkbox>
+                {useAlternativeEmail && (
+                  <label className="form-field alternative-email-field">
+                    <span>Alternative email <span className="required-mark" aria-hidden="true">*</span></span>
+                    <Input className="mh-control" type="email" value={alternativeEmail} autoComplete="email" onChange={(event) => { setAlternativeEmail(event.target.value); clearBookingConfirmation() }} onBlur={() => setTouched((current) => ({ ...current, contactEmail: true }))} aria-invalid={Boolean(touched.contactEmail && contactEmailError)} />
+                    {touched.contactEmail && contactEmailError && <small className="field-error">{contactEmailError}</small>}
+                  </label>
+                )}
+              </div>
               <label className="form-field">
                 <span>Phone <span className="optional-mark">(optional)</span></span>
-                <input type="tel" value={contactPhone} autoComplete="tel" onChange={(event) => { setContactPhone(event.target.value); clearBookingConfirmation() }} />
-              </label>
-              <label className="form-field form-field-wide">
-                <span>Special requirements <span className="optional-mark">(optional)</span></span>
-                <textarea rows="4" value={specialReqs} placeholder="Dietary needs, allergies, or anything else we should know" onChange={(event) => { setSpecialReqs(event.target.value); clearBookingConfirmation() }} />
+                <Input className="mh-control" type="tel" value={contactPhone} autoComplete="tel" onChange={(event) => { setContactPhone(event.target.value); clearBookingConfirmation() }} />
               </label>
             </div>
           </section>
@@ -329,17 +327,17 @@ function CustomerBookingPage() {
           <h2>Mountain Hut</h2>
           <div className="summary-divider" />
           <div className="summary-line"><span>Date</span><strong>{slotDate || 'Choose a date'}</strong></div>
-          <div className="summary-line"><span>Time</span><strong>{selectedSlot ? `${getSlotStart(selectedSlot)}${getSlotEnd(selectedSlot) ? ` – ${getSlotEnd(selectedSlot)}` : ''}` : 'Choose a time'}</strong></div>
+          <div className="summary-line"><span>Time</span><strong>{selectedSlot ? `${getSlotStart(selectedSlot)} – ${getSlotEnd(selectedSlot)}` : 'Choose a time'}</strong></div>
           <div className="summary-line"><span>Guests</span><strong>{partySize || 0}</strong></div>
           {availability && <div className="summary-line"><span>Seats left</span><strong>{remainingSeats}</strong></div>}
           <p className="summary-note">Reservations must be made at least 2 hours before the service time.</p>
-          <button className="submit-button booking-submit" type="submit" disabled={!canSubmit || isSubmitting}>
+          <Button className="submit-button booking-submit" type="primary" htmlType="submit" disabled={!canSubmit || isSubmitting} loading={isSubmitting}>
             {isSubmitting ? 'Confirming booking…' : 'Confirm booking'}
-          </button>
+          </Button>
           {!canSubmit && !isSubmitting && <small className="submit-hint">Select an available time and enter valid guest and contact details to continue.</small>}
           <Link className="summary-back-link" to="/home/hiker">Back to home</Link>
         </aside>
-      </form>
+      </Form>
     </main>
   )
 }

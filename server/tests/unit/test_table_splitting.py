@@ -1,4 +1,6 @@
 """Unit tests for MH-42: Table Splitting and 2-Hour Cutoff Rule."""
+from zoneinfo import ZoneInfo
+
 import pytest
 from datetime import date, time, datetime, timedelta
 from sqlalchemy import event, select
@@ -7,14 +9,17 @@ from sqlalchemy.pool import StaticPool
 
 from server.controllers.reservation_controller import ReservationController
 from server.database import AsyncSessionLocal, Base, engine as real_engine, set_sqlite_pragma
-from server.const import SlotStatus, ReservationStatus, UserRole
+from server.models.enum.slot_status import SlotStatus
+from server.models.enum.reservation_status import ReservationStatus
+from server.models.enum.user_type import UserType
 from server.models.DAO import UserDAO, TableDAO, TimeSlotDAO, SlotTableDAO, ReservationDAO
 from server.models.DTO.reservation_dto import ReservationCreate
 from server.models.error.conflict_error import ConflictError
+from server.repositories.reservation_repository import ReservationRepository
 from server.service.booking_service import (
     validate_two_hour_rule,
     assign_tables_for_party,
-    get_slot_availability,
+    validate_change_deadline,
 )
 
 
@@ -66,22 +71,52 @@ async def split_test_db():
 async def test_two_hour_cutoff_rule(split_test_db):
     """Test MH-01 / MH-42: Hiker can reserve a seat up to 2 hours before the due time."""
     slot = (await split_test_db.execute(select(TimeSlotDAO).filter_by(id=1))).scalar_one()
-
+    italy_tz = ZoneInfo("Europe/Rome")
     # The slot starts at 12:00, so the cutoff is at 10:00 of the same day
 
     # 1. Booking at 09:30 (2.5h before) -> OK
-    validate_two_hour_rule(slot, current_time=datetime.combine(slot.date, time(9, 30)))
+    validate_two_hour_rule(slot, current_time=datetime.combine(slot.date, time(9, 30),tzinfo=italy_tz))
 
     # 2. Booking at 10:00 (exactly 2h before) -> OK
-    validate_two_hour_rule(slot, current_time=datetime.combine(slot.date, time(10, 0)))
+    validate_two_hour_rule(slot, current_time=datetime.combine(slot.date, time(10, 0),tzinfo=italy_tz))
 
     # 3. Booking at 10:01 (1h 59m before) -> Rejected
     with pytest.raises(ConflictError, match="at least 2 hours before"):
-        validate_two_hour_rule(slot, current_time=datetime.combine(slot.date, time(10, 1)))
+        validate_two_hour_rule(slot, current_time=datetime.combine(slot.date, time(10, 1),tzinfo=italy_tz))
 
     # 4. Booking after slot start -> Rejected
     with pytest.raises(ConflictError, match="at least 2 hours before"):
-        validate_two_hour_rule(slot, current_time=datetime.combine(slot.date, time(12, 15)))
+        validate_two_hour_rule(slot, current_time=datetime.combine(slot.date, time(12, 15),tzinfo=italy_tz))
+
+
+async def test_changes_close_at_exactly_48_hours_before_the_slot(split_test_db):
+    """MH-06, PO issue #43: for a meal at 12:00, changes close 48 hours before at 12:00, that time included."""
+    slot = (await split_test_db.execute(select(TimeSlotDAO).filter_by(id=1))).scalar_one()
+    italy_tz = ZoneInfo("Europe/Rome")
+    two_days_before = slot.date - timedelta(days=2)
+
+    validate_change_deadline(slot, current_time=datetime.combine(two_days_before, time(11, 59), tzinfo=italy_tz))
+    with pytest.raises(ConflictError, match="48 hours"):
+        validate_change_deadline(slot, current_time=datetime.combine(two_days_before, time(12, 0), tzinfo=italy_tz))
+
+
+def test_rules_count_real_hours_when_the_clock_goes_forward():
+    """On Sunday 28 March 2027 the clock jumps from 02:00 to 03:00, so the night is one hour shorter."""
+    italy_tz = ZoneInfo("Europe/Rome")
+    sunday = date(2027, 3, 28)
+
+    # a slot at 04:00 is 2 real hours after 01:00, not after the 02:00 the wall clock would say
+    early = TimeSlotDAO(date=sunday, start_time=time(4, 0), end_time=time(5, 0))
+    validate_two_hour_rule(early, current_time=datetime.combine(sunday, time(1, 0), tzinfo=italy_tz))
+    with pytest.raises(ConflictError, match="at least 2 hours before"):
+        validate_two_hour_rule(early, current_time=datetime.combine(sunday, time(1, 30), tzinfo=italy_tz))
+
+    # a slot at 12:00 on Sunday is 48 real hours after Friday at 11:00
+    lunch = TimeSlotDAO(date=sunday, start_time=time(12, 0), end_time=time(13, 0))
+    friday = sunday - timedelta(days=2)
+    validate_change_deadline(lunch, current_time=datetime.combine(friday, time(10, 59), tzinfo=italy_tz))
+    with pytest.raises(ConflictError, match="48 hours"):
+        validate_change_deadline(lunch, current_time=datetime.combine(friday, time(11, 0), tzinfo=italy_tz))
 
 
 async def test_best_fit_single_table_allocation(split_test_db):
@@ -133,7 +168,7 @@ async def test_full_split_reservation_lifecycle(split_test_db):
         user_id=2,
         contact_name="Group Leader",
         contact_email="leader@test.com",
-        special_requirements="All outdoor gear",
+        special_requirements=[{"description": "All outdoor gear"}],
     )
     res = await ReservationController().create_reservation(payload)
 
@@ -146,6 +181,30 @@ async def test_full_split_reservation_lifecycle(split_test_db):
     assert assigned_numbers == {"T3": 8, "T2": 4}
 
     # Verify slot remaining capacity: 18 - 12 = 6
-    avail = await get_slot_availability(split_test_db, 1)
+    avail = await ReservationRepository().get_slot_availability(1)
     assert avail["reserved_seats"] == 12
     assert avail["remaining_seats"] == 6
+
+
+def slot_with_tables(seats):
+    """A slot in memory, without the database, with one free table for each number in seats."""
+    return TimeSlotDAO(slot_tables=[
+        SlotTableDAO(available_seats=n, is_available=True, table=TableDAO(table_number=f"M{i}", capacity=n))
+        for i, n in enumerate(seats)
+    ])
+
+
+def test_split_takes_the_set_of_tables_with_fewest_free_seats():
+    # 5 + 5 would also seat 8, but 4 + 4 leaves the two larger tables free
+    allocations = assign_tables_for_party(slot_with_tables([5, 5, 4, 4]), party_size=8)
+
+    assert sorted(seats for _, seats in allocations) == [4, 4]
+    assert {st.table.table_number for st, _ in allocations} == {"M2", "M3"}
+
+
+def test_many_small_tables_do_not_block_the_server():
+    # a party of 20 on 200 tables of 2 needs 10 tables: trying every set of 10 never ended
+    allocations = assign_tables_for_party(slot_with_tables([2] * 200), party_size=20)
+
+    assert len(allocations) == 10
+    assert sum(seats for _, seats in allocations) == 20

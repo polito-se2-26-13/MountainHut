@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { Button, Form, Input } from 'antd'
 import { Link, useNavigate } from 'react-router'
 import { apiRequest } from '../api/api.js'
 import { useToast } from '../components/ToastProvider.jsx'
@@ -10,8 +11,12 @@ const initialValues = {
   firstName: '',
   lastName: '',
   phone: '',
-  role: 'Hiker',
+  notes: '',
+  emergencyContact: '',
 }
+
+// optional for the PO (issue #22 of the course repository), every other field is required
+const optionalFields = ['notes', 'emergencyContact']
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const phonePattern = /^\+?[0-9][0-9\s().-]{6,19}$/
@@ -19,7 +24,8 @@ const phonePattern = /^\+?[0-9][0-9\s().-]{6,19}$/
 function validateField(name, values) {
   const value = values[name]
 
-  if (name !== 'phone' && !value.trim()) return 'This field is required.'
+  if (optionalFields.includes(name)) return ''
+  if (!value.trim()) return 'This field is required.'
   if (name === 'email' && value && !emailPattern.test(value.trim())) return 'Enter a valid email address.'
   if (name === 'password' && value && value.length < 8) return 'Password must be at least 8 characters.'
   if (name === 'confirmPassword' && value !== values.password) return 'Passwords do not match.'
@@ -61,8 +67,7 @@ function RegisterPage() {
     setTouched((current) => ({ ...current, [event.target.name]: true }))
   }
 
-  async function handleSubmit(event) {
-    event.preventDefault()
+  async function handleSubmit() {
     setSubmitted(true)
     setTouched(Object.fromEntries(Object.keys(initialValues).map((name) => [name, true])))
 
@@ -75,8 +80,10 @@ function RegisterPage() {
         password: values.password,
         firstName: values.firstName.trim(),
         lastName: values.lastName.trim(),
-        ...(values.phone.trim() ? { phone: values.phone.trim() } : {}),
-        role: values.role,
+        phone: values.phone.trim(),
+        ...(values.notes.trim() ? { notes: values.notes.trim() } : {}),
+        ...(values.emergencyContact.trim() ? { emergencyContact: values.emergencyContact.trim() } : {}),
+        role: 'Hiker',
       }
       const result = await apiRequest('/auth/register', {
         method: 'POST',
@@ -101,59 +108,61 @@ function RegisterPage() {
         <h1 id="register-title">Create your account</h1>
         <p className="form-intro">Join the MountainHut community.</p>
 
-        <form onSubmit={handleSubmit} noValidate>
+        <Form className="mh-form" onFinish={handleSubmit} noValidate>
           <div className="form-grid">
             <label className="form-field">
               <span>First name <span className="required-mark" aria-hidden="true">*</span></span>
-              <input name="firstName" required autoComplete="given-name" value={values.firstName} onChange={handleChange} onBlur={handleBlur} aria-invalid={Boolean(showError('firstName'))} />
+              <Input className="mh-control" name="firstName" required autoComplete="given-name" value={values.firstName} onChange={handleChange} onBlur={handleBlur} aria-invalid={Boolean(showError('firstName'))} />
               {showError('firstName') && <small className="field-error">{showError('firstName')}</small>}
             </label>
 
             <label className="form-field">
               <span>Last name <span className="required-mark" aria-hidden="true">*</span></span>
-              <input name="lastName" required autoComplete="family-name" value={values.lastName} onChange={handleChange} onBlur={handleBlur} aria-invalid={Boolean(showError('lastName'))} />
+              <Input className="mh-control" name="lastName" required autoComplete="family-name" value={values.lastName} onChange={handleChange} onBlur={handleBlur} aria-invalid={Boolean(showError('lastName'))} />
               {showError('lastName') && <small className="field-error">{showError('lastName')}</small>}
             </label>
 
             <label className="form-field form-field-wide">
               <span>Email <span className="required-mark" aria-hidden="true">*</span></span>
-              <input name="email" type="email" required autoComplete="email" value={values.email} onChange={handleChange} onBlur={handleBlur} aria-invalid={Boolean(showError('email'))} />
+              <Input className="mh-control" name="email" type="email" required autoComplete="email" value={values.email} onChange={handleChange} onBlur={handleBlur} aria-invalid={Boolean(showError('email'))} />
               {showError('email') && <small className="field-error">{showError('email')}</small>}
             </label>
 
             <label className="form-field">
               <span>Password <span className="required-mark" aria-hidden="true">*</span></span>
-              <input name="password" type="password" required autoComplete="new-password" value={values.password} onChange={handleChange} onBlur={handleBlur} aria-invalid={Boolean(showError('password'))} />
+              <Input.Password className="mh-control" name="password" required autoComplete="new-password" visibilityToggle={false} value={values.password} onChange={handleChange} onBlur={handleBlur} aria-invalid={Boolean(showError('password'))} />
               <small className={showError('password') ? 'field-error' : 'field-hint'}>{showError('password') || 'Use at least 8 characters.'}</small>
             </label>
 
             <label className="form-field">
               <span>Confirm password <span className="required-mark" aria-hidden="true">*</span></span>
-              <input name="confirmPassword" type="password" required autoComplete="new-password" value={values.confirmPassword} onChange={handleChange} onBlur={handleBlur} aria-invalid={Boolean(showError('confirmPassword'))} />
+              <Input.Password className="mh-control" name="confirmPassword" required autoComplete="new-password" visibilityToggle={false} value={values.confirmPassword} onChange={handleChange} onBlur={handleBlur} aria-invalid={Boolean(showError('confirmPassword'))} />
               {showError('confirmPassword') && <small className="field-error">{showError('confirmPassword')}</small>}
             </label>
 
-            <label className="form-field">
-              <span>Phone <span className="optional-mark">(optional)</span></span>
-              <input name="phone" type="tel" autoComplete="tel" value={values.phone} onChange={handleChange} onBlur={handleBlur} aria-invalid={Boolean(showError('phone'))} />
+            <label className="form-field form-field-wide">
+              <span>Phone <span className="required-mark" aria-hidden="true">*</span></span>
+              <Input className="mh-control" name="phone" type="tel" required autoComplete="tel" value={values.phone} onChange={handleChange} onBlur={handleBlur} aria-invalid={Boolean(showError('phone'))} />
               {showError('phone') && <small className="field-error">{showError('phone')}</small>}
             </label>
 
-            <label className="form-field">
-              <span>Role <span className="required-mark" aria-hidden="true">*</span></span>
-              <select name="role" required value={values.role} onChange={handleChange} onBlur={handleBlur}>
-                <option value="Hiker">Hiker</option>
-                <option value="Employee">Employee</option>
-                <option value="Manager">Manager</option>
-              </select>
+            <label className="form-field form-field-wide">
+              <span>Notes <span className="optional-mark">(optional)</span></span>
+              <Input.TextArea className="mh-control" name="notes" rows={2} maxLength={555} placeholder="e.g. registered mountain guide" value={values.notes} onChange={handleChange} />
             </label>
+
+            <label className="form-field form-field-wide">
+              <span>Emergency contact <span className="optional-mark">(optional)</span></span>
+              <Input className="mh-control" name="emergencyContact" maxLength={255} placeholder="Name and phone of someone to call" value={values.emergencyContact} onChange={handleChange} />
+            </label>
+
           </div>
 
-          <button className="submit-button" type="submit" disabled={loading}>
+          <Button className="submit-button" type="primary" htmlType="submit" loading={loading}>
             {loading ? 'Creating account…' : 'Create account'}
-          </button>
+          </Button>
           <p className="required-note"><span className="required-mark">*</span> Required fields</p>
-        </form>
+        </Form>
       </section>
       {success && (
         <div className="success-modal-backdrop">
@@ -168,14 +177,14 @@ function RegisterPage() {
             <p className="eyebrow">ACCOUNT READY</p>
             <h2 id="registration-success-title">Registration successful</h2>
             <p id="registration-success-message">{success} You can now sign in to your account.</p>
-            <button
+            <Button
               className="submit-button"
-              type="button"
+              type="primary"
               ref={loginButtonRef}
               onClick={() => navigate('/login', { replace: true })}
             >
               Return to sign in
-            </button>
+            </Button>
           </section>
         </div>
       )}

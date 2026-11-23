@@ -9,6 +9,7 @@ function HomePage() {
         <p className="home-welcome">Welcome to the mountains.</p>
         <p className="home-description">Find a place to pause, explore, and gather.</p>
         <div className="home-actions">
+          <Link to="/availability">Check availability</Link>
           <Link to="/login">Sign in</Link>
           <Link to="/register">Create an account</Link>
         </div>

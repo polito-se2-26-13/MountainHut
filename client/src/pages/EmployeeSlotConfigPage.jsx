@@ -1,14 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Navigate } from 'react-router';
+import { Button, DatePicker, Form, Input, InputNumber, Select, TimePicker } from 'antd';
+import dayjs from 'dayjs';
+import { Link, Navigate } from 'react-router';
 import { apiRequest } from '../api/api.js';
 import { useAuth } from '../auth/AuthContext.jsx';
 import { useToast } from '../components/ToastProvider.jsx';
-
-function localDateString() {
-  const now = new Date();
-  const localDate = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
-  return localDate.toISOString().slice(0, 10);
-}
+import { getSlotId, localDateString, normalizeSlots } from '../utils/slots.js';
 
 function createTable(tableNumber = '', seats = 2) {
   return {
@@ -18,24 +15,18 @@ function createTable(tableNumber = '', seats = 2) {
   };
 }
 
-function readSlotsResponse(response) {
-  if (Array.isArray(response)) return response;
-  if (Array.isArray(response?.slots)) return response.slots;
-  if (Array.isArray(response?.items)) return response.items;
-  return [];
-}
-
-function slotId(slot) {
-  return slot.slotId ?? slot.id;
-}
-
 function slotLabel(slot) {
-  if (slot.label) return slot.label;
-  const timeRange = [slot.startTime, slot.endTime].filter(Boolean).join('–');
-  const tables = Array.isArray(slot.tables) ? slot.tables : [];
-  const seats = tables.reduce((sum, table) => sum + Number(table.seats || 0), 0);
-  const date = slot.date || slot.slotDate || '';
-  return `${date} ${timeRange} (${tables.length} tables / ${seats} seats)`;
+  const seats = slot.tables.reduce((sum, table) => sum + table.seats, 0);
+  return `${slot.date} ${slot.startTime}–${slot.endTime} (${slot.tables.length} tables / ${seats} seats)`;
+}
+
+// the warden manages the hut, so they set up times and tables like an employee
+const staffRoles = ['Employee', 'Warden'];
+
+// Enter in a date or time field confirms that value only, it must not send the half-filled form;
+// it runs on the form, after the picker has already taken the typed value
+function keepEnterInField(event) {
+  if (event.key === 'Enter' && event.target.closest('.ant-picker')) event.preventDefault();
 }
 
 function EmployeeSlotConfigPage() {
@@ -50,13 +41,12 @@ function EmployeeSlotConfigPage() {
   const [copySourceOptions, setCopySourceOptions] = useState([]);
   const [selectedSourceSlotId, setSelectedSourceSlotId] = useState('');
   const [isLoadingSources, setIsLoadingSources] = useState(false);
-  const [isCopying, setIsCopying] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [sourceRefreshKey, setSourceRefreshKey] = useState(0);
   const notify = useToast();
 
   useEffect(() => {
-    if (!session?.isAuthenticated || session.userProfile.role !== 'Employee') return undefined;
+    if (!session?.isAuthenticated || !staffRoles.includes(session.userProfile.role)) return undefined;
     let active = true;
     queueMicrotask(() => {
       if (active) {
@@ -69,7 +59,7 @@ function EmployeeSlotConfigPage() {
       headers: { Authorization: `Bearer ${session.token}` },
     })
       .then(result => {
-        if (active) setCopySourceOptions(readSlotsResponse(result));
+        if (active) setCopySourceOptions(normalizeSlots(result));
       })
       .catch(error => {
         if (active) notify(error.message || 'Could not load saved time slots.');
@@ -87,7 +77,7 @@ function EmployeeSlotConfigPage() {
     [formData.tables]
   );
 
-  if (!session?.isAuthenticated || session.userProfile.role !== 'Employee') {
+  if (!session?.isAuthenticated || !staffRoles.includes(session.userProfile.role)) {
     return <Navigate to="/login" replace />;
   }
 
@@ -115,35 +105,23 @@ function EmployeeSlotConfigPage() {
     }));
   }
 
-  async function copyTables() {
+  function copyTables() {
     if (!selectedSourceSlotId) {
       notify('Choose a saved time slot to copy first.');
       return;
     }
     const source = copySourceOptions.find(
-      slot => String(slotId(slot)) === String(selectedSourceSlotId)
+      slot => String(getSlotId(slot)) === String(selectedSourceSlotId)
     );
     if (!source) {
       notify('The selected saved time slot is no longer available.');
       return;
     }
-    setIsCopying(true);
-    try {
-      const sourceTables = source.tables;
-      if (!Array.isArray(sourceTables))
-        throw new Error('The selected time slot has no table configuration.');
-      setFormData(current => ({
-        ...current,
-        tables: sourceTables.map(table =>
-          createTable(String(table.tableNumber ?? ''), Number(table.seats) || 1)
-        ),
-      }));
-      notify(`Copied ${sourceTables.length} table${sourceTables.length === 1 ? '' : 's'} from the selected time slot.`, 'success');
-    } catch (error) {
-      notify(error.message || 'Could not copy the saved table configuration.');
-    } finally {
-      setIsCopying(false);
-    }
+    setFormData(current => ({
+      ...current,
+      tables: source.tables.map(table => createTable(table.tableNumber, table.seats)),
+    }));
+    notify(`Copied ${source.tables.length} table${source.tables.length === 1 ? '' : 's'} from the selected time slot.`, 'success');
   }
 
   function validate() {
@@ -165,8 +143,7 @@ function EmployeeSlotConfigPage() {
     return '';
   }
 
-  async function handleSubmit(event) {
-    event.preventDefault();
+  async function handleSubmit() {
     const validationMessage = validate();
     if (validationMessage) {
       notify(validationMessage);
@@ -175,7 +152,7 @@ function EmployeeSlotConfigPage() {
 
     setIsSaving(true);
     try {
-      const result = await apiRequest('/slots', {
+      await apiRequest('/slots', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -192,7 +169,7 @@ function EmployeeSlotConfigPage() {
           })),
         }),
       });
-      notify(result?.message || 'Time slot and table configuration saved.', 'success');
+      notify('Time slot and table configuration saved.', 'success');
       setSourceRefreshKey(current => current + 1);
     } catch (error) {
       notify(error.message || 'Could not save this time slot.');
@@ -205,9 +182,9 @@ function EmployeeSlotConfigPage() {
     <main className="page slot-page">
       <header className="slot-page-header">
         <div>
-          {/* <Link className="back-link" to="/home/employee">
-            Employee home
-          </Link> */}
+          <Link className="back-link" to={`/home/${session.userProfile.role.toLowerCase()}`}>
+            ← Back
+          </Link>
           <p className="eyebrow">MOUNTAINHUT · EMPLOYEE TOOLS</p>
           <h1>Service slots &amp; table setup</h1>
           <p className="form-intro">Set service times and build a table layout for any date.</p>
@@ -219,7 +196,7 @@ function EmployeeSlotConfigPage() {
         </div>
       </header>
 
-      <form className="slot-form" onSubmit={handleSubmit} noValidate>
+      <Form className="slot-form mh-form" onFinish={handleSubmit} onKeyDown={keepEnterInField} noValidate>
         <section className="slot-panel" aria-labelledby="slot-details-title">
           <div className="section-heading">
             <div>
@@ -237,11 +214,12 @@ function EmployeeSlotConfigPage() {
                   *
                 </span>
               </span>
-              <input
-                type="date"
-                required
-                value={formData.slotDate}
-                onChange={event => updateForm('slotDate', event.target.value)}
+              <DatePicker
+                className="mh-control"
+                format="YYYY-MM-DD"
+                value={formData.slotDate ? dayjs(formData.slotDate) : null}
+                onChange={date => updateForm('slotDate', date ? date.format('YYYY-MM-DD') : '')}
+                allowClear={false}
               />
             </label>
             <label className="form-field">
@@ -251,11 +229,12 @@ function EmployeeSlotConfigPage() {
                   *
                 </span>
               </span>
-              <input
-                type="time"
-                required
-                value={formData.startTime}
-                onChange={event => updateForm('startTime', event.target.value)}
+              <TimePicker
+                className="mh-control"
+                format="HH:mm"
+                value={formData.startTime ? dayjs(`2000-01-01T${formData.startTime}`) : null}
+                onChange={time => updateForm('startTime', time ? time.format('HH:mm') : '')}
+                allowClear
               />
             </label>
             <label className="form-field">
@@ -265,26 +244,29 @@ function EmployeeSlotConfigPage() {
                   *
                 </span>
               </span>
-              <input
-                type="time"
-                required
-                value={formData.endTime}
-                onChange={event => updateForm('endTime', event.target.value)}
+              <TimePicker
+                className="mh-control"
+                format="HH:mm"
+                value={formData.endTime ? dayjs(`2000-01-01T${formData.endTime}`) : null}
+                onChange={time => updateForm('endTime', time ? time.format('HH:mm') : '')}
+                allowClear
               />
             </label>
             <label className="form-field">
               <span>
                 Meal type <span className="optional-mark">(optional)</span>
               </span>
-              <select
-                value={formData.mealType}
-                onChange={event => updateForm('mealType', event.target.value)}
-              >
-                <option value="">Select a meal type</option>
-                <option value="Lunch">Lunch</option>
-                <option value="Dinner">Dinner</option>
-                <option value="Snack">Snack</option>
-              </select>
+              <Select
+                className="mh-control"
+                value={formData.mealType || undefined}
+                placeholder="Select a meal type"
+                onChange={value => updateForm('mealType', value || '')}
+                options={[
+                  { value: 'Lunch', label: 'Lunch' },
+                  { value: 'Dinner', label: 'Dinner' },
+                  { value: 'Snack', label: 'Snack' },
+                ]}
+              />
             </label>
           </div>
         </section>
@@ -301,33 +283,31 @@ function EmployeeSlotConfigPage() {
           <div className="copy-toolbar">
             <label className="form-field copy-select-field">
               <span>Copy the tables of a previous slot</span>
-              <select
-                value={selectedSourceSlotId}
-                onChange={event => setSelectedSourceSlotId(event.target.value)}
+              <Select
+                className="mh-control"
+                value={selectedSourceSlotId || undefined}
+                placeholder={isLoadingSources
+                  ? 'Loading saved slots…'
+                  : copySourceOptions.length
+                    ? 'Choose a saved time slot'
+                    : 'No saved slots for this date'}
+                onChange={value => setSelectedSourceSlotId(value)}
                 disabled={isLoadingSources || copySourceOptions.length === 0}
-              >
-                <option value="">
-                  {isLoadingSources
-                    ? 'Loading saved slots…'
-                    : copySourceOptions.length
-                      ? 'Choose a saved time slot'
-                      : 'No saved slots for this date'}
-                </option>
-                {copySourceOptions.map((slot, index) => (
-                  <option key={slotId(slot) ?? index} value={slotId(slot)}>
-                    {slotLabel(slot)}
-                  </option>
-                ))}
-              </select>
+                loading={isLoadingSources}
+                options={copySourceOptions.map(slot => ({
+                  value: String(getSlotId(slot)),
+                  label: slotLabel(slot),
+                }))}
+              />
             </label>
-            <button
+            <Button
               className="secondary-button copy-button"
-              type="button"
+              htmlType="button"
               onClick={copyTables}
-              disabled={isCopying || isLoadingSources || !copySourceOptions.length}
+              disabled={isLoadingSources || !copySourceOptions.length}
             >
-              {isCopying ? 'Copying…' : 'Copy table configuration'}
-            </button>
+              Copy table configuration
+            </Button>
           </div>
 
           <div className="table-list-heading" aria-hidden="true">
@@ -348,7 +328,8 @@ function EmployeeSlotConfigPage() {
                   <label className="sr-only" htmlFor={`table-number-${table.id}`}>
                     Table number {index + 1}
                   </label>
-                  <input
+                  <Input
+                    className="mh-control"
                     id={`table-number-${table.id}`}
                     value={table.tableNumber}
                     placeholder="e.g. T1"
@@ -358,39 +339,39 @@ function EmployeeSlotConfigPage() {
                   <label className="sr-only" htmlFor={`table-seats-${table.id}`}>
                     Seats at table {index + 1}
                   </label>
-                  <input
+                  <InputNumber
+                    className="mh-control"
                     id={`table-seats-${table.id}`}
-                    type="number"
-                    min="1"
-                    step="1"
+                    min={1}
+                    step={1}
                     value={table.seats}
-                    onChange={event => updateTable(table.id, 'seats', event.target.value)}
+                    onChange={value => updateTable(table.id, 'seats', value ?? '')}
                     aria-label={`Seats at table ${index + 1}`}
                   />
-                  <button
+                  <Button
                     className="remove-table-button"
-                    type="button"
+                    htmlType="button"
                     onClick={() => removeTable(table.id)}
                     aria-label={`Remove table ${index + 1}`}
                   >
                     Remove
-                  </button>
+                  </Button>
                 </div>
               ))}
             </div>
           )}
-          <button className="add-table-button" type="button" onClick={addTable}>
+          <Button className="add-table-button" htmlType="button" onClick={addTable}>
             + Add a table
-          </button>
+          </Button>
         </section>
 
         <footer className="slot-form-footer">
           <span>Changes are saved to the selected date and time.</span>
-          <button className="submit-button save-slot-button" type="submit" disabled={isSaving}>
+          <Button className="submit-button save-slot-button" type="primary" htmlType="submit" loading={isSaving}>
             {isSaving ? 'Saving configuration…' : 'Save time slot'}
-          </button>
+          </Button>
         </footer>
-      </form>
+      </Form>
     </main>
   );
 }
