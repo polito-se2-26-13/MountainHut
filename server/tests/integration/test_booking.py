@@ -206,6 +206,8 @@ def test_availability_counts_the_booked_seats(client, db):
     assert seats["total_capacity"] == 10
     assert seats["reserved_seats"] == 3
     assert seats["remaining_seats"] == 7
+    # the party of 3 took the smallest table that fits, the one of 4
+    assert {table["table_number"]: table["free_seats"] for table in seats["tables"]} == {f"{slot}-1": 6, f"{slot}-2": 1}
 
 
 def test_unknown_slot(client, db):
