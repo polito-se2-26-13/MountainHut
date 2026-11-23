@@ -15,7 +15,7 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
-          cache-dependency-path: server/requirements.txt
-      - run: "pip install --only-binary :all: -r server/requirements.txt"
+          cache-dependency-path: server/requirements-lock.txt
+      - run: "pip install --only-binary :all: --require-hashes -r server/requirements-lock.txt"
       - run: python -m pytest
         working-directory: server
