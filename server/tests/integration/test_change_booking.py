@@ -73,6 +73,16 @@ def test_a_booking_moves_only_to_a_slot_at_least_48_hours_away(client, db):
     assert change(client, anna, booking, slot_id=in_three_days).json()["slot_id"] == in_three_days
 
 
+def test_a_booking_moved_to_another_slot_gives_its_seats_back(client, db):
+    anna = add_hiker(db)
+    old, new = add_slot(db, [6], hours_ahead=72), add_slot(db, [6], hours_ahead=80)
+    booking = book(client, anna, old, 3).json()
+
+    assert change(client, anna, booking, slot_id=new).status_code == 200
+    assert client.get(f"/api/slots/{old}/availability").json()["remaining_seats"] == 6
+    assert client.get(f"/api/slots/{new}/availability").json()["reserved_seats"] == 3
+
+
 def test_the_list_sent_replaces_the_requirements(client, db):
     anna = add_hiker(db)
     gluten = [{"has_allergy": True, "description": "1 gluten allergy"}]
