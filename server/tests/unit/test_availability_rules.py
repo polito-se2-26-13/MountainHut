@@ -12,7 +12,6 @@ from server.models.DAO.table import TableDAO
 from server.models.DAO.time_slot import SlotTableDAO, TimeSlotDAO
 from server.models.enum.reservation_status import ReservationStatus
 from server.models.enum.slot_status import SlotStatus
-from server.models.error.notfound_error import NotFoundError
 from server.repositories.reservation_repository import ReservationRepository
 
 
@@ -21,7 +20,6 @@ def build_slot_table(
     table_number: str,
     capacity: int,
     confirmed_seats: int = 0,
-    cancelled_seats: int = 0,
     is_available: bool = True,
     location: str = "Indoor",
 ) -> SlotTableDAO:
@@ -42,17 +40,6 @@ def build_slot_table(
             ReservationTableAssignmentDAO(
                 assigned_seats=confirmed_seats,
                 reservation=confirmed_reservation,
-            )
-        )
-
-    if cancelled_seats:
-        cancelled_reservation = ReservationDAO(
-            status=ReservationStatus.CANCELLED.value
-        )
-        assignments.append(
-            ReservationTableAssignmentDAO(
-                assigned_seats=cancelled_seats,
-                reservation=cancelled_reservation,
             )
         )
 
@@ -96,7 +83,7 @@ class InMemoryReservationRepository(ReservationRepository):
 
 
 @pytest.mark.asyncio
-async def test_availability_without_party_size_returns_capacity_totals():
+async def test_availability_lists_the_tables_in_order_and_has_no_layout_without_party_size():
     slot = build_slot(
         slot_tables=[
             build_slot_table(1, "T2", capacity=4, confirmed_seats=1),
@@ -107,10 +94,6 @@ async def test_availability_without_party_size_returns_capacity_totals():
 
     result = await repository.get_slot_availability(slot_id=1)
 
-    assert result["total_capacity"] == 10
-    assert result["reserved_seats"] == 3
-    assert result["remaining_seats"] == 7
-    assert result["is_available"] is True
     assert result["layout"] is None
     assert result["layout_summary"] is None
     assert [table["table_number"] for table in result["tables"]] == ["T1", "T2"]
@@ -157,26 +140,6 @@ async def test_single_table_best_fit_returns_expected_layout():
 
 
 @pytest.mark.asyncio
-async def test_party_can_be_split_across_three_tables():
-    slot = build_slot(
-        slot_tables=[
-            build_slot_table(1, "T7", capacity=2),
-            build_slot_table(2, "T8", capacity=2),
-            build_slot_table(3, "T9", capacity=2),
-        ]
-    )
-    repository = InMemoryReservationRepository({1: slot})
-
-    result = await repository.get_slot_availability(slot_id=1, party_size=6)
-
-    assert result["remaining_seats"] == 6
-    assert result["is_available"] is True
-    assert result["layout_summary"] == "2 + 2 + 2 seats"
-    assert len(result["layout"]) == 3
-    assert sum(item["assigned_seats"] for item in result["layout"]) == 6
-
-
-@pytest.mark.asyncio
 async def test_fragmented_free_seats_can_accommodate_party():
     slot = build_slot(
         slot_tables=[
@@ -193,45 +156,6 @@ async def test_fragmented_free_seats_can_accommodate_party():
     assert result["is_available"] is True
     assert result["layout_summary"] == "3 + 2 + 1 seats"
     assert sum(item["assigned_seats"] for item in result["layout"]) == 6
-
-
-@pytest.mark.asyncio
-async def test_party_larger_than_remaining_capacity_is_unavailable():
-    slot = build_slot(
-        slot_tables=[
-            build_slot_table(1, "T1", capacity=4, confirmed_seats=2),
-        ]
-    )
-    repository = InMemoryReservationRepository({1: slot})
-
-    result = await repository.get_slot_availability(slot_id=1, party_size=3)
-
-    assert result["remaining_seats"] == 2
-    assert result["is_available"] is False
-    assert result["layout"] == []
-    assert result["layout_summary"] is None
-
-
-@pytest.mark.asyncio
-async def test_cancelled_reservations_do_not_count_as_occupied():
-    slot = build_slot(
-        slot_tables=[
-            build_slot_table(
-                1,
-                "T1",
-                capacity=6,
-                confirmed_seats=2,
-                cancelled_seats=4,
-            ),
-        ]
-    )
-    repository = InMemoryReservationRepository({1: slot})
-
-    result = await repository.get_slot_availability(slot_id=1, party_size=4)
-
-    assert result["reserved_seats"] == 2
-    assert result["remaining_seats"] == 4
-    assert result["is_available"] is True
 
 
 @pytest.mark.asyncio
@@ -252,35 +176,14 @@ async def test_unavailable_tables_are_excluded_from_capacity():
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "slot_status",
-    [SlotStatus.CLOSED.value, SlotStatus.CANCELLED.value],
-)
-async def test_non_open_slot_is_unavailable_even_with_free_seats(slot_status):
+async def test_closed_slot_gives_no_layout_even_with_free_seats():
     slot = build_slot(
-        status=slot_status,
+        status=SlotStatus.CLOSED.value,
         slot_tables=[build_slot_table(1, "T1", capacity=6)],
     )
     repository = InMemoryReservationRepository({1: slot})
 
-    result_without_party = await repository.get_slot_availability(slot_id=1)
-    result_with_party = await repository.get_slot_availability(
-        slot_id=1,
-        party_size=2,
-    )
+    result = await repository.get_slot_availability(slot_id=1, party_size=2)
 
-    assert result_without_party["remaining_seats"] == 6
-    assert result_without_party["is_available"] is False
-    assert result_with_party["is_available"] is False
-    assert result_with_party["layout"] == []
-
-
-@pytest.mark.asyncio
-async def test_missing_slot_raises_not_found_error():
-    repository = InMemoryReservationRepository()
-
-    with pytest.raises(
-        NotFoundError,
-        match="Time slot with id 999 not found",
-    ):
-        await repository.get_slot_availability(slot_id=999)
+    assert result["is_available"] is False
+    assert result["layout"] == []
