@@ -131,11 +131,11 @@ JSON response:
 name: `/api/slots/availability`<br>
 parameters:
 - `date` (query, date string `YYYY-MM-DD`, required)
-- `time` (query, time string `HH:MM`, required)
-- `party_size` or `partySize` (query, integer >= 1, optional)<br>
+- `time` (query, time string `HH:MM`, optional): only the slot running at that time
+- `party_size` (query, integer >= 1, optional)<br>
 authentication: public (no login required)<br>
-HTTP Status: 200 ok, 404 not found, 500 ISE<br>
-JSON response: identical to `/api/slots/{slot_id}/availability`
+HTTP Status: 200 ok, 422 missing or invalid date, 500 ISE<br>
+JSON response: a list, in time order, of the slots of that date (with `time`, only the one running at that time, or an empty list), each one as `/api/slots/{slot_id}/availability` answers. A slot where the party does not fit is listed too, with `is_available` false
 ```
 
 **get reservation by reference**
@@ -312,9 +312,9 @@ body:
 }
 ```
 `mealType` is optional. Suggested values: `Lunch`, `Dinner`, `Snack`.<br>
-Saving the same date and times again adds or updates only the listed tables and takes the new `mealType` when one is sent, while the other tables stay as they are. A table number used for the first time creates the table. A table cannot get fewer seats than the ones already booked on it.<br>
+Saving the same date and times again adds or updates only the listed tables and takes the new `mealType` when one is sent, while the other tables stay as they are. A table number used for the first time creates the table with the seats sent. A table that already exists always keeps its seats (PO issue #47): sending a different number is refused.<br>
 A new slot cannot overlap another slot of the same day, while one right after another is fine. Every table needs a name of 1 to 50 characters, written once.<br>
-HTTP Status: 201 created, 401 unauthorized, 403 forbidden, 409 overlaps another slot of the same day or fewer seats than the booked ones, 422 invalid request, start time not before end time, a time with a UTC offset, slot in the past or invalid table name, 500 ISE<br>
+HTTP Status: 201 created, 401 unauthorized, 403 forbidden, 409 overlaps another slot of the same day or an existing table sent with seats different from its own, 422 invalid request, start time not before end time, a time with a UTC offset, slot in the past or invalid table name, 500 ISE<br>
 JSON response:
 ```json
 // 201

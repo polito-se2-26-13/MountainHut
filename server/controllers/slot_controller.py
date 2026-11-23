@@ -47,6 +47,15 @@ class SlotController():
             if await self.repo.find_overlapping_slot(slot.date,slot.startTime,slot.endTime):
                 raise ConflictError("the slot overlaps another slot of the same day")
 
+            # PO issue 47: a table always has the seats it was defined with, a slot only chooses which tables it uses.
+            # Checked before saving anything, so a refused request leaves no slot behind
+            existing: dict[str,TableDAO|None]={}
+            for t in slot.tables:
+                table=await self.repo.find_table(t.tableNumber)
+                if table is not None and t.seats!=table.capacity:
+                    raise ConflictError(f"table {t.tableNumber} has {table.capacity} seats")
+                existing[t.tableNumber]=table
+
             #search time slot, or create it: the employee chooses date and times freely (MH-02)
             slotTime=await self.repo.find_slot_time(slot.date,slot.startTime,slot.endTime)
             if slotTime is None:
@@ -61,10 +70,10 @@ class SlotController():
                     if t.seats<booked.get(t.tableNumber,0):
                         raise ConflictError(f"table {t.tableNumber} already has {booked[t.tableNumber]} seats booked")
 
-            #search table, or create it: there is no fixed set of tables and seats differ per slot (PO issue 17)
+            # a table used for the first time is created with the seats given
             tables: list[tuple[TableDAO,int]]=[]
             for t in slot.tables:
-                table=await self.repo.find_table(t.tableNumber)
+                table=existing[t.tableNumber]
                 if table is None:
                     table=await self.repo.add_table(t.tableNumber,t.seats)
                 tables.append((table,t.seats))
@@ -80,8 +89,8 @@ class SlotController():
         return await ReservationRepository().get_slot_availability(slot_id, party_size)
 
     async def getSlotAvailabilityByDateTime(
-        self, slot_date: date, slot_time: time, party_size: Optional[int] = None
-    ) -> dict:
+        self, slot_date: date, slot_time: Optional[time], party_size: Optional[int] = None
+    ) -> list[dict]:
         return await ReservationRepository().get_slot_availability_by_date_time(slot_date, slot_time, party_size)
 
     async def get_list_time(self)->list[TimeResponse]:
