@@ -42,8 +42,7 @@ async def record_migration(connection, version: str):
 
 async def run_sql_script(connection, script_path: Path):
     """Execute a raw SQL script containing multiple statements asynchronously."""
-    with open(script_path, "r", encoding="utf-8") as f:
-        sql_content = f.read()
+    sql_content = await asyncio.to_thread(script_path.read_text, encoding="utf-8")
 
     raw_conn = await connection.get_raw_connection()
     await raw_conn.driver_connection.executescript(sql_content)
