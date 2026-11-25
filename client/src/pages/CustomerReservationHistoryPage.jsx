@@ -207,9 +207,6 @@ function CustomerReservationHistoryPage() {
             Book a table
           </Link>
         </div>
-        <div className="booking-header-mark" aria-hidden="true">
-          MH
-        </div>
       </header>
       {loading && <p>Loading your bookings…</p>}
       {!loading && reservations.length === 0 && (

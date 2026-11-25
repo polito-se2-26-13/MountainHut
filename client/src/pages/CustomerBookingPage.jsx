@@ -10,6 +10,129 @@ import { formatSlotLabel, getSlotEnd, getSlotId, getSlotStart, isAtLeast, localD
 
 const TWO_HOURS_MS = 2 * 60 * 60 * 1000
 
+function initialSlotId(availabilitySearch) {
+  if (availabilitySearch?.slotId == null) return ''
+  return String(availabilitySearch.slotId)
+}
+
+function findSelectedSlot(slotOptions, slotOptionsDate, slotDate, slotId) {
+  if (slotOptionsDate !== slotDate) return undefined
+  return slotOptions.find((slot) => String(getSlotId(slot)) === String(slotId))
+}
+
+function getServiceTimePlaceholder(isLoadingSlots, slotCount) {
+  if (isLoadingSlots) return 'Loading service times…'
+  if (slotCount > 0) return 'Select a time'
+  return 'No bookable times for this date'
+}
+
+function getContactEmailError(email) {
+  const normalizedEmail = email.trim()
+  if (!normalizedEmail) return 'Contact email is required.'
+
+  const emailParts = normalizedEmail.split('@')
+  if (emailParts.length !== 2 || /\s/.test(normalizedEmail)) return 'Enter a valid email address.'
+  const [localPart, domain] = emailParts
+  const finalDot = domain.lastIndexOf('.')
+  if (!localPart || !domain || finalDot <= 0 || finalDot === domain.length - 1) {
+    return 'Enter a valid email address.'
+  }
+  return ''
+}
+
+function getPartySizeError(partySize, availability, remainingSeats) {
+  const guestCount = Number(partySize)
+  if (!Number.isInteger(guestCount) || guestCount < 1) return 'Party size must be at least 1.'
+  if (availability && guestCount > remainingSeats) {
+    const seatWord = remainingSeats === 1 ? 'seat' : 'seats'
+    return `Only ${remainingSeats} ${seatWord} remain for this time.`
+  }
+  return ''
+}
+
+function getBookingValidationError({
+  selectedSlot,
+  selectedTimeStillValid,
+  availability,
+  isSlotOpen,
+  isCheckingAvailability,
+  partySizeError,
+  contactNameError,
+  contactEmailError,
+  userId,
+}) {
+  if (!selectedSlot) return 'Choose a service time before continuing.'
+  if (!selectedTimeStillValid) return 'Bookings must be made at least 2 hours before the service time.'
+  if (!availability || !isSlotOpen || isCheckingAvailability) return 'This service time is not currently available.'
+  if (partySizeError || contactNameError || contactEmailError) {
+    return partySizeError || contactNameError || contactEmailError
+  }
+  if (!Number.isInteger(userId) || userId < 1) {
+    return 'Your account is missing a valid user ID. Please sign in again.'
+  }
+  return ''
+}
+
+function guestWord(count) {
+  return count === 1 ? 'guest' : 'guests'
+}
+
+function seatWord(count) {
+  return count === 1 ? 'seat' : 'seats'
+}
+
+function BookingConfirmation({ bookingSuccessData }) {
+  if (!bookingSuccessData) return null
+
+  return (
+    <section className="booking-confirmation" aria-labelledby="booking-confirmation-title">
+      <div className="confirmation-icon" aria-hidden="true">✓</div>
+      <div className="confirmation-content">
+        <p className="eyebrow">BOOKING CONFIRMED</p>
+        <h2 id="booking-confirmation-title"><output>Your table is reserved</output></h2>
+        <p>Reference <strong>{bookingSuccessData.booking_reference}</strong></p>
+        <p>{bookingSuccessData.bookingDate} · {bookingSuccessData.bookingTime}–{bookingSuccessData.bookingEndTime} · {bookingSuccessData.bookedPartySize} {guestWord(bookingSuccessData.bookedPartySize)}</p>
+        {bookingSuccessData.assigned_tables.length > 0 && (
+          <div className="assigned-tables">
+            <strong>Assigned seating</strong>
+            {bookingSuccessData.assigned_tables.map((table) => (
+              <span key={table.table_id}>
+                Table {table.table_number} · {table.assigned_seats} {seatWord(table.assigned_seats)}{table.location ? ` · ${table.location}` : ''}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
+  )
+}
+
+function AvailabilityFeedback({ isLoadingSlots, slotOptions, isCheckingAvailability, availability, isSlotOpen, remainingSeats }) {
+  if (isLoadingSlots) {
+    return <output className="availability-hint">Finding service times for your selected date…</output>
+  }
+  if (slotOptions.length === 0) {
+    return <p className="availability-hint">Only times at least 2 hours from now can be booked.</p>
+  }
+  if (isCheckingAvailability) {
+    return <output className="availability-hint">Checking remaining seats…</output>
+  }
+  if (!availability) return null
+
+  const isAvailable = isSlotOpen && remainingSeats > 0
+  const statusText = isAvailable ? 'Time available' : 'This time is not available'
+
+  return (
+    <div className={`availability-card${isAvailable ? '' : ' unavailable'}`}>
+      <span className="availability-dot" aria-hidden="true" />
+      <output>
+        <strong>{statusText}</strong>
+        <span>{remainingSeats} {seatWord(remainingSeats)} remaining</span>
+      </output>
+    </div>
+  )
+}
+
 function CustomerBookingPage() {
   const { session } = useAuth()
   const location = useLocation()
@@ -17,7 +140,7 @@ function CustomerBookingPage() {
   const [slotDate, setSlotDate] = useState(availabilitySearch?.date || localDateString())
   const [slotOptions, setSlotOptions] = useState([])
   const [slotOptionsDate, setSlotOptionsDate] = useState('')
-  const [slotId, setSlotId] = useState(availabilitySearch?.slotId != null ? String(availabilitySearch.slotId) : '')
+  const [slotId, setSlotId] = useState(() => initialSlotId(availabilitySearch))
   const [availability, setAvailability] = useState(null)
   const [partySize, setPartySize] = useState(availabilitySearch?.partySize ?? 2)
   const [contactName, setContactName] = useState(session?.userProfile?.fullName || '')
@@ -33,9 +156,7 @@ function CustomerBookingPage() {
   const [bookingSuccessData, setBookingSuccessData] = useState(null)
   const [touched, setTouched] = useState({})
   const notify = useToast()
-  const selectedSlot = slotOptionsDate === slotDate
-    ? slotOptions.find((slot) => String(getSlotId(slot)) === String(slotId))
-    : undefined
+  const selectedSlot = findSelectedSlot(slotOptions, slotOptionsDate, slotDate, slotId)
 
   useEffect(() => {
     if (!session?.isAuthenticated || session.userProfile.role !== 'Hiker') return undefined
@@ -85,16 +206,8 @@ function CustomerBookingPage() {
   const remainingSeats = availability?.remaining_seats ?? 0
   const isSlotOpen = availability?.status === 'OPEN'
   const contactNameError = !contactName.trim() ? 'Contact name is required.' : ''
-  const contactEmailError = !contactEmail.trim()
-    ? 'Contact email is required.'
-    : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail.trim())
-      ? 'Enter a valid email address.'
-      : ''
-  const partySizeError = !Number.isInteger(Number(partySize)) || Number(partySize) < 1
-    ? 'Party size must be at least 1.'
-    : availability && Number(partySize) > remainingSeats
-      ? `Only ${remainingSeats} seat${remainingSeats === 1 ? '' : 's'} remain for this time.`
-      : ''
+  const contactEmailError = getContactEmailError(contactEmail)
+  const partySizeError = getPartySizeError(partySize, availability, remainingSeats)
   const selectedTimeStillValid = selectedSlot && isAtLeast(slotDate, getSlotStart(selectedSlot), TWO_HOURS_MS)
   const canSubmit = Boolean(
     selectedSlot && selectedTimeStillValid && availability && isSlotOpen && !isCheckingAvailability
@@ -124,25 +237,20 @@ function CustomerBookingPage() {
     setTouched({ partySize: true, contactName: true, contactEmail: true })
     setBookingSuccessData(null)
 
-    if (!selectedSlot) {
-      notify('Choose a service time before continuing.')
-      return
-    }
-    if (!selectedTimeStillValid) {
-      notify('Bookings must be made at least 2 hours before the service time.')
-      return
-    }
-    if (!availability || !isSlotOpen || isCheckingAvailability) {
-      notify('This service time is not currently available.')
-      return
-    }
-    if (partySizeError || contactNameError || contactEmailError) {
-      notify(partySizeError || contactNameError || contactEmailError)
-      return
-    }
     const userId = Number(session.userProfile.id)
-    if (!Number.isInteger(userId) || userId < 1) {
-      notify('Your account is missing a valid user ID. Please sign in again.')
+    const validationError = getBookingValidationError({
+      selectedSlot,
+      selectedTimeStillValid,
+      availability,
+      isSlotOpen,
+      isCheckingAvailability,
+      partySizeError,
+      contactNameError,
+      contactEmailError,
+      userId,
+    })
+    if (validationError) {
+      notify(validationError)
       return
     }
 
@@ -172,6 +280,7 @@ function CustomerBookingPage() {
         bookingEndTime: getSlotEnd(selectedSlot),
         bookedPartySize: Number(partySize),
       })
+      window.scrollTo({ top: 0, behavior: 'smooth' })
       setSlotId('')
       setAvailability(null)
       setPartySize(2)
@@ -192,30 +301,9 @@ function CustomerBookingPage() {
           <h1>Book a table</h1>
           <p className="form-intro">Choose a service time, tell us how many are joining, and we’ll take care of the seating.</p>
         </div>
-        <div className="booking-header-mark" aria-hidden="true">MH</div>
       </header>
 
-      {bookingSuccessData && (
-        <section className="booking-confirmation" role="status" aria-labelledby="booking-confirmation-title">
-          <div className="confirmation-icon" aria-hidden="true">✓</div>
-          <div className="confirmation-content">
-            <p className="eyebrow">BOOKING CONFIRMED</p>
-            <h2 id="booking-confirmation-title">Your table is reserved</h2>
-            <p>Reference <strong>{bookingSuccessData.booking_reference}</strong></p>
-            <p>{bookingSuccessData.bookingDate} · {bookingSuccessData.bookingTime}–{bookingSuccessData.bookingEndTime} · {bookingSuccessData.bookedPartySize} guest{bookingSuccessData.bookedPartySize === 1 ? '' : 's'}</p>
-            {bookingSuccessData.assigned_tables.length > 0 && (
-              <div className="assigned-tables">
-                <strong>Assigned seating</strong>
-                {bookingSuccessData.assigned_tables.map((table) => (
-                  <span key={table.table_id}>
-                    Table {table.table_number} · {table.assigned_seats} seat{table.assigned_seats === 1 ? '' : 's'}{table.location ? ` · ${table.location}` : ''}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-        </section>
-      )}
+      <BookingConfirmation bookingSuccessData={bookingSuccessData} />
 
       <Form className="booking-layout mh-form" onFinish={handleSubmit} noValidate>
         <div className="booking-main-column">
@@ -241,7 +329,7 @@ function CustomerBookingPage() {
                 <Select
                   className="mh-control"
                   value={slotId || undefined}
-                  placeholder={isLoadingSlots ? 'Loading service times…' : slotOptions.length ? 'Select a time' : 'No bookable times for this date'}
+                  placeholder={getServiceTimePlaceholder(isLoadingSlots, slotOptions.length)}
                   loading={isLoadingSlots}
                   onChange={(value) => { setSlotId(value); setAvailability(null); setIsCheckingAvailability(Boolean(value)); clearBookingConfirmation() }}
                   disabled={isLoadingSlots || slotOptions.length === 0}
@@ -249,15 +337,14 @@ function CustomerBookingPage() {
                 />
               </label>
             </div>
-            {isLoadingSlots && <p className="availability-hint">Finding service times for your selected date…</p>}
-            {!isLoadingSlots && slotOptions.length === 0 && <p className="availability-hint">Only times at least 2 hours from now can be booked.</p>}
-            {isCheckingAvailability && <p className="availability-hint" role="status">Checking remaining seats…</p>}
-            {availability && (
-              <div className={`availability-card${isSlotOpen && remainingSeats > 0 ? '' : ' unavailable'}`} role="status">
-                <span className="availability-dot" aria-hidden="true" />
-                <div><strong>{isSlotOpen && remainingSeats > 0 ? 'Time available' : 'This time is not available'}</strong><span>{remainingSeats} seat{remainingSeats === 1 ? '' : 's'} remaining</span></div>
-              </div>
-            )}
+            <AvailabilityFeedback
+              isLoadingSlots={isLoadingSlots}
+              slotOptions={slotOptions}
+              isCheckingAvailability={isCheckingAvailability}
+              availability={availability}
+              isSlotOpen={isSlotOpen}
+              remainingSeats={remainingSeats}
+            />
           </section>
 
           <section className="booking-panel" aria-labelledby="party-size-title">
