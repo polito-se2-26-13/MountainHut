@@ -18,7 +18,7 @@ const initialValues = {
 // optional for the PO (issue #22 of the course repository), every other field is required
 const optionalFields = ['notes', 'emergencyContact']
 
-const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const emailPattern = /^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/
 const phonePattern = /^\+?[0-9][0-9\s().-]{6,19}$/
 
 function validateField(name, values) {

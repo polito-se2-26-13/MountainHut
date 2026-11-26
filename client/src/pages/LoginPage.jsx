@@ -5,7 +5,7 @@ import { useAuth } from '../auth/AuthContext.jsx'
 import { useToast } from '../components/ToastProvider.jsx'
 import { apiRequest } from '../api/api.js'
 
-const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const emailPattern = /^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/
 
 function routeForRole(role) {
   return {

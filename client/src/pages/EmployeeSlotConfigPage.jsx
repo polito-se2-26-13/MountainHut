@@ -7,9 +7,12 @@ import { useAuth } from '../auth/AuthContext.jsx';
 import { useToast } from '../components/ToastProvider.jsx';
 import { getSlotId, localDateString, normalizeSlots } from '../utils/slots.js';
 
+// the id only tells the rows of this form apart, so a counter is enough
+let nextTableId = 1;
+
 function createTable(tableNumber = '', seats = 2) {
   return {
-    id: globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`,
+    id: nextTableId++,
     tableNumber,
     seats,
   };
