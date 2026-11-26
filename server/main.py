@@ -7,7 +7,7 @@ from server.config.config import ORIGIN
 from server.models.error.app_error import AppError
 from server.middleware.error_middleware import error_handler
 from server.routes import(
-    user_routes,
+    auth_routes,
     res_routes,
     slot_routes,
 )
@@ -30,7 +30,7 @@ async def health():
     """Quick check that the backend is running."""
     return {"status": "ok"}
 
-app.include_router(user_routes.router)
+app.include_router(auth_routes.router)
 app.include_router(res_routes.router)
 app.include_router(slot_routes.router)
 
