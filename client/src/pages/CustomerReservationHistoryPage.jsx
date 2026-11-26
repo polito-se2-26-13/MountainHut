@@ -10,12 +10,6 @@ import { formatSlotLabel, getSlotId, getSlotStart, isAtLeast, normalizeSlots } f
 
 const CHANGE_WINDOW_MS = 48 * 60 * 60 * 1000;
 
-function formatTables(tables) {
-  return tables
-    .map(table => `${table.table_number} (${table.assigned_seats} seat${table.assigned_seats === 1 ? '' : 's'})`)
-    .join(', ');
-}
-
 // the latest service first, and on the same day the later time first
 function newestFirst(a, b) {
   return `${b.date} ${b.start_time}`.localeCompare(`${a.date} ${a.start_time}`);
@@ -197,18 +191,12 @@ function CustomerReservationHistoryPage() {
     <main className="page reservation-history-page">
       <header className="reservation-history-header">
         <div>
-          <Link className="back-link" to="/home/hiker">
-            ← Back
-          </Link>
           <p className="eyebrow">MOUNTAINHUT · YOUR BOOKINGS</p>
           <h1>Booking history</h1>
-          <p className="form-intro">Review your reservations and assigned seating.</p>
+          <p className="form-intro">Review your reservations.</p>
           <Link className="history-book-button" to="/customer/book-table">
             Book a table
           </Link>
-        </div>
-        <div className="booking-header-mark" aria-hidden="true">
-          MH
         </div>
       </header>
       {loading && <p>Loading your bookings…</p>}
@@ -237,9 +225,6 @@ function CustomerReservationHistoryPage() {
                     {reservation.party_size ?? '—'} guest{reservation.party_size === 1 ? '' : 's'} ·{' '}
                     {reservation.status || 'Status unavailable'}
                   </span>
-                  {reservation.assigned_tables?.length > 0 && (
-                    <span>Tables: {formatTables(reservation.assigned_tables)}</span>
-                  )}
                   {reservation.special_requirements?.length > 0 && (
                     <span>
                       Requests: {reservation.special_requirements.map(item => item.description).join(', ')}
@@ -312,10 +297,6 @@ function CustomerReservationHistoryPage() {
             <span>
               <strong>Reference</strong>
               {target.booking_reference}
-            </span>
-            <span>
-              <strong>Current tables</strong>
-              {target.assigned_tables.length ? formatTables(target.assigned_tables) : 'Not assigned'}
             </span>
           </div>
           {error && (

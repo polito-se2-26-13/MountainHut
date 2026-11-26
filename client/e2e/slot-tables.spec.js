@@ -21,8 +21,8 @@ test('an employee creates a slot with its tables and a hiker sees its free seats
   await page.getByLabel('Seats at table 2').fill('4')
   await page.getByRole('button', { name: 'Save time slot' }).click()
   await expect(page.getByText('Time slot and table configuration saved.')).toBeVisible()
-  // Back goes to the home of the role, not to the page before in the browser history
-  await page.getByRole('link', { name: '← Back' }).click()
+  // the logo of the bar goes to the home of the role, not to the page before in the browser history
+  await page.getByRole('link', { name: 'MountainHut dashboard' }).click()
   await expect(page).toHaveURL(/\/home\/employee/)
   // also from a page opened directly, as from a shared link, where the history has nothing before it
   const guest = await (await browser.newContext()).newPage()

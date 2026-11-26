@@ -76,7 +76,6 @@ function AvailabilityPage() {
           <h1>Check availability</h1>
           <p className="form-intro">Choose a date and group size to see available service times.</p>
         </div>
-        <div className="booking-header-mark" aria-hidden="true">MH</div>
       </header>
 
       <section className="availability-search booking-panel" aria-labelledby="availability-slots-title">
