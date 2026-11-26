@@ -10,7 +10,8 @@ test('a hiker books a table and finds it in the booking history', async ({ page 
   await bookTable(page, { date: daysFromToday(7), time: '19:00 – 20:30 · Dinner', guests: 3 })
 
   const confirmation = page.getByRole('status', { name: 'Your table is reserved' })
-  await expect(confirmation).toContainText('Table')
+  // issue #55: the hiker does not see the tables
+  await expect(confirmation).not.toContainText('Assigned seating')
   const reference = (await confirmation.locator('strong').first().textContent()).trim()
   expect(reference).toMatch(/^MH-\d{8}-[A-Z0-9]+$/)
 

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Button, Checkbox, DatePicker, Form, Input, InputNumber, Select } from 'antd'
 import dayjs from 'dayjs'
-import { Link, Navigate, useLocation } from 'react-router'
+import { Navigate, useLocation } from 'react-router'
 import { apiRequest } from '../api/api.js'
 import { useAuth } from '../auth/AuthContext.jsx'
 import { useToast } from '../components/ToastProvider.jsx'
@@ -29,24 +29,13 @@ function getServiceTimePlaceholder(isLoadingSlots, slotCount) {
 function getContactEmailError(email) {
   const normalizedEmail = email.trim()
   if (!normalizedEmail) return 'Contact email is required.'
-
-  const emailParts = normalizedEmail.split('@')
-  if (emailParts.length !== 2 || /\s/.test(normalizedEmail)) return 'Enter a valid email address.'
-  const [localPart, domain] = emailParts
-  const finalDot = domain.lastIndexOf('.')
-  if (!localPart || !domain || finalDot <= 0 || finalDot === domain.length - 1) {
-    return 'Enter a valid email address.'
-  }
-  return ''
+  return /^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/.test(normalizedEmail) ? '' : 'Enter a valid email address.'
 }
 
 function getPartySizeError(partySize, availability, remainingSeats) {
   const guestCount = Number(partySize)
   if (!Number.isInteger(guestCount) || guestCount < 1) return 'Party size must be at least 1.'
-  if (availability && guestCount > remainingSeats) {
-    const seatWord = remainingSeats === 1 ? 'seat' : 'seats'
-    return `Only ${remainingSeats} ${seatWord} remain for this time.`
-  }
+  if (availability && guestCount > remainingSeats) return `Only ${remainingSeats} ${seatWord(remainingSeats)} remain for this time.`
   return ''
 }
 
@@ -85,23 +74,14 @@ function BookingConfirmation({ bookingSuccessData }) {
   if (!bookingSuccessData) return null
 
   return (
-    <section className="booking-confirmation" aria-labelledby="booking-confirmation-title">
+    // role status, not output: output may hold only text, and the whole box has to be announced (Sonar S6819 accepted)
+    <section className="booking-confirmation" role="status" aria-labelledby="booking-confirmation-title">
       <div className="confirmation-icon" aria-hidden="true">✓</div>
       <div className="confirmation-content">
         <p className="eyebrow">BOOKING CONFIRMED</p>
-        <h2 id="booking-confirmation-title"><output>Your table is reserved</output></h2>
+        <h2 id="booking-confirmation-title">Your table is reserved</h2>
         <p>Reference <strong>{bookingSuccessData.booking_reference}</strong></p>
         <p>{bookingSuccessData.bookingDate} · {bookingSuccessData.bookingTime}–{bookingSuccessData.bookingEndTime} · {bookingSuccessData.bookedPartySize} {guestWord(bookingSuccessData.bookedPartySize)}</p>
-        {bookingSuccessData.assigned_tables.length > 0 && (
-          <div className="assigned-tables">
-            <strong>Assigned seating</strong>
-            {bookingSuccessData.assigned_tables.map((table) => (
-              <span key={table.table_id}>
-                Table {table.table_number} · {table.assigned_seats} {seatWord(table.assigned_seats)}{table.location ? ` · ${table.location}` : ''}
-              </span>
-            ))}
-          </div>
-        )}
       </div>
     </section>
   )
@@ -296,7 +276,6 @@ function CustomerBookingPage() {
     <main className="page booking-page">
       <header className="booking-header">
         <div>
-          <Link className="back-link" to="/home/hiker">← Back</Link>
           <p className="eyebrow">MOUNTAINHUT · GUEST BOOKING</p>
           <h1>Book a table</h1>
           <p className="form-intro">Choose a service time, tell us how many are joining, and we’ll take care of the seating.</p>
@@ -422,7 +401,6 @@ function CustomerBookingPage() {
             {isSubmitting ? 'Confirming booking…' : 'Confirm booking'}
           </Button>
           {!canSubmit && !isSubmitting && <small className="submit-hint">Select an available time and enter valid guest and contact details to continue.</small>}
-          <Link className="summary-back-link" to="/home/hiker">Back to home</Link>
         </aside>
       </Form>
     </main>

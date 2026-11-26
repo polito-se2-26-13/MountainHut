@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router'
 import { useAuth } from '../auth/AuthContext.jsx'
 
@@ -15,41 +15,17 @@ function AccountMenu() {
   const location = useLocation()
   const navigate = useNavigate()
   const menuRef = useRef(null)
-  const [isVisible, setIsVisible] = useState(true)
 
-  useEffect(() => {
-    let previousScrollY = window.scrollY
-    const onScroll = () => {
-      const currentScrollY = window.scrollY
-      if (currentScrollY < 40 || currentScrollY < previousScrollY - 4) setIsVisible(true)
-      else if (currentScrollY > previousScrollY + 4) setIsVisible(false)
-      previousScrollY = currentScrollY
-    }
-    const onMouseMove = (event) => {
-      if (event.clientY <= 12) setIsVisible(true)
-    }
-    window.addEventListener('scroll', onScroll, { passive: true })
-    window.addEventListener('mousemove', onMouseMove)
-    return () => {
-      window.removeEventListener('scroll', onScroll)
-      window.removeEventListener('mousemove', onMouseMove)
-    }
-  }, [])
-
-  if (!session?.isAuthenticated || ['/', '/login', '/register'].includes(location.pathname) || location.pathname.startsWith('/home/')) return null
+  if (!session?.isAuthenticated || ['/login', '/register'].includes(location.pathname)) return null
 
   const role = session.userProfile.role
-  const links = role === 'Hiker'
+  // the logo already leads to the home of the role, whose cards are the same links, and the booking page shows the free seats
+  const links = location.pathname.startsWith('/home/') ? [] : role === 'Hiker'
     ? [
-        { label: 'Home', to: '/home/hiker' },
-        { label: 'Availability', to: '/availability' },
         { label: 'Book a table', to: '/customer/book-table' },
         { label: 'Booking history', to: '/customer/reservations' },
       ]
-    : [
-        { label: 'Home', to: `/home/${role.toLowerCase()}` },
-        { label: 'Times & tables', to: '/employee/slots' },
-      ]
+    : [{ label: 'Times & tables', to: '/employee/slots' }]
 
   function handleSignOut() {
     if (menuRef.current) menuRef.current.open = false
@@ -58,7 +34,7 @@ function AccountMenu() {
   }
 
   return (
-    <header className={`site-nav${isVisible ? '' : ' site-nav-hidden'}`}>
+    <header className="site-nav">
       <nav className="site-nav-inner" aria-label="Main navigation">
         <Link className="site-nav-brand" to={`/home/${role.toLowerCase()}`} aria-label="MountainHut dashboard">
           <img src="/logo.png" alt="" />

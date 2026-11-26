@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Button, DatePicker, Form, Input, InputNumber, Select, TimePicker } from 'antd';
 import dayjs from 'dayjs';
-import { Link, Navigate } from 'react-router';
+import { Navigate } from 'react-router';
 import { apiRequest } from '../api/api.js';
 import { useAuth } from '../auth/AuthContext.jsx';
 import { useToast } from '../components/ToastProvider.jsx';
@@ -182,9 +182,6 @@ function EmployeeSlotConfigPage() {
     <main className="page slot-page">
       <header className="slot-page-header">
         <div>
-          <Link className="back-link" to={`/home/${session.userProfile.role.toLowerCase()}`}>
-            ← Back
-          </Link>
           <p className="eyebrow">MOUNTAINHUT · EMPLOYEE TOOLS</p>
           <h1>Service slots &amp; table setup</h1>
           <p className="form-intro">Set service times and build a table layout for any date.</p>

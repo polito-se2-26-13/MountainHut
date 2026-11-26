@@ -1,7 +1,7 @@
 .page {
   width: min(100% - 2rem, 72rem);
   margin: 0 auto;
-  padding: 5rem 0 3rem;
+  padding: 3rem 0;
 }
 
 .page h1 {
@@ -24,7 +24,6 @@
 
 .reservation-history-page {
   width: min(100% - 2rem, 74rem);
-  padding-top: 5rem;
 }
 
 .reservation-history-header {
@@ -660,12 +659,12 @@ header .back-link {
 .toast-region {
   position: fixed;
   z-index: 3000;
+  bottom: max(1rem, env(safe-area-inset-bottom));
   left: 50%;
-  top: 50%;
   display: grid;
   width: min(30rem, calc(100vw - 2rem));
   gap: 0.65rem;
-  translate: -50% -50%;
+  translate: -50% 0;
   pointer-events: none;
 }
 
@@ -799,7 +798,7 @@ header .back-link {
 
 .slot-page {
   width: min(100% - 2rem, 72rem);
-  padding: 5rem 0 4rem;
+  padding: 2.5rem 0 4rem;
 }
 
 .slot-page-header {
@@ -1351,30 +1350,16 @@ header .back-link {
   text-align: center;
 }
 
-.summary-back-link {
-  display: block;
-  margin-top: 1rem;
-  color: #64748b !important;
-  font-size: 0.82rem;
-  text-align: center;
-  text-decoration: none;
-}
-
 .site-nav {
-  position: fixed;
+  position: sticky;
   z-index: 1000;
-  inset: 0 0 auto;
+  top: 0;
   padding: max(0.55rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) 0.55rem max(1rem, env(safe-area-inset-left));
   border-bottom: 1px solid rgb(203 213 225 / 75%);
   background: rgb(255 255 255 / 96%);
   box-shadow: 0 0.35rem 1.25rem rgb(15 23 42 / 8%);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
-  transition: transform 180ms ease;
-}
-
-.site-nav-hidden {
-  transform: translateY(-110%);
 }
 
 .site-nav-inner {
@@ -1407,25 +1392,18 @@ header .back-link {
   display: flex;
   min-width: 0;
   flex: 1 1 auto;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.35rem;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
-.site-nav-links::-webkit-scrollbar {
-  display: none;
 }
 
 .site-nav-link {
-  display: inline-flex !important;
+  display: inline-flex;
   min-height: 2.5rem;
-  flex: 0 0 auto;
   align-items: center;
-  margin: 0 !important;
   padding: 0.5rem 0.75rem;
   border-radius: 0.55rem;
-  color: #536174 !important;
+  color: #536174;
   font-size: 0.86rem;
   font-weight: 650;
   text-decoration: none;
@@ -1435,7 +1413,7 @@ header .back-link {
 .site-nav-link:hover,
 .site-nav-link-active {
   background: #eff6ff;
-  color: #125486 !important;
+  color: #125486;
 }
 
 .account-menu {
@@ -1543,11 +1521,6 @@ header .back-link {
   background: #fef3f2;
 }
 
-.slot-page,
-.booking-page {
-  padding-top: 5rem;
-}
-
 .booking-confirmation {
   display: flex;
   gap: 1rem;
@@ -1561,7 +1534,7 @@ header .back-link {
 
 .availability-page {
   width: min(100% - 2rem, 58rem);
-  padding: 5rem 0 4rem;
+  padding: 2.5rem 0 4rem;
 }
 
 .availability-search {
@@ -1675,7 +1648,7 @@ header .back-link {
 .availability-footnote { margin-top: 1rem; color: #64748b; font-size: 0.82rem; }
 
 @media (max-width: 680px) {
-  .availability-page { width: min(100% - 1.25rem, 58rem); padding-top: 5rem; }
+  .availability-page { width: min(100% - 1.25rem, 58rem); }
   .availability-fields { grid-template-columns: 1fr; }
   .availability-filter-fields { grid-template-columns: 1fr; }
   .availability-result { padding: 1rem; }
@@ -1703,18 +1676,6 @@ header .back-link {
 
 .confirmation-content .eyebrow {
   color: #15803d !important;
-}
-
-.assigned-tables {
-  display: grid;
-  gap: 0.3rem;
-  margin-top: 0.85rem;
-  font-size: 0.83rem;
-}
-
-.assigned-tables strong {
-  margin-bottom: 0.15rem;
-  color: #14532d;
 }
 
 @media (max-width: 560px) {
@@ -1838,7 +1799,6 @@ header .back-link {
   .slot-page,
   .booking-page {
     width: min(100% - 1.25rem, 74rem);
-    padding-top: 5rem;
   }
 
   .register-page {
