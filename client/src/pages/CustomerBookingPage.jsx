@@ -87,7 +87,7 @@ function CustomerBookingPage() {
   const contactNameError = !contactName.trim() ? 'Contact name is required.' : ''
   const contactEmailError = !contactEmail.trim()
     ? 'Contact email is required.'
-    : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail.trim())
+    : !/^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/.test(contactEmail.trim())
       ? 'Enter a valid email address.'
       : ''
   const partySizeError = !Number.isInteger(Number(partySize)) || Number(partySize) < 1
