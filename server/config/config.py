@@ -32,4 +32,4 @@ TOKEN_LIFESPAN_HOURS_FORGOT = 24
 # without it a random key is made at every start, so the logins end when the server restarts
 SECRET_KEY = os.getenv("SECRET_KEY") or secrets.token_hex(32)
 ALGORITHM = "HS256"
-LINK_RECOVETY_PASSWORD=""
+LINK_RECOVETY_PASSWORD="http://www.ere.com?query="

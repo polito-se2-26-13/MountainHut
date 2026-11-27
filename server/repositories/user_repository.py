@@ -30,7 +30,7 @@ class UserRepository:
                 emergency_contact=user.emergencyContact,
                 role=user.role.value,
                 must_change_password=user.must_change_password,
-                first_loging=user.first_login
+                first_login=user.first_login
             )
             session.add(userDao)
             await session.commit()
@@ -115,7 +115,7 @@ class UserRepository:
                 update(UserDAO)
                 .where(UserDAO.id==id)
                 .values(password_hash=psw,
-                        must_be_change=False,
+                        must_change_password=False,
                         first_login=False,)
             )
             await session.commit()

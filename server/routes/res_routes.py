@@ -20,7 +20,7 @@ async def create_reservation(reservation:ReservationCreate,background_tasks:Back
 @router.post("/for-hinker", 
              response_model=ReservationResponse, 
              status_code=status.HTTP_201_CREATED,
-             dependencies=Depends(authenticate_user([UserType.EMPLOYEE,UserType.WARDEN]))
+             #dependencies=[Depends(authenticate_user([UserType.EMPLOYEE, UserType.WARDEN]))]
              )
 async def create_reservation(reservation:ReservationHinkerCreate,background_tasks:BackgroundTasks):
      return await controller.create_reservation_for_hinker(reservation,background_tasks)

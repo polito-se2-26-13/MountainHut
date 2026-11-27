@@ -1,10 +1,12 @@
 """Email Template & Formatting Service (MH-03: Receive Confirmation)."""
 from html import escape
+import time
 from typing import Dict, Any
 import os
 import smtplib
 from email.message import EmailMessage
 from dotenv import load_dotenv
+from fastapi import BackgroundTasks
 from server.models.DTO.reservation_dto import ReservationMailDTO
 from pathlib import Path
 
@@ -14,6 +16,30 @@ BASE_DIR = Path(__file__).resolve().parents[1]
 ENV_PATH = BASE_DIR / ".env"
 load_dotenv(ENV_PATH)
 
+def information_email(email_type,content,to:str,background_tasks:BackgroundTasks|None):
+    """send the email with funcion email_type"""
+    """
+        email_type: function in service that create the email
+        content: dto with parameter of email
+        to: parameter that send_confermation_with_retry needed to print error (email to send)
+    """
+    if background_tasks is not None:
+            background_tasks.add_task(send_confirmation_with_retry,email_type,content,to)
+    else:
+        send_confirmation_with_retry(email_type,content,to)
+
+def send_confirmation_with_retry(mail_type,content,to:str, waits=(5, 10)):
+    """Sends the confirmation, trying again after 5 and then 10 seconds.
+    It runs after the answer, so the booking stands anyway and a failure is only written in the log."""
+    for wait in (*waits, None):
+        result = mail_type(content)
+        if result["status"] == "SENT" or wait is None:
+            break
+        time.sleep(wait)
+    if result["status"] != "SENT":
+        # flush, otherwise the line waits in a buffer when the output goes to a file or to Docker
+        print(f"confirmation email not sent for {to}: {result.get('error')}", flush=True)
+        
 def format_booking_email_text(reservation: ReservationMailDTO) -> str:
     """
     Generate plain text confirmation email for a reservation (MH-03).
@@ -29,6 +55,7 @@ def format_booking_email_text(reservation: ReservationMailDTO) -> str:
     date_str = reservation.date_str
     time_slot = reservation.time_slot
     party_size = reservation.party_size
+    booking_name=reservation.booking_name
     # PO issues #4 and #29: one line per requirement, the allergies marked
     special_reqs = "".join(
         f"\n  - {'ALLERGY: ' if r.has_allergy else ''}{r.description}" for r in reservation.special_reqs
@@ -44,7 +71,7 @@ Dear {hiker_name},
 ------------------------------------------------------------
 BOOKING DETAILS (Reference: {ref})
 ------------------------------------------------------------
-* Hiker Name:          {hiker_name}
+* Booking Name:        {booking_name}
 * Booking Reference:   {ref}
 * Date:                {date_str}
 * Time Slot:           {time_slot}
@@ -159,6 +186,7 @@ def format_booking_email_html(reservation: ReservationMailDTO) -> str:
     date_str = reservation.date_str
     time_slot = reservation.time_slot
     party_size = reservation.party_size
+    booking_name=reservation.booking_name
     special_reqs = "<br>".join(
         f'<strong style="color: #c2410c;">Allergy: {escape(r.description)}</strong>' if r.has_allergy else escape(r.description)
         for r in reservation.special_reqs
@@ -192,8 +220,8 @@ def format_booking_email_html(reservation: ReservationMailDTO) -> str:
       <!-- Details Table -->
       <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px; font-size: 14px;">
         <tr>
-          <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; color: #64748b; width: 40%;">Hiker Name</td>
-          <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; font-weight: 600;">{hiker_name}</td>
+          <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; color: #64748b; width: 40%;">Booking Name</td>
+          <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; font-weight: 600;">{booking_name}</td>
         </tr>
         <tr>
           <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; color: #64748b;">Date</td>

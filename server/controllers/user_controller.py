@@ -1,6 +1,6 @@
 from typing import Optional
-
-from fastapi import BackgroundTasks,JSONResponse
+from fastapi import BackgroundTasks
+from fastapi.responses import JSONResponse
 from server.config.config import LINK_RECOVETY_PASSWORD
 from server.models.DAO.user import UserDAO
 from server.models.DTO.user_dto import ChangePasswordEmail, EmailUserDTO, ResponseResetPassword, SetPasswordDTO, UserCreateDTO, UserResponseDTO, UserLoginDTO, UserLoginResponse, UserSearchResponse
@@ -14,7 +14,7 @@ from server.models.error.unauthorized_error import UnauthorizedError
 from server.models.error.notfound_error import NotFoundError
 from server.models.enum.user_type import UserType
 from server.service.auth_service import generate_token_forgot_password
-from server.controllers.reservation_controller import information_email
+from server.service.email_service import information_email
 
 class UserController():
    def __init__(self):
@@ -63,7 +63,7 @@ class UserController():
       return resp
    
    async def delete_user(self, user_id:int)->bool:
-      return self.repo.delete_user(user_id)
+      return await self.repo.delete_user(user_id)
    
    async def reset_password(self,email:EmailUserDTO,bgt:BackgroundTasks|None):
       user:UserDAO=await self.repo.get_user_by_email(email.email)
@@ -83,16 +83,16 @@ class UserController():
       return ResponseResetPassword()
    
    async def set_password(self,ch_pw:SetPasswordDTO,email:str)->ResponseResetPassword:
-      user:UserDAO=self.repo.get_user_by_email(ch_pw)
+      user:UserDAO= await self.repo.get_user_by_email(ch_pw.email)
       
       if user is None:
-         raise UnauthorizedError("error during autentication, controll the email")
+         raise UnauthorizedError("error during autentication")
       
       if user.email!=email:
-         raise UnauthorizedError("error during autentication, controll the email")
+         raise UnauthorizedError("error during autentication")
 
       if not user.first_login or not user.must_change_password:
-         raise UnauthorizedError("error during autentication, controll the email")
+         raise UnauthorizedError("error during autentication")
       
-      self.repo.set_password(user.id,hash_password(ch_pw.password))
+      await self.repo.set_password(user.id,hash_password(ch_pw.password))
       return ResponseResetPassword(msg="password change!")

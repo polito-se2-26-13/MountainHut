@@ -92,7 +92,8 @@ def reservationEmailDto_to_email(
         partySize:int,
         spReq:list,
         hikerName:str,
-        changed:bool=False):
+        booking_name:str,
+        changed:bool=False,):
     
     return ReservationMailDTO(
         booking_reference=ref,
@@ -102,7 +103,8 @@ def reservationEmailDto_to_email(
         party_size=partySize,
         special_reqs=spReq,
         hiker_name=hikerName,
-        changed=changed
+        changed=changed,
+        booking_name=booking_name
     )
 
 def specialRequirementDTO_to_DAO(requirements:list[SpecialRequirementDTO])->list[SpecialRequirementDAO]:

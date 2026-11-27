@@ -2,7 +2,7 @@ from fastapi import APIRouter, BackgroundTasks,status,Depends
 from server.config.config import ROUTES
 from server.middleware.auth_middleware import authenticate_forgot_password
 from server.models.DAO.user import UserDAO
-from server.models.DTO.user_dto import ChangePasswordDTO, EmailUserDTO, ResponseResetPassword, SetPasswordDTO, UserResponseDTO,UserCreateDTO, UserLoginDTO,UserLoginResponse
+from server.models.DTO.user_dto import EmailUserDTO, ResponseResetPassword, SetPasswordDTO, UserResponseDTO,UserCreateDTO, UserLoginDTO,UserLoginResponse
 from server.controllers.user_controller import UserController
 from server.models.error.bad_request import BadRequestError
 
@@ -37,12 +37,13 @@ async def login_user(user:UserLoginDTO):
 
 @router.post("/recovery-password",
              response_model=ResponseResetPassword,
-             status_code=status.HTTP_204_NO_CONTENT,
+             status_code=status.HTTP_200_OK,
             )
 async def reset_password(email:EmailUserDTO):
-  return controller.reset_password(email,BackgroundTasks())
+  return await controller.reset_password(email,BackgroundTasks())
 
 @router.post("/recovery-password/setPassword",
-            status_code=status.HTTP_204_NO_CONTENT,)
+            response_model=ResponseResetPassword,
+            status_code=status.HTTP_200_OK,)
 async def set_password(ch_pw:SetPasswordDTO,user:UserDAO=Depends(authenticate_forgot_password())):
-  return controller.set_password(ch_pw,user.email)
+  return await controller.set_password(ch_pw,user.email)

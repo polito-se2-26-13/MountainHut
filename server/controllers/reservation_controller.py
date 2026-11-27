@@ -14,7 +14,7 @@ from server.models.enum.slot_status import SlotStatus
 from server.models.enum.reservation_status import ReservationStatus
 from server.service.booking_service import check_time_employee_reservation, validate_two_hour_rule,assign_tables_for_party,validate_change_deadline
 from server.service.mapper_service import UserDetailRes_to_UserCreateDTO, reservationDTO_to_response,reservationEmailDto_to_email, reservationHinkerCreate_to_reservationCreate
-from server.service.email_service import send_booking_confirmation_email,send_password_to_user_email
+from server.service.email_service import information_email, send_booking_confirmation_email, send_confirmation_with_retry,send_password_to_user_email
 from server.controllers.user_controller import UserController
 from server.models.enum.hinker_type import HinkerType
 from fastapi import BackgroundTasks
@@ -35,21 +35,12 @@ def generate_password(length: int = 12) -> str:
     alphabet = string.ascii_letters + string.digits + string.punctuation
     return ''.join(secrets.choice(alphabet) for _ in range(length))
 
-def send_confirmation_with_retry(mail_type,content,to:str, waits=(5, 10)):
-    """Sends the confirmation, trying again after 5 and then 10 seconds.
-    It runs after the answer, so the booking stands anyway and a failure is only written in the log."""
-    for wait in (*waits, None):
-        result = mail_type(content)
-        if result["status"] == "SENT" or wait is None:
-            break
-        time.sleep(wait)
-    if result["status"] != "SENT":
-        # flush, otherwise the line waits in a buffer when the output goes to a file or to Docker
-        print(f"confirmation email not sent for {to}: {result.get('error')}", flush=True)
-
-
 def confirm_by_mail(res,background_tasks:BackgroundTasks|None,changed:bool=False):
     """Mail of a new or a changed booking, with its details as they are now (MH-03, PO issue #41)"""
+    if res.hiker is None:
+        name= res.contact_name
+    else:
+        name= res.hiker.full_name
     mail:ReservationMailDTO=reservationEmailDto_to_email(
             res.booking_reference,
             res.contact_email,
@@ -57,7 +48,7 @@ def confirm_by_mail(res,background_tasks:BackgroundTasks|None,changed:bool=False
             f"{res.slot.start_time:%H:%M}-{res.slot.end_time:%H:%M}",
             res.party_size,
             res.requirements,
-            res.hiker.full_name,
+            res.contact_name,
             changed
         )
     # the answer does not wait for the mail server, which kept the whole backend busy for up to 20 seconds
@@ -66,42 +57,29 @@ def confirm_by_mail(res,background_tasks:BackgroundTasks|None,changed:bool=False
     else:
         send_confirmation_with_retry(send_booking_confirmation_email,mail,mail.contact_email)
 
-def information_email(email_type,content,to:str,background_tasks:BackgroundTasks|None):
-    """send the email with funcion email_type"""
-    """
-        email_type: function in service that create the email
-        content: dto with parameter of email
-        to: parameter that send_confermation_with_retry needed to print error (email to send)
-    """
-    if background_tasks is not None:
-            background_tasks.add_task(send_confirmation_with_retry,email_type,content,to)
-    else:
-        send_confirmation_with_retry(email_type,content,to)
 
 class ReservationController():
     def __init__(self):
         self.repo=ReservationRepository()
 
-    async def _check_user(type:HinkerType,user_info:UserDetailReservationDTO)->tuple[int,UserCreateDTO|None]:
+    async def _check_user(self,type:HinkerType,user_info:UserDetailReservationDTO)->tuple[int,UserCreateDTO|None]:
         """Create account if needed"""
-        
+        userController=UserController()
         if type==HinkerType.NEW:
             psw=generate_password()
             newUser=UserDetailRes_to_UserCreateDTO(user_info,psw)
             newUser.first_login=True
-            userRes:UserResponseDTO=await UserController.create_user(newUser)
-            user=tuple[userRes.id,newUser]
+            userRes:UserResponseDTO=await userController.create_user(newUser)
+            user= (userRes.id, newUser)
 
         elif type== HinkerType.PRESENT:
-            user:UserSearchResponse=await UserController.find_user(mail=user_info.email)
-            if user is None:
+            findUser:UserSearchResponse=await userController.find_user(name=None,mail=user_info.email,phone=None)
+            if findUser is None:
                 raise NotFoundError("accout not found")
-            if  user.role != UserType.HIKER or user.is_active==False:
-                raise ConflictError(f"cannot create a reservation for an user that have role {user.role}")
-            user=tuple[user.id,None]
+            user=(findUser[0].id,None)
 
         elif type== HinkerType.TEMPORARY:
-            user=[None,None]
+            user=(None,None)
 
         else:
             raise ConflictError(f"\"{type}\" doesn't exit as type of hiker")
@@ -189,8 +167,10 @@ class ReservationController():
     async def create_reservation_for_hinker(self,reservation:ReservationHinkerCreate,background_tasks:BackgroundTasks|None=None):
         """Creation reservation"""
         async with booking_lock:
+            user_create=False
             try:
-                user_id,user=await self._check_user(reservation.hiker_typer,reservation.user_info,background_tasks)        
+                user_id,user=await self._check_user(reservation.hiker_typer,reservation.user_info)        
+                user_create=reservation.hiker_typer==HinkerType.NEW
                 timeSlot=await self._check_slot_for_booking(False,reservation.slot_id,user_id)
                 
                 #check hours of prenotation
@@ -209,12 +189,13 @@ class ReservationController():
                 new_res=reservationHinkerCreate_to_reservationCreate(reservation,user_id)
                 res,tables= await self.repo.transaction_add_reservation(new_res,table_allocations)
             except Exception as e:
-                if reservation.hiker_typer==HinkerType.NEW:
-                    UserController.delete_user(user_id)
+                if reservation.hiker_typer==HinkerType.NEW and user_create:
+                    usercontroller=UserController()
+                    usercontroller.delete_user(user_id)
                 raise(e)
         
         if reservation.hiker_typer==HinkerType.NEW:
-            information_email_new_user(user,background_tasks)
+            information_email(send_password_to_user_email,user,reservation.user_info.email,background_tasks)
         confirm_by_mail(res,background_tasks)
         
         return reservationDTO_to_response(res,tables)

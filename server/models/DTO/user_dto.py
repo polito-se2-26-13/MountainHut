@@ -18,7 +18,7 @@ class UserDTO(BaseModel):
     role: UserType
     firstName: str =Field(min_length=1, max_length=100)
     lastName: str=Field(min_length=1, max_length=100)
-    phone: Optional[Phone]= None
+    phone: Optional[Phone]= Field(None, min_length=1, max_length=15)
 
 class UserLoginDTO(BaseModel):
     username: EmailStr=Field(max_length=100)
@@ -42,7 +42,7 @@ class UserCreateDTO(BaseModel):
     firstName: Name
     lastName: Name
     # for the PO the phone of a hiker is required, notes and emergency contact are optional (issue #22 of the course repository)
-    phone: Phone
+    phone: Optional[Phone]=Field(None, min_length=1, max_length=15)
     notes: Optional[str]=Field(None, max_length=555)
     emergencyContact: Optional[str]=Field(None, max_length=255)
     must_change_password: bool =Field(False)
@@ -57,10 +57,10 @@ class UserDetailDTO(BaseModel):
     phone: Optional[Phone]= None
 
 class UserDetailReservationDTO(BaseModel):
-    id: Optional[int] = None
-    email: Optional[EmailStr]=Field(min_length=5, max_length=100)
-    firstName: Optional[str] =Field(min_length=1, max_length=100)
-    lastName: Optional[str]=Field(min_length=1, max_length=100)
+    id: Optional[int] = Field(None,)
+    email: Optional[EmailStr]=Field(None,min_length=5, max_length=100)
+    firstName: Optional[str] =Field(None,min_length=1, max_length=100)
+    lastName: Optional[str]=Field(None,min_length=1, max_length=100)
     phone: Optional[Phone]= None
     emergencyConctat: Optional[str]=None
 

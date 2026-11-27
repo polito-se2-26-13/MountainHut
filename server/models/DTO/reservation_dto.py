@@ -32,7 +32,7 @@ class ReservationHinkerCreate(BaseModel):
     contact_email: EmailStr = Field(..., min_length=5, max_length=100, description="Email for booking confirmation")
     contact_phone: Optional[Phone] = Field(None, description="Mobile number")
     special_requirements: List[SpecialRequirementDTO] = Field([], description="Dietary requirements and allergies")
-    user_info: Optional[UserDetailReservationDTO]
+    user_info: Optional[UserDetailReservationDTO]=Field(None)
 
 class ReservationUpdate(BaseModel):
     """What a hiker can change in a booking (MH-06), sent whole as the change window of the history page does."""
@@ -103,6 +103,7 @@ class SlotAvailabilityResponse(BaseModel):
 
 class ReservationMailDTO(BaseModel):
     hiker_name:str
+    booking_name:str
     booking_reference: str
     contact_email:str
     date_str: str
