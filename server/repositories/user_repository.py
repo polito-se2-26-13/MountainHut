@@ -86,6 +86,17 @@ class UserRepository:
         async with await self._get_session() as session:
             user = await session.get(UserDAO, user_id)
             return user
+        
+    async def delete_user(self, user_id: int) -> bool:
+            """
+            Delete user by id
+            """
+            async with await self._get_session() as session:
+                user = await session.get(UserDAO, user_id)
+        
+                await session.delete(user)
+                await session.commit()
+                return True
 
 '''
     async def list_users(self) -> list[UserDAO]:
@@ -119,20 +130,4 @@ class UserRepository:
             await session.refresh(db_user)
             return db_user
 
-    async def delete_user(self, user_id: int) -> bool:
-        """
-        Delete user by id. Will throw NotFoundError if user doesn't exist
-        """
-        async with await self._get_session() as session:
-            user = await session.get(UserDAO, user_id)
-
-            find_or_throw_not_found(
-                [user] if user else [],
-                lambda _: True,
-                f"User with id '{user_id}' not found"
-            )
-
-            await session.delete(user)
-            await session.commit()
-            return True
 '''

@@ -44,3 +44,6 @@ class UserController():
       for l in list:
          resp.append(userDAO_to_searchResponse(l))
       return resp
+   
+   async def delete_user(self, user_id:int)->bool:
+      return self.repo.delete_user(user_id)

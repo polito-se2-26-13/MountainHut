@@ -16,7 +16,7 @@ from server.service.email_service import send_booking_confirmation_email,send_pa
 from server.controllers.user_controller import UserController
 from server.models.enum.hinker_type import HinkerType
 from fastapi import BackgroundTasks
-from server.models.DTO.user_dto import UserCreateDTO, UserDetailReservationDTO, UserResponseDTO
+from server.models.DTO.user_dto import UserCreateDTO, UserDetailReservationDTO, UserResponseDTO, UserSearchResponse
 from server.repositories.user_repository import UserRepository
 import asyncio
 import time
@@ -77,28 +77,30 @@ class ReservationController():
     def __init__(self):
         self.repo=ReservationRepository()
 
-    async def _check_user(type:HinkerType,user_info:UserDetailReservationDTO,background_task:BackgroundTasks|None)->int|None:
+    async def _check_user(type:HinkerType,user_info:UserDetailReservationDTO)->tuple[int,UserCreateDTO|None]:
         """Create account if needed"""
         
         if type==HinkerType.NEW:
             psw=generate_password()
-            user=UserDetailRes_to_UserCreateDTO(user_info,psw)
-            user.must_change_password=True
-            new_user:UserResponseDTO=await UserController.create_user(user)
-            user_id=new_user.id
-            information_email_new_user(user,background_task)
+            newUser=UserDetailRes_to_UserCreateDTO(user_info,psw)
+            newUser.must_change_password=True
+            userRes:UserResponseDTO=await UserController.create_user(newUser)
+            user=tuple[userRes.id,newUser]
+
         elif type== HinkerType.PRESENT:
-            user:UserDAO=await UserRepository.get_user(user_info.id)
+            user:UserSearchResponse=await UserController.find_user(mail=user_info.email)
             if user is None:
                 raise NotFoundError("accout not found")
             if  user.role != UserType.HIKER or user.is_active==False:
                 raise ConflictError(f"cannot create a reservation for an user that have role {user.role}")
-            user_id=user_id
+            user=tuple[user.id,None]
+
         elif type== HinkerType.TEMPORARY:
-            user_id=None
+            user=[None,None]
+
         else:
             raise ConflictError(f"\"{type}\" doesn't exit as type of hiker")
-        return user_id
+        return user
 
     async def _check_slot_for_booking(self,two_hours_check:bool,slot_id:int,user_id:Optional[int]=None)->TimeSlotDAO:
         """MH-01 rules of the slot, for a new booking and for a booking moved there (MH-06)"""
@@ -182,18 +184,27 @@ class ReservationController():
     async def create_reservation_for_hinker(self,reservation:ReservationHinkerCreate,background_tasks:BackgroundTasks|None=None):
         """Creation reservation"""
         async with booking_lock:
-            user_id=await self._check_user(reservation.hiker_typer,reservation.user_info,background_tasks)        
-            timeSlot=await self._check_slot_for_booking(False,reservation.slot_id,user_id)
+            try:
+                user_id,user=await self._check_user(reservation.hiker_typer,reservation.user_info,background_tasks)        
+                timeSlot=await self._check_slot_for_booking(False,reservation.slot_id,user_id)
 
-            # Check available capacity (Capacity Deduction constraint), on the slot just read, as the change does
-            remaining = sum(st.free_seats for st in timeSlot.slot_tables if st.is_available)
-            if reservation.party_size > remaining:
-                raise ConflictError(
-                    f"Not enough seats available (requested {reservation.party_size}, remaining {remaining})."
-                )
-            #allocation
-            table_allocations = assign_tables_for_party(timeSlot, reservation.party_size)
-            new_res=reservationHinkerCreate_to_reservationCreate(reservation,user_id)
-            res,tables= await self.repo.transaction_add_reservation(new_res,table_allocations)
+                # Check available capacity (Capacity Deduction constraint), on the slot just read, as the change does
+                remaining = sum(st.free_seats for st in timeSlot.slot_tables if st.is_available)
+                if reservation.party_size > remaining:
+                    raise ConflictError(
+                        f"Not enough seats available (requested {reservation.party_size}, remaining {remaining})."
+                    )
+                #allocation
+                table_allocations = assign_tables_for_party(timeSlot, reservation.party_size)
+                new_res=reservationHinkerCreate_to_reservationCreate(reservation,user_id)
+                res,tables= await self.repo.transaction_add_reservation(new_res,table_allocations)
+            except Exception as e:
+                if reservation.hiker_typer==HinkerType.NEW:
+                    UserController.delete_user(user_id)
+                raise(e)
+        
+        if reservation.hiker_typer==HinkerType.NEW:
+            information_email_new_user(user,background_tasks)
         confirm_by_mail(res,background_tasks)
+        
         return reservationDTO_to_response(res,tables)
