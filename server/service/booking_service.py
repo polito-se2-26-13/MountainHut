@@ -97,3 +97,12 @@ def assign_tables_for_party(
         remaining -= seats_to_take
 
     return assignments
+
+def check_time_employee_reservation(slot:TimeSlotDAO)->bool:
+    italy_tz = ZoneInfo("Europe/Rome")
+    now=datetime.now(italy_tz)
+    start_time = datetime.combine(slot.date, slot.start_time, tzinfo=italy_tz).astimezone(timezone.utc)
+    end_time=datetime.combine(slot.date, slot.end_time, tzinfo=italy_tz).astimezone(timezone.utc)
+    if start_time<=now and now<=end_time:
+       return False
+    return True

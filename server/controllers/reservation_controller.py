@@ -1,4 +1,6 @@
+from datetime import datetime
 from typing import Optional
+from zoneinfo import ZoneInfo
 
 from server.models.DAO.user import UserDAO
 from server.models.enum.user_type import UserType
@@ -10,7 +12,7 @@ from server.models.error.conflict_error import ConflictError
 from server.models.error.forbidden_error import ForbiddenError
 from server.models.enum.slot_status import SlotStatus
 from server.models.enum.reservation_status import ReservationStatus
-from server.service.booking_service import validate_two_hour_rule,assign_tables_for_party,validate_change_deadline
+from server.service.booking_service import check_time_employee_reservation, validate_two_hour_rule,assign_tables_for_party,validate_change_deadline
 from server.service.mapper_service import UserDetailRes_to_UserCreateDTO, reservationDTO_to_response,reservationEmailDto_to_email, reservationHinkerCreate_to_reservationCreate
 from server.service.email_service import send_booking_confirmation_email,send_password_to_user_email
 from server.controllers.user_controller import UserController
@@ -187,13 +189,18 @@ class ReservationController():
             try:
                 user_id,user=await self._check_user(reservation.hiker_typer,reservation.user_info,background_tasks)        
                 timeSlot=await self._check_slot_for_booking(False,reservation.slot_id,user_id)
-
+                
+                #check hours of prenotation
+                if not check_time_employee_reservation(timeSlot):
+                     raise ConflictError("you cannot provide the reservetion for started time slot ")
+                
                 # Check available capacity (Capacity Deduction constraint), on the slot just read, as the change does
                 remaining = sum(st.free_seats for st in timeSlot.slot_tables if st.is_available)
                 if reservation.party_size > remaining:
                     raise ConflictError(
                         f"Not enough seats available (requested {reservation.party_size}, remaining {remaining})."
                     )
+                
                 #allocation
                 table_allocations = assign_tables_for_party(timeSlot, reservation.party_size)
                 new_res=reservationHinkerCreate_to_reservationCreate(reservation,user_id)
