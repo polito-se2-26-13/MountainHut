@@ -1,6 +1,11 @@
 from typing import Optional
-from server.models.DTO.user_dto import UserCreateDTO, UserResponseDTO, UserLoginDTO, UserLoginResponse, UserSearchResponse
+
+from fastapi import BackgroundTasks,JSONResponse
+from server.config.config import LINK_RECOVETY_PASSWORD
+from server.models.DAO.user import UserDAO
+from server.models.DTO.user_dto import ChangePasswordEmail, EmailUserDTO, ResponseResetPassword, SetPasswordDTO, UserCreateDTO, UserResponseDTO, UserLoginDTO, UserLoginResponse, UserSearchResponse
 from server.repositories.user_repository import UserRepository
+from server.service.email_service import send_reset_password_to_user_email
 from server.service.mapper_service import userdao_to_responsedto, loging_response, userdao_to_userdto,userdao_to_userdto_detail,userDAO_to_searchResponse
 from server.service.auth_service import generate_token
 from server.utils.security import hash_password, verify_password
@@ -8,6 +13,8 @@ from server.models.error.conflict_error import ConflictError
 from server.models.error.unauthorized_error import UnauthorizedError
 from server.models.error.notfound_error import NotFoundError
 from server.models.enum.user_type import UserType
+from server.service.auth_service import generate_token_forgot_password
+from server.controllers.reservation_controller import information_email
 
 class UserController():
    def __init__(self):
@@ -32,7 +39,17 @@ class UserController():
          raise UnauthorizedError("email or password wrong")
       userDto=userdao_to_userdto(users)
       if(verify_password(userLog.password,userDto.password)):
-         return loging_response(generate_token(userDto),userdao_to_userdto_detail(users))
+         if users.first_login:
+            return JSONResponse(
+               content={
+                  "token":generate_token_forgot_password(userDto.email)
+               },
+               status_code=204,
+               headers={"Location": "/recovery-password/setPassword"}
+            )
+         else:
+            await self.repo.set_must_be_change(users.id,False)
+            return loging_response(generate_token(userDto),userdao_to_userdto_detail(users))
       else:
          raise UnauthorizedError("email or password wrong")
 
@@ -47,3 +64,35 @@ class UserController():
    
    async def delete_user(self, user_id:int)->bool:
       return self.repo.delete_user(user_id)
+   
+   async def reset_password(self,email:EmailUserDTO,bgt:BackgroundTasks|None):
+      user:UserDAO=await self.repo.get_user_by_email(email.email)
+      if user:
+         try:
+            jwt= generate_token_forgot_password(user.email)
+            await self.repo.set_must_be_change(user.id,True)
+            content=ChangePasswordEmail(
+               email=user.email,
+               link=LINK_RECOVETY_PASSWORD+jwt
+            )
+            information_email(send_reset_password_to_user_email,content,user.email,bgt)
+         except Exception as e:
+            await self.repo.set_must_be_change(user.id,False)
+            raise(e)
+         
+      return ResponseResetPassword()
+   
+   async def set_password(self,ch_pw:SetPasswordDTO,email:str)->ResponseResetPassword:
+      user:UserDAO=self.repo.get_user_by_email(ch_pw)
+      
+      if user is None:
+         raise UnauthorizedError("error during autentication, controll the email")
+      
+      if user.email!=email:
+         raise UnauthorizedError("error during autentication, controll the email")
+
+      if not user.first_login or not user.must_change_password:
+         raise UnauthorizedError("error during autentication, controll the email")
+      
+      self.repo.set_password(user.id,hash_password(ch_pw.password))
+      return ResponseResetPassword(msg="password change!")

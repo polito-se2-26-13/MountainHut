@@ -1,6 +1,6 @@
 import jwt
 from fastapi import HTTPException, status
-from server.config.config import SECRET_KEY, TOKEN_LIFESPAN_HOURS, ALGORITHM
+from server.config.config import SECRET_KEY, TOKEN_LIFESPAN_HOURS, ALGORITHM, TOKEN_LIFESPAN_HOURS_FORGOT
 from server.models.DTO.user_dto import UserDTO
 from server.repositories.user_repository import UserRepository
 from server.models.enum.user_type import UserType
@@ -13,7 +13,6 @@ def generate_token(user: UserDTO) -> str:
         "exp": datetime.now(timezone.utc) + timedelta(hours=TOKEN_LIFESPAN_HOURS)
     }
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
-
 
 async def process_token(auth_header: str, allowed_roles: list[UserType] = []):
     token = extract_bearer_token(auth_header)
@@ -42,7 +41,39 @@ async def process_token(auth_header: str, allowed_roles: list[UserType] = []):
         # the decoding error stays inside the server, it only tells an attacker what to try next
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 
+def generate_token_forgot_password(mail:str)->str:
+    payload={
+        "sub":mail,
+        "exp": datetime.now(timezone.utc)+timedelta(hours=TOKEN_LIFESPAN_HOURS_FORGOT)
+    }
+    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
+async def process_token_forgot_password(auth_header: str):
+    token = extract_bearer_token(auth_header)
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email = payload.get("sub")
+
+        if not email:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+
+        user_repo = UserRepository()
+        user_dao = await user_repo.get_user_by_email(email)
+
+        if not user_dao:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+
+        if not user_dao.must_change_password:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient rights")
+
+        return user_dao
+
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token expired")
+    except jwt.InvalidTokenError:
+        # the decoding error stays inside the server, it only tells an attacker what to try next
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+    
 def extract_bearer_token(auth_header: str) -> str:
     if not auth_header:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No token provided")

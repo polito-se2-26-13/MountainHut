@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 from server.models.DTO.reservation_dto import ReservationMailDTO
 from pathlib import Path
 
-from server.models.DTO.user_dto import UserCreateDTO
+from server.models.DTO.user_dto import ChangePasswordEmail, UserCreateDTO
 
 BASE_DIR = Path(__file__).resolve().parents[1]
 ENV_PATH = BASE_DIR / ".env"
@@ -102,6 +102,49 @@ Welcome to Mountain Hut!
 
 Warm regards,
 The Mountain Hut Team
+============================================================
+"""
+    return text.strip()
+
+def format_change_password_request_text(content: ChangePasswordEmail) -> str:
+    """
+    Generate plain text email for password recovery.
+    The reset link expires after 24 hours.
+    """
+
+    link = str(content.link)
+
+    text = f"""============================================================
+           MOUNTAIN HUT - PASSWORD RESET REQUEST
+============================================================
+
+Hello,
+
+We received a request to reset the password associated
+with your Mountain Hut account.
+
+If you made this request, use the link below to choose
+a new password:
+
+{link}
+
+------------------------------------------------------------
+IMPORTANT INFORMATION
+------------------------------------------------------------
+
+* This link will expire in 24 hours.
+* The link can only be used once.
+
+If you did not request a password reset, you can safely
+ignore and delete this email.
+
+Your password will remain unchanged.
+
+------------------------------------------------------------
+
+Best regards,
+The Mountain Hut Team
+
 ============================================================
 """
     return text.strip()
@@ -263,7 +306,89 @@ def format_new_user_email_html(user: UserCreateDTO) -> str:
 </html>"""
 
     return html
- 
+
+def format_change_password_request_html(content: ChangePasswordEmail) -> str:
+    """
+    Generate an HTML email for password recovery.
+    The reset link expires after 24 hours.
+    """
+
+    link = escape(str(content.link))
+
+    html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Mountain Hut - Password Reset</title>
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; margin: 0; padding: 24px; color: #1e293b;">
+
+  <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
+
+    <!-- Header -->
+    <div style="background-color: #0f172a; color: #ffffff; padding: 28px 24px; text-align: center;">
+      <h1 style="margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.5px;">Mountain Hut</h1>
+      <p style="margin: 6px 0 0; color: #94a3b8; font-size: 14px;">Password Reset Request</p>
+    </div>
+
+    <!-- Body -->
+    <div style="padding: 24px;">
+
+      <p style="margin-top: 0; font-size: 16px;">
+        Hello,
+      </p>
+
+      <p style="color: #475569; font-size: 15px; line-height: 1.5;">
+        We received a request to reset the password associated with your Mountain Hut account.
+        If you made this request, click the button below to choose a new password.
+      </p>
+
+      <!-- Reset Button -->
+      <div style="text-align: center; margin: 28px 0;">
+        <a href="{link}"
+           style="display: inline-block; background-color: #2563eb; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-size: 15px; font-weight: 600;">
+          Reset Password
+        </a>
+      </div>
+
+      <p style="color: #475569; font-size: 14px; line-height: 1.5;">
+        This link will expire in <strong>24 hours</strong>.
+        For security reasons, it can only be used once.
+      </p>
+
+      <!-- Security Warning -->
+      <div style="background-color: #fff7ed; border-left: 4px solid #f97316; padding: 14px 18px; margin: 20px 0; border-radius: 0 8px 8px 0;">
+        <p style="margin: 0; font-size: 14px; color: #9a3412; line-height: 1.5;">
+          <strong>Didn't request a password reset?</strong><br>
+          If you did not make this request, you can safely ignore and delete this email.
+          Your password will remain unchanged.
+        </p>
+      </div>
+
+      <p style="color: #475569; font-size: 14px; line-height: 1.5;">
+        If the button doesn't work, you can also copy and paste the following link into your browser:
+        <br>
+        <a href="{link}" style="color: #2563eb; word-break: break-all;">{link}</a>
+      </p>
+
+      <p style="margin-bottom: 0; font-size: 14px; color: #475569;">
+        Best regards,<br>
+        <strong>The Mountain Hut Team</strong>
+      </p>
+
+    </div>
+
+    <!-- Footer -->
+    <div style="background-color: #f8fafc; border-top: 1px solid #e2e8f0; padding: 16px 24px; text-align: center; font-size: 12px; color: #94a3b8;">
+      Mountain Hut Hospitality & Refuge System &bull; Automatic notification &bull; Please do not reply directly to this email
+    </div>
+
+  </div>
+</body>
+</html>"""
+
+    return html
+
 def email_subject(reservation: ReservationMailDTO) -> str:
   return f"Mountain Hut Booking {'Updated' if reservation.changed else 'Confirmation'} [{reservation.booking_reference}]"
 
@@ -279,6 +404,13 @@ def send_password_to_user_email(user:UserCreateDTO):
   to_email=user.email
   text_content= format_new_user_email_text(user)
   html_content= format_new_user_email_html(user)
+  return sender_email(subject,to_email,text_content,html_content)
+
+def send_reset_password_to_user_email(content:ChangePasswordEmail):
+  subject="Reset passoword in Mountain Hut"
+  to_email=content.email
+  text_content= format_change_password_request_text(content)
+  html_content= format_change_password_request_html(content)
   return sender_email(subject,to_email,text_content,html_content)
 
 def sender_email(subject:str,to_email:str,text_content:str,html_content:str) -> Dict[str, Any]:

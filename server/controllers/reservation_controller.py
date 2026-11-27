@@ -19,7 +19,6 @@ from server.controllers.user_controller import UserController
 from server.models.enum.hinker_type import HinkerType
 from fastapi import BackgroundTasks
 from server.models.DTO.user_dto import UserCreateDTO, UserDetailReservationDTO, UserResponseDTO, UserSearchResponse
-from server.repositories.user_repository import UserRepository
 import asyncio
 import time
 import secrets
@@ -65,15 +64,19 @@ def confirm_by_mail(res,background_tasks:BackgroundTasks|None,changed:bool=False
     if background_tasks is not None:
         background_tasks.add_task(send_confirmation_with_retry,send_booking_confirmation_email,mail,mail.contact_email)
     else:
-        send_confirmation_with_retry(send_booking_confirmation_email,mail)
+        send_confirmation_with_retry(send_booking_confirmation_email,mail,mail.contact_email)
 
-def information_email_new_user(user:UserCreateDTO,background_tasks:BackgroundTasks|None):
-    """Mail to inform the new user for the password"""
-    #we can be change if need to send other mail type: Ask to Andrea
+def information_email(email_type,content,to:str,background_tasks:BackgroundTasks|None):
+    """send the email with funcion email_type"""
+    """
+        email_type: function in service that create the email
+        content: dto with parameter of email
+        to: parameter that send_confermation_with_retry needed to print error (email to send)
+    """
     if background_tasks is not None:
-            background_tasks.add_task(send_confirmation_with_retry,send_password_to_user_email,user,user.email)
+            background_tasks.add_task(send_confirmation_with_retry,email_type,content,to)
     else:
-        send_confirmation_with_retry(send_password_to_user_email,user,user.email)
+        send_confirmation_with_retry(email_type,content,to)
 
 class ReservationController():
     def __init__(self):
@@ -85,7 +88,7 @@ class ReservationController():
         if type==HinkerType.NEW:
             psw=generate_password()
             newUser=UserDetailRes_to_UserCreateDTO(user_info,psw)
-            newUser.must_change_password=True
+            newUser.first_login=True
             userRes:UserResponseDTO=await UserController.create_user(newUser)
             user=tuple[userRes.id,newUser]
 

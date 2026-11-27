@@ -1,5 +1,5 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import or_, select, func
+from sqlalchemy import or_, select, func, update
 from server.models.enum.user_type import UserType
 from server.models.DTO.user_dto import UserCreateDTO
 from server.models.DAO.user import UserDAO
@@ -29,7 +29,8 @@ class UserRepository:
                 notes=user.notes,
                 emergency_contact=user.emergencyContact,
                 role=user.role.value,
-                must_change_password=user.must_change_password
+                must_change_password=user.must_change_password,
+                first_loging=user.first_login
             )
             session.add(userDao)
             await session.commit()
@@ -97,6 +98,28 @@ class UserRepository:
                 await session.delete(user)
                 await session.commit()
                 return True
+            
+    async def set_must_be_change(self,id:int,flag:bool)->bool:
+        async with await self._get_session() as session:
+            await session.execute(
+                update(UserDAO)
+                .where(UserDAO.id==id)
+                .values(must_change_password=flag)
+            )
+            await session.commit()
+            return True
+
+    async def set_password(self,id:int,psw:str)->bool:
+        async with await self._get_session() as session:
+            await session.execute(
+                update(UserDAO)
+                .where(UserDAO.id==id)
+                .values(password_hash=psw,
+                        must_be_change=False,
+                        first_login=False,)
+            )
+            await session.commit()
+            return True
 
 '''
     async def list_users(self) -> list[UserDAO]:
