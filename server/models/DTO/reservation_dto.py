@@ -2,8 +2,8 @@
 from typing import Annotated, Optional, List
 from pydantic import ConfigDict
 from pydantic import BaseModel, EmailStr, Field, StringConstraints
-from server.models.DTO.user_dto import Phone, Name
-
+from server.models.DTO.user_dto import Phone, Name, UserDetailReservationDTO
+from server.models.enum.hinker_type import HinkerType
 
 class SpecialRequirementDTO(BaseModel):
     """One requirement for part of the party, with its own allergy flag (MH-05)."""
@@ -24,6 +24,15 @@ class ReservationCreate(BaseModel):
     contact_phone: Optional[Phone] = Field(None, description="Mobile number")
     special_requirements: List[SpecialRequirementDTO] = Field([], description="Dietary requirements and allergies")
 
+class ReservationHinkerCreate(BaseModel):
+    slot_id: int = Field(..., description="ID of the selected time slot")
+    party_size: int = Field(..., ge=1, description="Number of people in the party")
+    hiker_typer: HinkerType =Field(...)
+    contact_name: Name = Field(..., description="Full name of contact hiker")
+    contact_email: EmailStr = Field(..., min_length=5, max_length=100, description="Email for booking confirmation")
+    contact_phone: Optional[Phone] = Field(None, description="Mobile number")
+    special_requirements: List[SpecialRequirementDTO] = Field([], description="Dietary requirements and allergies")
+    user_info: Optional[UserDetailReservationDTO]
 
 class ReservationUpdate(BaseModel):
     """What a hiker can change in a booking (MH-06), sent whole as the change window of the history page does."""
@@ -43,8 +52,8 @@ class ReservationResponse(BaseModel):
     """Response containing reservation details and confirmation info."""
     id: int
     booking_reference: str
-    user_id: int
-    slot_id: int
+    user_id: Optional[int]=None
+    slot_id: Optional[int]=None
     date: Optional[str] = None
     start_time: Optional[str] = None
     end_time: Optional[str] = None

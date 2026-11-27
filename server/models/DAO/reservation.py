@@ -43,7 +43,7 @@ class ReservationDAO(Base):
         String(32), unique=True, nullable=False, index=True, default=generate_booking_reference
     )
     user_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), index=True
     )
     slot_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("time_slots.id", ondelete="CASCADE"), nullable=False, index=True

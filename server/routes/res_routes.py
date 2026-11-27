@@ -1,4 +1,4 @@
-from server.models.DTO.reservation_dto import ReservationResponse,ReservationCreate,ReservationUpdate
+from server.models.DTO.reservation_dto import ReservationHinkerCreate, ReservationResponse,ReservationCreate,ReservationUpdate
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from server.config.config import ROUTES
 from server.middleware.auth_middleware import authenticate_user
@@ -16,6 +16,14 @@ async def create_reservation(reservation:ReservationCreate,background_tasks:Back
      # from the token and not from the body, otherwise anyone could book in someone else's name
      reservation.user_id=user.id
      return await controller.create_reservation(reservation,background_tasks)
+
+@router.post("/for-hinker", 
+             response_model=ReservationResponse, 
+             status_code=status.HTTP_201_CREATED,
+             dependencies=Depends(authenticate_user([UserType.EMPLOYEE,UserType.WARDEN]))
+             )
+async def create_reservation(reservation:ReservationHinkerCreate,background_tasks:BackgroundTasks):
+     return await controller.create_reservation_for_hinker(reservation,background_tasks)
 
 @router.get("/reference/{reference}",
             response_model=ReservationResponse,

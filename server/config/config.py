@@ -15,11 +15,13 @@ ORIGIN = [
 URL_AUTH = "auth"
 URL_RESERVATION = "reservations"
 URL_SLOT  = "slots"
+URL_USER="users"
 
 ROUTES = {
     "AUTH": BASEURL + URL_AUTH,
     "RESERVATION": BASEURL + URL_RESERVATION,
     "SLOT":  BASEURL + URL_SLOT,
+    "USER":BASEURL+URL_USER,
 }
 
 # JWT Configuration

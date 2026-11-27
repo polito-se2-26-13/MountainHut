@@ -10,6 +10,7 @@ from server.routes import(
     auth_routes,
     res_routes,
     slot_routes,
+    user_routes,
 )
 
 
@@ -33,6 +34,7 @@ async def health():
 app.include_router(auth_routes.router)
 app.include_router(res_routes.router)
 app.include_router(slot_routes.router)
+app.include_router(user_routes.router)
 
 app.add_exception_handler(AppError, error_handler)
 app.add_exception_handler(Exception, error_handler)

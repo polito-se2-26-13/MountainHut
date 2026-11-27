@@ -27,6 +27,14 @@ class UserLoginDTO(BaseModel):
 class UserResponseDTO(BaseModel):
     id: int
 
+class UserSearchResponse(BaseModel):
+    id:int
+    email: EmailStr
+    firstName: Name
+    lastName: Name
+    phone: Optional[Phone]
+    emergencyContact: Optional[str]
+
 class UserCreateDTO(BaseModel):
     email: EmailStr=Field(min_length=5, max_length=100)
     password: str=Field(min_length=8)
@@ -37,6 +45,7 @@ class UserCreateDTO(BaseModel):
     phone: Phone
     notes: Optional[str]=Field(None, max_length=555)
     emergencyContact: Optional[str]=Field(None, max_length=255)
+    must_change_password: bool =Field(False)
 
 class UserDetailDTO(BaseModel):
     id: Optional[int] = None
@@ -45,6 +54,14 @@ class UserDetailDTO(BaseModel):
     firstName: str =Field(min_length=1, max_length=100)
     lastName: str=Field(min_length=1, max_length=100)
     phone: Optional[Phone]= None
+
+class UserDetailReservationDTO(BaseModel):
+    id: Optional[int] = None
+    email: Optional[EmailStr]=Field(min_length=5, max_length=100)
+    firstName: Optional[str] =Field(min_length=1, max_length=100)
+    lastName: Optional[str]=Field(min_length=1, max_length=100)
+    phone: Optional[Phone]= None
+    emergencyConctat: Optional[str]=None
 
 class UserLoginResponse(BaseModel):
     token: str

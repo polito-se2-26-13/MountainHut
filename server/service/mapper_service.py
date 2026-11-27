@@ -1,14 +1,16 @@
 from server.models.DAO.table import TableDAO
 from server.models.DAO.time_slot import TimeSlotDAO
 from server.models.DTO.error_dto import ErrorDTO
-from server.models.DTO.user_dto import UserResponseDTO,UserLoginResponse,UserDTO, UserDetailDTO
+from server.models.DTO.user_dto import UserCreateDTO, UserDetailReservationDTO, UserResponseDTO,UserLoginResponse,UserDTO, UserDetailDTO, UserSearchResponse
 from server.models.DAO.user import UserDAO
-from server.models.DTO.reservation_dto import ReservationResponse, AssignedTableInfo,ReservationMailDTO,SpecialRequirementDTO
+from server.models.DTO.reservation_dto import ReservationCreate, ReservationHinkerCreate, ReservationResponse, AssignedTableInfo,ReservationMailDTO,SpecialRequirementDTO
 from server.models.DAO.reservation import ReservationDAO,ReservationTableAssignmentDAO,SpecialRequirementDAO
 from server.models.DTO.slot_dto import SlotResponse,Table,SlotDetail
 from server.models.DTO.table_dto import TableResponse
 from server.models.DTO.time_dto import TimeResponse
 from typing import List
+
+from server.models.enum.user_type import UserType
 
 def create_error_dto(code: int, message: str, name: str) -> ErrorDTO:
     """Create an ErrorDTO instance"""
@@ -126,4 +128,33 @@ def tableDAO_to_response(tableDao:TableDAO)->TableResponse:
         tableNumber=tableDao.table_number,
         capacity=tableDao.capacity,
         location=tableDao.location,
+    )
+def userDAO_to_searchResponse(userDAO:UserDAO)->UserSearchResponse:
+    return UserSearchResponse(
+        id=userDAO.id,
+        email=userDAO.email,
+        firstName=userDAO.first_name,
+        lastName=userDAO.last_name,
+        phone=userDAO.phone,
+        emergencyContact=userDAO.emergency_contact,
+    )
+def UserDetailRes_to_UserCreateDTO(userDetail:UserDetailReservationDTO,psw:str)->UserCreateDTO:
+    return UserCreateDTO(
+        email=userDetail.email,
+        password=psw,
+        role=UserType.HIKER,
+        firstName=userDetail.firstName,
+        lastName=userDetail.lastName,
+        phone=userDetail.phone,
+        emergencyContact=userDetail.emergencyConctat
+    )
+def reservationHinkerCreate_to_reservationCreate(reservation:ReservationHinkerCreate,user_id:int)->ReservationCreate:
+    return ReservationCreate(
+        slot_id=reservation.slot_id,
+        party_size=reservation.party_size,
+        contact_name=reservation.contact_name,
+        user_id=user_id,
+        contact_email=reservation.contact_email,
+        contact_phone=reservation.contact_phone,
+        special_requirements=reservation.special_requirements
     )

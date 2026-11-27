@@ -8,6 +8,8 @@ from dotenv import load_dotenv
 from server.models.DTO.reservation_dto import ReservationMailDTO
 from pathlib import Path
 
+from server.models.DTO.user_dto import UserCreateDTO
+
 BASE_DIR = Path(__file__).resolve().parents[1]
 ENV_PATH = BASE_DIR / ".env"
 load_dotenv(ENV_PATH)
@@ -57,6 +59,52 @@ The Mountain Hut Team
 """
     return text.strip()
 
+def format_new_user_email_text(user: UserCreateDTO) -> str:
+    """
+    Generate plain text email for a newly created hiker account.
+    Includes the user's name, temporary password and login link.
+    """
+
+    first_name = str(user.firstName)
+    last_name = str(user.lastName)
+    password = user.password
+
+    # TODO: Insert the actual login URL here
+    login_url = "INSERT_LOGIN_URL_HERE"
+
+    text = f"""============================================================
+           MOUNTAIN HUT - ACCOUNT CREATED
+============================================================
+
+Dear {first_name} {last_name},
+
+A Mountain Hut account has been created for you.
+You can use the credentials below to log in for the first time.
+
+------------------------------------------------------------
+ACCOUNT CREDENTIALS
+------------------------------------------------------------
+* Username: {user.email}
+* Temporary Password: {password}
+
+IMPORTANT:
+You will be required to change your password the first time
+you log in.
+
+------------------------------------------------------------
+LOGIN
+------------------------------------------------------------
+Access Mountain Hut using the following link:
+
+{login_url}
+
+Welcome to Mountain Hut!
+
+Warm regards,
+The Mountain Hut Team
+============================================================
+"""
+    return text.strip()
 
 def format_booking_email_html(reservation: ReservationMailDTO) -> str:
     """
@@ -137,6 +185,85 @@ def format_booking_email_html(reservation: ReservationMailDTO) -> str:
 </html>"""
     return html
 
+def format_new_user_email_html(user: UserCreateDTO) -> str:
+    """
+    Generate an HTML email for a newly created hiker account.
+    The user must change the password at the first login.
+    """
+
+    first_name = escape(str(user.firstName))
+    last_name = escape(str(user.lastName))
+    password = escape(user.password)
+
+    # TODO: Insert the actual login URL here
+    login_url = "INSERT_LOGIN_URL_HERE"
+
+    html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Mountain Hut - Account Created</title>
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; margin: 0; padding: 24px; color: #1e293b;">
+
+  <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
+
+    <!-- Header -->
+    <div style="background-color: #0f172a; color: #ffffff; padding: 28px 24px; text-align: center;">
+      <h1 style="margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.5px;">Mountain Hut</h1>
+      <p style="margin: 6px 0 0; color: #94a3b8; font-size: 14px;">Your account has been created</p>
+    </div>
+
+    <!-- Body -->
+    <div style="padding: 24px;">
+      <p style="margin-top: 0; font-size: 16px;">
+        Dear <strong>{first_name} {last_name}</strong>,
+      </p>
+
+      <p style="color: #475569; font-size: 15px; line-height: 1.5;">
+        A Mountain Hut account has been created for you. You can use the credentials below to log in for the first time.
+      </p>
+
+      <!-- Credentials -->
+      <div style="background-color: #f1f5f9; border-left: 4px solid #3b82f6; padding: 14px 18px; margin: 20px 0; border-radius: 0 8px 8px 0;">
+        <span style="font-size: 12px; text-transform: uppercase; color: #64748b; font-weight: 600;">Temporary Password</span>
+        <div style="font-size: 20px; font-weight: 800; color: #0f172a; letter-spacing: 0.5px; word-break: break-word;">
+          {password}
+        </div>
+      </div>
+
+      <!-- First Login Warning -->
+      <div style="background-color: #fff7ed; border-left: 4px solid #f97316; padding: 14px 18px; margin: 20px 0; border-radius: 0 8px 8px 0;">
+        <p style="margin: 0; font-size: 14px; color: #9a3412; line-height: 1.5;">
+          <strong>Important:</strong> You will be required to change this password the first time you log in.
+        </p>
+      </div>
+
+      <!-- Login Button -->
+      <div style="text-align: center; margin: 28px 0;">
+        <a href="{login_url}"
+           style="display: inline-block; background-color: #2563eb; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-size: 15px; font-weight: 600;">
+          Log In to Mountain Hut
+        </a>
+      </div>
+
+      <p style="margin-bottom: 0; font-size: 14px; color: #475569;">
+        Welcome to Mountain Hut!<br>
+        <strong>The Mountain Hut Team</strong>
+      </p>
+    </div>
+
+    <!-- Footer -->
+    <div style="background-color: #f8fafc; border-top: 1px solid #e2e8f0; padding: 16px 24px; text-align: center; font-size: 12px; color: #94a3b8;">
+      Mountain Hut Hospitality & Refuge System &bull; Automatic notification &bull; Please do not reply directly to this email
+    </div>
+
+  </div>
+</body>
+</html>"""
+
+    return html
+ 
 def email_subject(reservation: ReservationMailDTO) -> str:
   return f"Mountain Hut Booking {'Updated' if reservation.changed else 'Confirmation'} [{reservation.booking_reference}]"
 
@@ -145,9 +272,16 @@ def send_booking_confirmation_email(reservation: ReservationMailDTO) -> Dict[str
   to_email = reservation.contact_email
   text_content = format_booking_email_text(reservation)
   html_content = format_booking_email_html(reservation)
-  return sender_email(subject,to_email,text_content,html_content,reservation.booking_reference)
+  return sender_email(subject,to_email,text_content,html_content)
 
-def sender_email(subject:str,to_email:str,text_content:str,html_content:str,booking_ref:str) -> Dict[str, Any]:
+def send_password_to_user_email(user:UserCreateDTO):
+  subject="First login in Mountain Hut"
+  to_email=user.email
+  text_content= format_new_user_email_text(user)
+  html_content= format_new_user_email_html(user)
+  return sender_email(subject,to_email,text_content,html_content)
+
+def sender_email(subject:str,to_email:str,text_content:str,html_content:str) -> Dict[str, Any]:
   """
   Format and dispatch the booking confirmation email to the hiker (MH-03).
   Returns delivery metadata including recipient, subject, text, and html body.
@@ -180,7 +314,6 @@ def sender_email(subject:str,to_email:str,text_content:str,html_content:str,book
         "status": "SENT",
         "to": to_email,
         "subject": subject,
-        "booking_reference": booking_ref,
         "text_content": text_content,
         "html_content": html_content,
     }
@@ -189,7 +322,6 @@ def sender_email(subject:str,to_email:str,text_content:str,html_content:str,book
             "status": "FAILED",
             "to": to_email,
             "subject": subject,
-            "booking_reference": booking_ref,
             "error": str(e)
         }  
 

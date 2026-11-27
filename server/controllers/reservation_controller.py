@@ -1,6 +1,9 @@
+from typing import Optional
+
+from server.models.DAO.user import UserDAO
 from server.models.enum.user_type import UserType
 from server.repositories.reservation_repository import ReservationRepository
-from server.models.DTO.reservation_dto import ReservationCreate,ReservationResponse,ReservationUpdate
+from server.models.DTO.reservation_dto import ReservationCreate, ReservationHinkerCreate, ReservationMailDTO,ReservationResponse,ReservationUpdate
 from server.models.DAO.time_slot import TimeSlotDAO
 from server.models.error.notfound_error import NotFoundError
 from server.models.error.conflict_error import ConflictError
@@ -8,11 +11,17 @@ from server.models.error.forbidden_error import ForbiddenError
 from server.models.enum.slot_status import SlotStatus
 from server.models.enum.reservation_status import ReservationStatus
 from server.service.booking_service import validate_two_hour_rule,assign_tables_for_party,validate_change_deadline
-from server.service.mapper_service import reservationDTO_to_response,reservationEmailDto_to_email
-from server.service.email_service import send_booking_confirmation_email
+from server.service.mapper_service import UserDetailRes_to_UserCreateDTO, reservationDTO_to_response,reservationEmailDto_to_email, reservationHinkerCreate_to_reservationCreate
+from server.service.email_service import send_booking_confirmation_email,send_password_to_user_email
+from server.controllers.user_controller import UserController
+from server.models.enum.hinker_type import HinkerType
 from fastapi import BackgroundTasks
+from server.models.DTO.user_dto import UserCreateDTO, UserDetailReservationDTO, UserResponseDTO
+from server.repositories.user_repository import UserRepository
 import asyncio
 import time
+import secrets
+import string
 
 # One booking at a time between the check of the free seats and the save, otherwise two bookings sent
 # at the same moment both see the same free seats. Whoever takes or gives back seats (also the change of
@@ -21,23 +30,26 @@ import time
 # the lock has to move to the database (a transaction started with BEGIN IMMEDIATE in SQLite)
 booking_lock = asyncio.Lock()
 
+def generate_password(length: int = 12) -> str:
+    alphabet = string.ascii_letters + string.digits + string.punctuation
+    return ''.join(secrets.choice(alphabet) for _ in range(length))
 
-def send_confirmation_with_retry(mail, waits=(5, 10)):
+def send_confirmation_with_retry(mail_type,content,to:str, waits=(5, 10)):
     """Sends the confirmation, trying again after 5 and then 10 seconds.
     It runs after the answer, so the booking stands anyway and a failure is only written in the log."""
     for wait in (*waits, None):
-        result = send_booking_confirmation_email(mail)
+        result = mail_type(content)
         if result["status"] == "SENT" or wait is None:
             break
         time.sleep(wait)
     if result["status"] != "SENT":
         # flush, otherwise the line waits in a buffer when the output goes to a file or to Docker
-        print(f"confirmation email not sent for {mail.booking_reference}: {result.get('error')}", flush=True)
+        print(f"confirmation email not sent for {to}: {result.get('error')}", flush=True)
 
 
 def confirm_by_mail(res,background_tasks:BackgroundTasks|None,changed:bool=False):
     """Mail of a new or a changed booking, with its details as they are now (MH-03, PO issue #41)"""
-    mail=reservationEmailDto_to_email(
+    mail:ReservationMailDTO=reservationEmailDto_to_email(
             res.booking_reference,
             res.contact_email,
             res.slot.date.strftime("%d/%m/%Y"),
@@ -49,17 +61,48 @@ def confirm_by_mail(res,background_tasks:BackgroundTasks|None,changed:bool=False
         )
     # the answer does not wait for the mail server, which kept the whole backend busy for up to 20 seconds
     if background_tasks is not None:
-        background_tasks.add_task(send_confirmation_with_retry,mail)
+        background_tasks.add_task(send_confirmation_with_retry,send_booking_confirmation_email,mail,mail.contact_email)
     else:
-        send_confirmation_with_retry(mail)
+        send_confirmation_with_retry(send_booking_confirmation_email,mail)
 
+def information_email_new_user(user:UserCreateDTO,background_tasks:BackgroundTasks|None):
+    """Mail to inform the new user for the password"""
+    #we can be change if need to send other mail type: Ask to Andrea
+    if background_tasks is not None:
+            background_tasks.add_task(send_confirmation_with_retry,send_password_to_user_email,user,user.email)
+    else:
+        send_confirmation_with_retry(send_password_to_user_email,user,user.email)
 
 class ReservationController():
     def __init__(self):
         self.repo=ReservationRepository()
 
-    async def _check_slot_for_booking(self,slot_id:int,user_id:int)->TimeSlotDAO:
+    async def _check_user(type:HinkerType,user_info:UserDetailReservationDTO,background_task:BackgroundTasks|None)->int|None:
+        """Create account if needed"""
+        
+        if type==HinkerType.NEW:
+            psw=generate_password()
+            user=UserDetailRes_to_UserCreateDTO(user_info,psw)
+            user.must_change_password=True
+            new_user:UserResponseDTO=await UserController.create_user(user)
+            user_id=new_user.id
+            information_email_new_user(user,background_task)
+        elif type== HinkerType.PRESENT:
+            user:UserDAO=await UserRepository.get_user(user_info.id)
+            if user is None:
+                raise NotFoundError("accout not found")
+            if  user.role != UserType.HIKER or user.is_active==False:
+                raise ConflictError(f"cannot create a reservation for an user that have role {user.role}")
+            user_id=user_id
+        elif type== HinkerType.TEMPORARY:
+            user_id=None
+        else:
+            raise ConflictError(f"\"{type}\" doesn't exit as type of hiker")
+        return user_id
+
+    async def _check_slot_for_booking(self,two_hours_check:bool,slot_id:int,user_id:Optional[int]=None)->TimeSlotDAO:
         """MH-01 rules of the slot, for a new booking and for a booking moved there (MH-06)"""
+        """for employee booking, avoid controll on 2h"""
         #check time slot
         timeSlot=await self.repo.get_time_slot(slot_id)
         if timeSlot is None:
@@ -70,10 +113,11 @@ class ReservationController():
             raise ConflictError("time slot is not open")
 
         #check two hour rule
-        validate_two_hour_rule(timeSlot,None)
+        if two_hours_check:
+            validate_two_hour_rule(timeSlot,None)
 
         # Check rule: Only one booking per time slot on a date per hiker
-        if await self.repo.get_reservation_confirmed(user_id,slot_id) is not None:
+        if slot_id is not None and await self.repo.get_reservation_confirmed(user_id,slot_id) is not None:
             raise ConflictError("Hiker already has a confirmed booking for this time slot.")
         return timeSlot
 
@@ -86,11 +130,12 @@ class ReservationController():
             raise ForbiddenError("you cannot see other reservation")
         return res,tables
 
-    async def create_reservation(self,reservation:ReservationCreate,background_tasks:BackgroundTasks|None=None)->ReservationResponse:
-        """Creation reservation"""
+    async def create_reservation(self,reservation:ReservationCreate,background_tasks:BackgroundTasks|None=None)->ReservationResponse:       
+        """Creation reservation for hinker"""
         # the slot is read inside the lock, so its free seats already count the booking saved just before
         async with booking_lock:
-            timeSlot=await self._check_slot_for_booking(reservation.slot_id,reservation.user_id)
+
+            timeSlot=await self._check_slot_for_booking(True,reservation.slot_id,reservation.user_id)
 
             # Check available capacity (Capacity Deduction constraint), on the slot just read, as the change does
             remaining = sum(st.free_seats for st in timeSlot.slot_tables if st.is_available)
@@ -132,4 +177,23 @@ class ReservationController():
         # read again, so the answer and the email show the booking as it is now
         res,tables= await self.repo.get_reservation_by_reference(reference)
         confirm_by_mail(res,background_tasks,changed=True)
+        return reservationDTO_to_response(res,tables)
+
+    async def create_reservation_for_hinker(self,reservation:ReservationHinkerCreate,background_tasks:BackgroundTasks|None=None):
+        """Creation reservation"""
+        async with booking_lock:
+            user_id=await self._check_user(reservation.hiker_typer,reservation.user_info,background_tasks)        
+            timeSlot=await self._check_slot_for_booking(False,reservation.slot_id,user_id)
+
+            # Check available capacity (Capacity Deduction constraint), on the slot just read, as the change does
+            remaining = sum(st.free_seats for st in timeSlot.slot_tables if st.is_available)
+            if reservation.party_size > remaining:
+                raise ConflictError(
+                    f"Not enough seats available (requested {reservation.party_size}, remaining {remaining})."
+                )
+            #allocation
+            table_allocations = assign_tables_for_party(timeSlot, reservation.party_size)
+            new_res=reservationHinkerCreate_to_reservationCreate(reservation,user_id)
+            res,tables= await self.repo.transaction_add_reservation(new_res,table_allocations)
+        confirm_by_mail(res,background_tasks)
         return reservationDTO_to_response(res,tables)
