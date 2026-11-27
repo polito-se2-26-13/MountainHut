@@ -904,8 +904,20 @@ header .back-link {
 
 .slot-form-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
   gap: 1rem;
+}
+
+.slot-definition-action {
+  justify-content: flex-end;
+  min-width: max-content;
+}
+
+.define-slot-button {
+  width: auto;
+  min-height: 2.9rem;
+  padding: 0.6rem 1rem;
+  white-space: nowrap;
 }
 
 .copy-toolbar {
@@ -968,20 +980,53 @@ header .back-link {
 
 .table-list {
   display: grid;
-  gap: 0.55rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+  margin-inline: 0;
+  padding: 0;
+  border: 0;
+  min-inline-size: 0;
 }
 
 .table-row {
-  padding: 0.45rem 0.6rem;
-  border: 1px solid #e2e8f0;
-  border-radius: 0.65rem;
+  display: grid;
+  grid-template-columns: 1fr;
+  justify-items: start;
+  gap: 0.35rem;
+  min-width: 0;
+  min-height: 5rem;
+  padding: 0.8rem;
+  border: 1px solid #dbe3ed;
+  border-radius: 0.75rem;
+  background: #fff;
+  color: #334155;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  transition: border-color 150ms ease, background-color 150ms ease, box-shadow 150ms ease;
+}
+
+.table-choice-card:hover {
+  border-color: #93b9dc;
+  background: #f8fbff;
+}
+
+.table-choice-card-selected {
+  border-color: #1769aa;
+  background: #eff6ff;
+  box-shadow: 0 0 0 2px rgb(23 105 170 / 10%);
 }
 
 .table-index {
-  color: #94a3b8;
-  font-size: 0.78rem;
+  color: #18212f;
+  font-size: 0.95rem;
   font-weight: 700;
-  text-align: center;
+}
+
+.table-choice-card > span:last-child {
+  color: #64748b;
+  font-size: 0.82rem;
 }
 
 .table-row input {
@@ -1031,10 +1076,26 @@ header .back-link {
 }
 
 .add-table-button {
-  margin-top: 0.9rem;
   padding: 0.65rem 0.85rem;
   border-color: #bfdbfe;
   color: #1769aa;
+}
+
+.table-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.9rem;
+}
+
+.table-actions .add-table-button {
+  margin-top: 0;
+}
+
+.clear-selection-button {
+  min-height: 2.9rem;
+  padding: 0.65rem 0.85rem;
+  white-space: nowrap;
 }
 
 .add-table-button:hover {
@@ -1703,10 +1764,17 @@ header .back-link {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .table-list-heading,
-  .table-row {
-    grid-template-columns: 1.75rem minmax(0, 1fr) minmax(4rem, 0.55fr) auto;
-    gap: 0.4rem;
+  .table-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .slot-definition-action {
+    grid-column: 1 / -1;
+    align-items: flex-end;
+  }
+
+  .define-slot-button {
+    width: auto;
   }
 
   .remove-table-button {
