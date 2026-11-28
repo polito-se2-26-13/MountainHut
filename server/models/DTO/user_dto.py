@@ -42,7 +42,7 @@ class UserCreateDTO(BaseModel):
     firstName: Name
     lastName: Name
     # for the PO the phone of a hiker is required, notes and emergency contact are optional (issue #22 of the course repository)
-    phone: Optional[Phone]=Field(None, min_length=1, max_length=15)
+    phone: Phone
     notes: Optional[str]=Field(None, max_length=555)
     emergencyContact: Optional[str]=Field(None, max_length=255)
     must_change_password: bool =Field(False)

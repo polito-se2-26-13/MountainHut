@@ -66,7 +66,6 @@ def test_a_booking_moves_only_to_a_slot_at_least_48_hours_away(client, db):
     # PO issue #43: the 48 hours hold for the old slot and for the new one
     anna = add_hiker(db)
     booking = book(client, anna, add_slot(db, [6], hours_ahead=72), 2).json()
-
     for hours in (1, 24):
         assert change(client, anna, booking, slot_id=add_slot(db, [6], hours_ahead=hours)).status_code == 409
     in_three_days = add_slot(db, [6], hours_ahead=80)

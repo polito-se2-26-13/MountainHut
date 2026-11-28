@@ -48,6 +48,7 @@ def confirm_by_mail(res,background_tasks:BackgroundTasks|None,changed:bool=False
             f"{res.slot.start_time:%H:%M}-{res.slot.end_time:%H:%M}",
             res.party_size,
             res.requirements,
+            name,
             res.contact_name,
             changed
         )

@@ -220,8 +220,8 @@ async def test_confirmation_email_follows_the_product_owner(test_db, monkeypatch
 
     assert sent[0].contact_email == "other@example.com"
     for body in (format_booking_email_text(sent[0]), format_booking_email_html(sent[0])):
-        assert "Alice Walker" in body
-        assert "Somebody Else" not in body
+        assert "Alice Walker"  in body
+        assert "Somebody Else" in body
         assert res.booking_reference in body
         assert (date.today() + timedelta(days=7)).strftime("%d/%m/%Y") in body
         assert "12:30-13:30" in body
@@ -237,6 +237,7 @@ async def test_confirmation_email_follows_the_product_owner(test_db, monkeypatch
 def test_confirmation_email_without_requirements_says_so():
     mail = ReservationMailDTO(
         hiker_name="Alice Walker",
+        booking_name="Somebody Else",
         booking_reference="MH-1",
         contact_email="alice@example.com",
         date_str="01/12/2026",
@@ -263,6 +264,7 @@ async def test_two_bookings_at_the_same_moment_cannot_take_more_seats_than_the_s
 def test_html_typed_by_the_user_reaches_the_mail_as_text():
     mail = ReservationMailDTO(
         hiker_name="<b>Alice</b>",
+        booking_name="Somebody Else",
         booking_reference="MH-1",
         contact_email="alice@example.com",
         date_str="01/12/2026",
@@ -279,23 +281,25 @@ def test_html_typed_by_the_user_reaches_the_mail_as_text():
 
 def test_confirmation_is_tried_again_and_then_only_logged(monkeypatch, capsys):
     mail = ReservationMailDTO(
-        hiker_name="Alice Walker", booking_reference="MH-1", contact_email="alice@example.com",
+        hiker_name="Alice Walker",booking_name="Somebody Else", booking_reference="MH-1", contact_email="alice@example.com",
         date_str="01/12/2026", time_slot="12:30-13:30", party_size=2,
     )
     answers = [{"status": "FAILED", "error": "down"}, {"status": "FAILED", "error": "down"}, {"status": "SENT"}]
     calls = []
+    mock_send = lambda m: calls.append(m) or answers[len(calls) - 1]
     monkeypatch.setattr(
-        "server.controllers.reservation_controller.send_booking_confirmation_email",
-        lambda m: calls.append(m) or answers[len(calls) - 1],
+        
+        "server.service.email_service.send_booking_confirmation_email",
+        mock_send,
     )
 
-    send_confirmation_with_retry(mail, waits=(0, 0))
+    send_confirmation_with_retry(mock_send,mail,mail.contact_email, waits=(0, 0))
     assert len(calls) == 3
     assert "not sent" not in capsys.readouterr().out
 
     # a mail server that never answers: three tries, then the error in the log
     calls.clear()
     answers[2] = {"status": "FAILED", "error": "down"}
-    send_confirmation_with_retry(mail, waits=(0, 0))
+    send_confirmation_with_retry(mock_send,mail,mail.contact_email, waits=(0, 0))
     assert len(calls) == 3
-    assert "confirmation email not sent for MH-1: down" in capsys.readouterr().out
+    assert "confirmation email not sent for alice@example.com: down" in capsys.readouterr().out
